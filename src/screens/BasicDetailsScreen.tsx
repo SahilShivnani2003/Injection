@@ -16,12 +16,12 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../theme/colors';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 const { width, height } = Dimensions.get('window');
 
-interface Props {
-  navigation: any;
-}
+type bookingProps = NativeStackScreenProps<RootStackParamList, 'BasicDetails'>;
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
 
@@ -132,7 +132,7 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 );
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
-const BasicDetailsScreen: React.FC<Props> = ({ navigation }) => {
+const BasicDetailsScreen= ({ navigation }: bookingProps) => {
   const [form, setForm] = useState({
     patientName: '',
     age: '',

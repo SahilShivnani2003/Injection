@@ -13,13 +13,12 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../theme/colors';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 const { width, height } = Dimensions.get('window');
+type chargesProps = NativeStackScreenProps<RootStackParamList, 'Charges'>;
 
-interface Props {
-  navigation: any;
-  route: any;
-}
 
 const ALL_SERVICES = [
   { id: 1, name: 'IV Fluid Administration',  charge: 350, icon: '💧' },
@@ -84,7 +83,7 @@ const SummaryRow: React.FC<{
 );
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
-const ChargesScreen: React.FC<Props> = ({ navigation, route }) => {
+const ChargesScreen = ({ navigation, route }: chargesProps) => {
   const selectedIds: number[] = route?.params?.selectedServices || [1, 2, 4];
   const selected = ALL_SERVICES.filter(s => selectedIds.includes(s.id));
   const subtotal   = selected.reduce((sum, s) => sum + s.charge, 0);
