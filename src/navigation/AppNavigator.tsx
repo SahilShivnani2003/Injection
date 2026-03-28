@@ -6,6 +6,9 @@ import BasicDetailsScreen from '../screens/BasicDetailsScreen';
 import RequirementsScreen from '../screens/RequirementsScreen';
 import ChargesScreen from '../screens/ChargesScreen';
 import ComplimentaryScreen from '../screens/ComplimentaryScreen';
+import DashboardScreen from '../screens/DashboardScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import BookingsScreen from '../screens/BookingsScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -14,6 +17,9 @@ export type RootStackParamList = {
   Requirements: undefined;
   Charges: { selectedServices: number[] };
   Complimentary: undefined;
+  Dashboard: undefined;
+  Profile: undefined;
+  Bookings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -31,6 +37,9 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Bookings" component={BookingsScreen} />
         <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
 
         <Stack.Screen name="Requirements" component={RequirementsScreen} />

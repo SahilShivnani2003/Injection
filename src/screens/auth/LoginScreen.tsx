@@ -141,7 +141,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
             Alert.alert('Invalid OTP', 'Please enter the correct OTP.');
             return;
         }
-        navigation.navigate('BasicDetails');
+        navigation.navigate('Dashboard');
     };
 
     const otpTranslateY = otpSlide.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
