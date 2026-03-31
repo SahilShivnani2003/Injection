@@ -18,6 +18,9 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useAlert } from '../../context/AlertContext';
+import Loader from '../../components/Loader';
+import { userApi } from '../../service/apis/userService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,6 +31,8 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    const alert = useAlert();
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -52,32 +57,35 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
     const handleLogin = async () => {
         if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email address');
+            alert.error('Validation Error', 'Please enter your email address');
             return;
         }
         if (!password.trim()) {
-            Alert.alert('Error', 'Please enter your password');
+            alert.error('Validation Error', 'Please enter your password');
             return;
         }
 
         // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            alert.warning('Invalid Email', 'Please enter a valid email address');
             return;
         }
-
-        setIsLoading(true);
-
-        // Simulate login process
-        setTimeout(() => {
+        try {
+            const response = await userApi.login({ email, password });
+            if (response.status === 200) {
+                alert.success('Login Successful', 'Welcome back!');
+                navigation.replace('MainTab', {
+                    screen: 'Dashboard',
+                });
+            } else {
+                alert.error('Login Failed', 'Invalid email or password. Please try again.');
+            }
+        } catch (error) {
+            alert.error('Login Failed', 'An error occurred while logging in. Please try again.');
+        } finally {
             setIsLoading(false);
-            // For demo purposes, navigate to main tab
-            // In real app, this would validate credentials
-            navigation.replace('MainTab', {
-                screen: 'Dashboard',
-            });
-        }, 1500);
+        }
     };
 
     const togglePasswordVisibility = () => {
@@ -173,7 +181,24 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                         </View>
 
                         {/* Forgot Password */}
-                        <TouchableOpacity style={styles.forgotPassword}>
+                        <TouchableOpacity
+                            style={styles.forgotPassword}
+                            onPress={() => {
+                                alert.confirm({
+                                    title: 'Reset Password',
+                                    message: 'Send password reset link to your email?',
+                                    confirmText: 'Send',
+                                    cancelText: 'Cancel',
+                                    onConfirm: () => {
+                                        alert.info(
+                                            'Password Reset',
+                                            'Check your email for reset instructions',
+                                        );
+                                    },
+                                });
+                            }}
+                            activeOpacity={0.7}
+                        >
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>
 
@@ -185,14 +210,20 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+                                colors={[
+                                    Colors.gradientStart,
+                                    Colors.gradientMid,
+                                    Colors.gradientEnd,
+                                ]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.btnGrad}
                             >
-                                <Text style={styles.loginBtnText}>
-                                    {isLoading ? 'Signing In...' : 'Sign In'}
-                                </Text>
+                                {isLoading ? (
+                                    <Loader type="spinner" size="small" color={Colors.white} />
+                                ) : (
+                                    <Text style={styles.loginBtnText}>Sign In</Text>
+                                )}
                             </LinearGradient>
                         </TouchableOpacity>
 
@@ -215,7 +246,8 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             activeOpacity={0.7}
                         >
                             <Text style={styles.registerText}>
-                                New user? <Text style={styles.registerLinkText}>Create Account</Text>
+                                New user?{' '}
+                                <Text style={styles.registerLinkText}>Create Account</Text>
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>

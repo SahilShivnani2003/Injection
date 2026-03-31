@@ -14,71 +14,83 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import Loader from '../../components/Loader';
+import { CreateUserDTO } from '../../types/user';
+import { RegisterUserDTO, validateRegisterUserDTO } from '../../types/userDTO';
 
 type RegisterProps = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 const RegisterScreen = ({ navigation }: RegisterProps) => {
   const [userType, setUserType] = useState<'patient' | 'labpartner' | 'staff'>('patient');
-  const [form, setForm] = useState({
-    fullName: '',
+  const [form, setForm] = useState<RegisterUserDTO>({
+    name: '',
     email: '',
-    mobile: '',
     password: '',
     confirmPassword: '',
+    phone: '',
+    gender: 'Male',
+    age: 0,
+    address: '',
+    pincode: '',
+    role: 'user',
   });
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const updateForm = (field: string, value: string) => {
+  const updateForm = (field: keyof RegisterUserDTO, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
   const validateForm = () => {
-    if (!form.fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return false;
-    }
-    if (!form.email.trim() || !form.email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
-    }
-    if (!form.mobile.trim() || form.mobile.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
-      return false;
-    }
-    if (form.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
-      return false;
-    }
-    if (form.password !== form.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return false;
-    }
-    if (!agreed) {
-      Alert.alert('Error', 'Please accept the terms and conditions');
+    const errors = validateRegisterUserDTO(form);
+    if (errors.length > 0) {
+      Alert.alert('Validation Error', errors.join('\n'));
       return false;
     }
     return true;
+  };
+
+  const createUserDTO = (): CreateUserDTO => {
+    return {
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      phone: form.phone.trim(),
+      gender: form.gender,
+      age: form.age,
+      address: form.address.trim(),
+      pincode: form.pincode.trim(),
+      role: form.role,
+    };
   };
 
   const handleRegister = async () => {
     if (!validateForm()) return;
 
     setLoading(true);
-    // Mock registration API call
-    setTimeout(() => {
+
+    try {
+      const userData = createUserDTO();
+      console.log('User registration data:', userData);
+
+      // Mock registration API call
+      setTimeout(() => {
+        setLoading(false);
+        Alert.alert(
+          'Registration Successful',
+          'Your account has been created successfully! Please login with your mobile number.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ]
+        );
+      }, 2000);
+    } catch (error) {
       setLoading(false);
-      Alert.alert(
-        'Registration Successful',
-        'Your account has been created successfully! Please login with your mobile number.',
-        [
-          {
-            text: 'Go to Login',
-            onPress: () => navigation.navigate('Login'),
-          },
-        ]
-      );
-    }, 2000);
+      Alert.alert('Error', 'Registration failed. Please try again.');
+    }
   };
 
   const handleLogin = () => {
@@ -151,8 +163,8 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
             <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               style={styles.input}
-              value={form.fullName}
-              onChangeText={(value) => updateForm('fullName', value)}
+              value={form.name}
+              onChangeText={(value) => updateForm('name', value)}
               placeholder="Enter your full name"
               placeholderTextColor={Colors.textMuted}
             />
@@ -175,12 +187,84 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
             <Text style={styles.inputLabel}>Mobile Number</Text>
             <TextInput
               style={styles.input}
-              value={form.mobile}
-              onChangeText={(value) => updateForm('mobile', value.replace(/[^0-9]/g, ''))}
+              value={form.phone}
+              onChangeText={(value) => updateForm('phone', value.replace(/[^0-9]/g, ''))}
               placeholder="10-digit mobile number"
               placeholderTextColor={Colors.textMuted}
               keyboardType="phone-pad"
               maxLength={10}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Gender</Text>
+            <View style={styles.genderRow}>
+              {[
+                { key: 'Male', label: 'Male', icon: '👨' },
+                { key: 'Female', label: 'Female', icon: '👩' },
+                { key: 'Other', label: 'Other', icon: '🧑' },
+              ].map((gender) => (
+                <TouchableOpacity
+                  key={gender.key}
+                  style={[
+                    styles.genderOption,
+                    form.gender === gender.key && styles.genderOptionActive,
+                  ]}
+                  onPress={() => updateForm('gender', gender.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.genderIcon}>{gender.icon}</Text>
+                  <Text style={[
+                    styles.genderLabel,
+                    form.gender === gender.key && styles.genderLabelActive
+                  ]}>
+                    {gender.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Age</Text>
+            <TextInput
+              style={styles.input}
+              value={form.age.toString()}
+              onChangeText={(value) => {
+                const numValue = value.replace(/[^0-9]/g, '');
+                updateForm('age', numValue ? parseInt(numValue) : 0);
+              }}
+              placeholder="Enter your age"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              maxLength={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Address</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={form.address}
+              onChangeText={(value) => updateForm('address', value)}
+              placeholder="Enter your full address"
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Pincode</Text>
+            <TextInput
+              style={styles.input}
+              value={form.pincode}
+              onChangeText={(value) => updateForm('pincode', value.replace(/[^0-9]/g, ''))}
+              placeholder="6-digit pincode"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              maxLength={6}
             />
           </View>
 
@@ -237,9 +321,17 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
           disabled={loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.registerText}>
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </Text>
+          {loading ? (
+            <Loader
+              type="dots"
+              size="small"
+              color={Colors.white}
+            />
+          ) : (
+            <Text style={styles.registerText}>
+              Create Account
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Login Link */}
@@ -334,6 +426,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: Colors.inputBorder,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+
+  // Gender Selection
+  genderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  genderOption: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+  },
+  genderOptionActive: {
+    borderColor: Colors.gradientStart,
+    backgroundColor: '#E6FAF5',
+  },
+  genderIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  genderLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textMedium,
+  },
+  genderLabelActive: {
+    color: Colors.gradientStart,
   },
 
   // Checkbox
