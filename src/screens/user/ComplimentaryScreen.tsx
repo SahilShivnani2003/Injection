@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../theme/colors';
+import { Colors } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
 

@@ -393,6 +393,18 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             Your data is encrypted and never shared.
                         </Text>
 
+                        {/* Alternative Login */}
+                        <View style={styles.alternativeContainer}>
+                            <Text style={styles.alternativeText}>Or sign in with</Text>
+                            <TouchableOpacity
+                                style={styles.emailLoginBtn}
+                                onPress={() => navigation.replace('EmailLogin')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.emailLoginText}>📧 Email & Password</Text>
+                            </TouchableOpacity>
+                        </View>
+
                         {/* Register Link */}
                         <TouchableOpacity
                             style={styles.registerLink}
@@ -670,6 +682,31 @@ const styles = StyleSheet.create({
         marginTop: 20,
         lineHeight: 17,
         paddingHorizontal: 10,
+    },
+
+    // Alternative Login
+    alternativeContainer: {
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 16,
+    },
+    alternativeText: {
+        fontSize: 14,
+        color: Colors.textMuted,
+        marginBottom: 12,
+    },
+    emailLoginBtn: {
+        backgroundColor: '#F0F7FA',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E8F0F4',
+    },
+    emailLoginText: {
+        fontSize: 14,
+        color: Colors.textMedium,
+        fontWeight: '600',
     },
 
     // Register Link

@@ -2,23 +2,25 @@ import { NavigationContainer,  NavigatorScreenParams } from '@react-navigation/n
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
+import EmailLoginScreen from '../screens/auth/EmailLoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
-import BasicDetailsScreen from '../screens/BasicDetailsScreen';
-import UploadPrescriptionScreen from '../screens/UploadPrescriptionScreen';
-import RequirementsScreen from '../screens/RequirementsScreen';
-import InsuranceScreen from '../screens/InsuranceScreen';
-import SlotBookingScreen from '../screens/SlotBookingScreen';
-import ChargesScreen from '../screens/ChargesScreen';
-import ComplimentaryScreen from '../screens/ComplimentaryScreen';
+import BasicDetailsScreen from '../screens/user/BasicDetailsScreen';
+import UploadPrescriptionScreen from '../screens/user/UploadPrescriptionScreen';
+import RequirementsScreen from '../screens/user/RequirementsScreen';
+import InsuranceScreen from '../screens/user/InsuranceScreen';
+import SlotBookingScreen from '../screens/user/SlotBookingScreen';
+import ChargesScreen from '../screens/user/ChargesScreen';
+import ComplimentaryScreen from '../screens/user/ComplimentaryScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
-import LabPartnerScreen from '../screens/LabPartnerScreen';
-import StaffPanelScreen from '../screens/StaffPanelScreen';
+import LabPartnerScreen from '../screens/vendor/LabPartnerScreen';
+import StaffPanelScreen from '../screens/staff/StaffPanelScreen';
 import TabNavigator, { TabParamList } from './TabNavigator';
 import { useColorScheme } from 'react-native';
 
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
+  EmailLogin: undefined;
   Register: undefined;
   BasicDetails: undefined;
   UploadPrescription: undefined;
@@ -50,6 +52,7 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
         <Stack.Screen name="UploadPrescription" component={UploadPrescriptionScreen} />

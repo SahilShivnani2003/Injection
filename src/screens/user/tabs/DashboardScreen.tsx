@@ -9,10 +9,10 @@ import {
     Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../theme/colors';
+import { Colors } from '../../../theme/colors';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
-import { TabParamList } from '../../navigation/TabNavigator';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { TabParamList } from '../../../navigation/TabNavigator';
 
 const { width } = Dimensions.get('window');
 
