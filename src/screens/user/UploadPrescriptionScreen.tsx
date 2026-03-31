@@ -16,11 +16,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import * as DocumentPicker from '@react-native-documents/picker';
 import type { DocumentPickerResponse } from '@react-native-documents/picker';
+import { useBookingStore } from '../../store/useBookingStore';
+import { bookingAPI } from '../../service/apis/bookingService';
 
 type UploadPrescriptionProps = NativeStackScreenProps<RootStackParamList, 'UploadPrescription'>;
 
 const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
-  const [uploadedFile, setUploadedFile] = useState<DocumentPickerResponse | null>(null);
+  const { bookingData, updatePrescription, setStep, isLoading, setLoading } = useBookingStore();
+  const [uploadedFile, setUploadedFile] = useState<DocumentPickerResponse | null>(bookingData.prescriptionFile || null);
   const [selectedTests, setSelectedTests] = useState<number[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -49,8 +52,28 @@ const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
           return;
         }
 
-        setUploadedFile(file);
-        Alert.alert('Success', 'Prescription uploaded successfully!');
+        // Upload to server
+        const formData = new FormData();
+        formData.append('prescription', {
+          uri: file.uri,
+          type: file.type || 'application/octet-stream',
+          name: file.name || 'prescription',
+        } as any);
+
+        try {
+          const uploadResponse = await bookingAPI.uploadPrescription(formData);
+          const prescriptionUrl = uploadResponse.data.url; // Assuming API returns { url: string }
+
+          const fileWithUrl = { ...file, serverUrl: prescriptionUrl } as any;
+          updatePrescription(fileWithUrl);
+          setUploadedFile(fileWithUrl);
+          Alert.alert('Success', 'Prescription uploaded successfully!');
+        } catch (uploadError) {
+          // If upload fails, still save locally for now
+          updatePrescription(file as any);
+          setUploadedFile(file);
+          Alert.alert('Warning', 'Prescription saved locally. Upload to server failed.');
+        }
       }
     } catch (err: any) {
       if (err?.code !== 'DOCUMENT_PICKER_CANCELED') {
@@ -73,6 +96,14 @@ const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
       Alert.alert('Error', 'Please upload prescription or select tests manually');
       return;
     }
+
+    // If prescription uploaded, save selected tests (if any)
+    if (uploadedFile) {
+      // Here we could analyze the prescription and auto-select tests
+      // For now, we'll proceed
+    }
+
+    setStep(3);
     navigation.navigate('Requirements');
   };
 

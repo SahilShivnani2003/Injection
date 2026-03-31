@@ -18,6 +18,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useBookingStore } from '../../store/useBookingStore';
+import { validatePatientDetailsDTO } from '../../types/bookingDTO';
 
 const { width, height } = Dimensions.get('window');
 
@@ -133,15 +135,17 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
 const BasicDetailsScreen= ({ navigation }: bookingProps) => {
+  const { bookingData, updateBasicDetails, setStep, isLoading, setLoading } = useBookingStore();
+
   const [form, setForm] = useState({
-    patientName: '',
-    age: '',
-    sex: '',
-    address: '',
-    pinCode: '',
-    currentLocation: '',
-    alternateMobile: '',
-    email: '',
+    patientName: bookingData.patientName || '',
+    age: bookingData.age?.toString() || '',
+    sex: bookingData.sex || '',
+    address: bookingData.address || '',
+    pinCode: bookingData.pinCode || '',
+    currentLocation: bookingData.currentLocation || '',
+    alternateMobile: bookingData.alternateMobile || '',
+    email: bookingData.email || '',
   });
 
   const sheetY  = useRef(new Animated.Value(60)).current;
@@ -161,12 +165,34 @@ const BasicDetailsScreen= ({ navigation }: bookingProps) => {
   const update = (key: string, value: string) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleNext = () => {
-    if (!form.patientName || !form.age || !form.sex || !form.address || !form.pinCode) {
-      Alert.alert('Required Fields', 'Please fill all required fields.');
+  const handleNext = async () => {
+    const patientData = {
+      patientName: form.patientName,
+      age: parseInt(form.age),
+      sex: form.sex as 'Male' | 'Female' | 'Other',
+      address: form.address,
+      pinCode: form.pinCode,
+      currentLocation: form.currentLocation,
+      alternateMobile: form.alternateMobile || undefined,
+      email: form.email,
+    };
+
+    const errors = validatePatientDetailsDTO(patientData);
+    if (errors.length > 0) {
+      Alert.alert('Validation Error', errors.join('\n'));
       return;
     }
-    navigation.navigate('UploadPrescription');
+
+    try {
+      setLoading(true);
+      updateBasicDetails(patientData);
+      setStep(2);
+      navigation.navigate('UploadPrescription');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save patient details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isComplete = !!(form.patientName && form.age && form.sex && form.address && form.pinCode);

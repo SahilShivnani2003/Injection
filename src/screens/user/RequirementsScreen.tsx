@@ -15,23 +15,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
+import { useBookingStore } from '../../store/useBookingStore';
+import { bookingAPI } from '../../service/apis/bookingService';
 
 const { width, height } = Dimensions.get('window');
 
 interface Props {
   navigation: any;
 }
-
-const SERVICES = [
-  { id: 1, name: 'Blood\nTest', icon: '🩸' },
-  { id: 2, name: 'Urine\nTest',        icon: '🧪' },
-  { id: 3, name: 'X-Ray\nScan',         icon: '🦴' },
-  { id: 4, name: 'MRI\nScan',           icon: '🧠' },
-  { id: 5, name: 'ECG\nTest',    icon: '❤️' },
-  { id: 6, name: 'Ultrasound\nScan',              icon: '🔊' },
-  { id: 7, name: 'CT\nScan',            icon: '🩻' },
-  { id: 8, name: 'Thyroid\nTest',    icon: '🦋' },
-];
 
 // ── Step progress bar ────────────────────────────────────────────────────────
 const StepBar: React.FC<{ current: number; total: number }> = ({ current, total }) => (
@@ -114,13 +105,11 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
-  const [selected, setSelected]         = useState<number[]>([]);
-  const [otherText, setOtherText]       = useState('');
-  const [hasInsurance, setHasInsurance] = useState(false);
-  const [policyNo, setPolicyNo]         = useState('');
-  const [policyFetched, setPolicyFetched] = useState(false);
-  const [otherFocused, setOtherFocused]   = useState(false);
-  const [policyFocused, setPolicyFocused] = useState(false);
+  const { bookingData, updateServices, setStep, isLoading, setLoading } = useBookingStore();
+  const [services, setServices] = useState<any[]>([]);
+  const [selected, setSelected] = useState<number[]>(bookingData.selectedServices || []);
+  const [otherText, setOtherText] = useState('');
+  const [otherFocused, setOtherFocused] = useState(false);
 
   const sheetY  = useRef(new Animated.Value(60)).current;
   const sheetOp = useRef(new Animated.Value(0)).current;
@@ -131,12 +120,30 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
   const insOp     = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(headerY,  { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(headerOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(sheetY,   { toValue: 0, duration: 580, delay: 140, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(sheetOp,  { toValue: 1, duration: 580, delay: 140, useNativeDriver: true }),
-    ]).start();
+    const fetchServices = async () => {
+      try {
+        setLoading(true);
+        const response = await bookingAPI.getAvailableServices();
+        setServices(response.data);
+      } catch (error) {
+        console.error('Failed to fetch services:', error);
+        // Fallback to mock data
+        setServices([
+          { id: 1, name: 'Blood Test', icon: '🩸', price: 500 },
+          { id: 2, name: 'Urine Test', icon: '🧪', price: 300 },
+          { id: 3, name: 'X-Ray Scan', icon: '🦴', price: 800 },
+          { id: 4, name: 'MRI Scan', icon: '🧠', price: 2500 },
+          { id: 5, name: 'ECG Test', icon: '❤️', price: 400 },
+          { id: 6, name: 'Ultrasound Scan', icon: '🔊', price: 1200 },
+          { id: 7, name: 'CT Scan', icon: '🩻', price: 1800 },
+          { id: 8, name: 'Thyroid Test', icon: '🦋', price: 600 },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
   }, []);
 
   useEffect(() => {
@@ -155,13 +162,12 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
     ]).start();
   }, [hasInsurance]);
 
-  const toggleService = (id: number) =>
-    setSelected(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  const handleFetchPolicy = () => {
-    if (!policyNo.trim()) { Alert.alert('Policy Required', 'Please enter your policy number.'); return; }
-    setPolicyFetched(true);
-    Alert.alert('Policy Found', `Policy No. ${policyNo} — Active\nCoverage: ₹5,00,000\nExpiry: 31-Dec-2025`);
+  const toggleService = (id: number) => {
+    const newSelected = selected.includes(id)
+      ? selected.filter(s => s !== id)
+      : [...selected, id];
+    setSelected(newSelected);
+    updateServices(newSelected);
   };
 
   const handleNext = () => {
@@ -169,7 +175,9 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('Select Service', 'Please select at least one service.');
       return;
     }
-    navigation.navigate('Insurance');
+
+    setStep(4);
+    navigation.navigate('Complimentary');
   };
 
   const insMaxHeight = insHeight.interpolate({ inputRange: [0, 1], outputRange: [0, 180] });
@@ -220,7 +228,7 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
           <SectionLabel title="Available Services" />
 
           <View style={styles.grid}>
-            {SERVICES.map(s => (
+            {services.map(s => (
               <ServiceCard
                 key={s.id}
                 service={s}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,55 +12,86 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useBookingStore } from '../../store/useBookingStore';
+import { bookingAPI } from '../../service/apis/bookingService';
 
 type SlotBookingProps = NativeStackScreenProps<RootStackParamList, 'SlotBooking'>;
 
 const SlotBookingScreen = ({ navigation }: SlotBookingProps) => {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
-  const [selectedComplimentary, setSelectedComplimentary] = useState<number[]>([]);
+  const { bookingData, updateSlot, calculateCharges, setStep, isLoading, setLoading } = useBookingStore();
+  const [selectedDate, setSelectedDate] = useState<string | null>(bookingData.selectedDate || null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(bookingData.selectedTime || null);
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(bookingData.selectedStaff || 'any');
+  const [availableDates, setAvailableDates] = useState<any[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [staffOptions, setStaffOptions] = useState<any[]>([]);
 
-  const availableDates = [
-    { date: '2026-03-31', day: 'Today', display: '31 Mar' },
-    { date: '2026-04-01', day: 'Tomorrow', display: '1 Apr' },
-    { date: '2026-04-02', day: 'Wed', display: '2 Apr' },
-    { date: '2026-04-03', day: 'Thu', display: '3 Apr' },
-    { date: '2026-04-04', day: 'Fri', display: '4 Apr' },
-  ];
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      try {
+        setLoading(true);
+        // Fetch available dates (mock for now)
+        const dates = [
+          { date: '2026-03-31', day: 'Today', display: '31 Mar' },
+          { date: '2026-04-01', day: 'Tomorrow', display: '1 Apr' },
+          { date: '2026-04-02', day: 'Wed', display: '2 Apr' },
+          { date: '2026-04-03', day: 'Thu', display: '3 Apr' },
+          { date: '2026-04-04', day: 'Fri', display: '4 Apr' },
+        ];
+        setAvailableDates(dates);
 
-  const availableTimes = [
-    '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
-  ];
+        // Set default staff options
+        setStaffOptions([
+          { id: 'any', name: 'Any Available', icon: '👨‍⚕️' },
+          { id: 'male', name: 'Male Staff', icon: '👨' },
+          { id: 'female', name: 'Female Staff', icon: '👩' },
+        ]);
+      } catch (error) {
+        console.error('Failed to fetch available slots:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const staffOptions = [
-    { id: 'any', name: 'Any Available', icon: '👨‍⚕️' },
-    { id: 'male', name: 'Male Staff', icon: '👨' },
-    { id: 'female', name: 'Female Staff', icon: '👩' },
-  ];
+    fetchAvailableSlots();
+  }, []);
 
-  const complimentaryTests = [
-    { id: 'sugar', name: 'Blood Sugar', icon: '🍬', desc: 'Random / Fasting' },
-    { id: 'group', name: 'Blood Group', icon: '🩸', desc: 'ABO & Rh Typing' },
-    { id: 'hb', name: 'Haemoglobin', icon: '⚗️', desc: 'Hb Level Check' },
-  ];
-
-  const toggleComplimentary = (id: number) => {
-    const index = selectedComplimentary.indexOf(id);
-    if (index > -1) {
-      setSelectedComplimentary(selectedComplimentary.filter(i => i !== id));
-    } else {
-      setSelectedComplimentary([...selectedComplimentary, id]);
+  useEffect(() => {
+    // Fetch available times when date changes
+    if (selectedDate) {
+      const fetchTimesForDate = async () => {
+        try {
+          const response = await bookingAPI.getAvailableSlots(selectedDate);
+          setAvailableTimes(response.data);
+        } catch (error) {
+          // Fallback to mock times
+          setAvailableTimes([
+            '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+            '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
+          ]);
+        }
+      };
+      fetchTimesForDate();
     }
-  };
+  }, [selectedDate]);
 
   const handleConfirm = () => {
     if (!selectedDate || !selectedTime) {
       Alert.alert('Error', 'Please select date and time');
       return;
     }
-    navigation.navigate('Charges', { selectedServices: [] }); // Pass empty for now, can be updated to include complimentary tests
+
+    // Save slot booking data
+    updateSlot({
+      date: selectedDate,
+      time: selectedTime,
+      staff: selectedStaff as 'any' | 'male' | 'female'
+    });
+
+    // Calculate charges
+    calculateCharges();
+
+    navigation.navigate('Charges', { selectedServices: bookingData.selectedServices || [] });
   };
 
   return (
@@ -166,34 +197,6 @@ const SlotBookingScreen = ({ navigation }: SlotBookingProps) => {
           </View>
         </View>
 
-        {/* Complimentary Tests */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Free Complimentary Tests</Text>
-          <Text style={styles.sectionSub}>Select up to 3 free tests with your booking</Text>
-          {complimentaryTests.map((test, index) => (
-            <TouchableOpacity
-              key={test.id}
-              style={[
-                styles.compCard,
-                selectedComplimentary.includes(index) && styles.compCardSelected
-              ]}
-              onPress={() => toggleComplimentary(index)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.compLeft}>
-                <Text style={styles.compIcon}>{test.icon}</Text>
-                <View>
-                  <Text style={styles.compName}>{test.name}</Text>
-                  <Text style={styles.compDesc}>{test.desc}</Text>
-                </View>
-              </View>
-              {selectedComplimentary.includes(index) && (
-                <Text style={styles.checkIcon}>✓</Text>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
         <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.8}>
           <Text style={styles.confirmText}>Confirm Booking</Text>
         </TouchableOpacity>
@@ -291,28 +294,6 @@ const styles = StyleSheet.create({
   staffIcon: { fontSize: 24, marginBottom: 8 },
   staffName: { fontSize: 12, fontWeight: '600', color: Colors.textDark, textAlign: 'center' },
   staffNameSelected: { color: Colors.gradientStart },
-
-  // Complimentary tests
-  compCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-  },
-  compCardSelected: {
-    borderColor: Colors.gradientStart,
-    backgroundColor: 'rgba(0, 212, 160, 0.05)',
-  },
-  compLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  compIcon: { fontSize: 26, marginRight: 12 },
-  compName: { fontSize: 16, fontWeight: '600', color: Colors.textDark },
-  compDesc: { fontSize: 12, color: Colors.textMedium },
-  checkIcon: { fontSize: 18, color: Colors.gradientStart, fontWeight: 'bold' },
 
   confirmBtn: {
     backgroundColor: Colors.gradientStart,

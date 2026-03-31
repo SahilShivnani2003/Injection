@@ -13,13 +13,17 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useBookingStore } from '../../store/useBookingStore';
+import { bookingAPI } from '../../service/apis/bookingService';
+import { validateInsuranceVerificationDTO } from '../../types/bookingDTO';
 
 type InsuranceProps = NativeStackScreenProps<RootStackParamList, 'Insurance'>;
 
 const InsuranceScreen = ({ navigation }: InsuranceProps) => {
-  const [policyNumber, setPolicyNumber] = useState('');
-  const [insuranceDetails, setInsuranceDetails] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { bookingData, updateInsurance, setStep, isLoading, setLoading } = useBookingStore();
+  const [policyNumber, setPolicyNumber] = useState(bookingData.policyNumber || '');
+  const [insuranceDetails, setInsuranceDetails] = useState<any>(bookingData.insuranceDetails || null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const mockInsuranceData = {
     policyHolder: 'John Doe',
@@ -32,30 +36,50 @@ const InsuranceScreen = ({ navigation }: InsuranceProps) => {
   };
 
   const handleFetchInsurance = async () => {
-    if (!policyNumber.trim()) {
-      Alert.alert('Error', 'Please enter policy number');
+    const validationErrors = validateInsuranceVerificationDTO({ policyNumber });
+    if (validationErrors.length > 0) {
+      Alert.alert('Validation Error', validationErrors.join('\n'));
       return;
     }
 
-    setIsLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      setInsuranceDetails(mockInsuranceData);
-      setIsLoading(false);
-      Alert.alert('Success', 'Insurance details fetched successfully!');
-    }, 1500);
+    try {
+      setIsVerifying(true);
+      const response = await bookingAPI.verifyInsurance({ policyNumber });
+      const insuranceData = response.data;
+
+      if (insuranceData.valid) {
+        setInsuranceDetails(insuranceData);
+        updateInsurance({
+          hasInsurance: true,
+          policyNumber,
+          insuranceDetails: insuranceData
+        });
+        Alert.alert('Success', 'Insurance details verified successfully!');
+      } else {
+        Alert.alert('Invalid Policy', 'The policy number could not be verified. Please check and try again.');
+      }
+    } catch (error) {
+      console.error('Insurance verification error:', error);
+      Alert.alert('Error', 'Failed to verify insurance. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleContinue = () => {
     if (!insuranceDetails) {
-      Alert.alert('Error', 'Please fetch insurance details first');
+      Alert.alert('Error', 'Please verify insurance details first');
       return;
     }
+
+    setStep(6);
     navigation.navigate('SlotBooking');
   };
 
   const handleSkip = () => {
-    navigation.navigate('Charges', { selectedServices: [] }); // Pass empty for now, can be updated to include complimentary tests
+    updateInsurance({ hasInsurance: false });
+    setStep(6);
+    navigation.navigate('SlotBooking');
   };
 
   return (

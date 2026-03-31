@@ -14,33 +14,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
+import { useBookingStore } from '../../store/useBookingStore';
+import { bookingAPI } from '../../service/apis/bookingService';
 
 const { width, height } = Dimensions.get('window');
 
 interface Props {
   navigation: any;
 }
-
-const COMPLIMENTARY = [
-  { id: 'sugar', name: 'Blood Sugar',   icon: '🍬', desc: 'Random / Fasting' },
-  { id: 'group', name: 'Blood Group',   icon: '🩸', desc: 'ABO & Rh Typing'  },
-  { id: 'hb',    name: 'Haemoglobin',  icon: '⚗️', desc: 'Hb Level Check'   },
-];
-
-const TIME_SLOTS = [
-  '07:00 AM – 09:00 AM',
-  '09:00 AM – 11:00 AM',
-  '11:00 AM – 01:00 PM',
-  '02:00 PM – 04:00 PM',
-  '04:00 PM – 06:00 PM',
-  '06:00 PM – 08:00 PM',
-];
-
-const STAFF = [
-  { id: 'any',    name: 'Any Available', icon: '👨‍⚕️' },
-  { id: 'male',   name: 'Male Staff',    icon: '👨'   },
-  { id: 'female', name: 'Female Staff',  icon: '👩'   },
-];
 
 // ── Step progress bar ────────────────────────────────────────────────────────
 const StepBar: React.FC<{ current: number; total: number }> = ({ current, total }) => (
@@ -153,14 +134,38 @@ const StaffPicker: React.FC<{ selected: string; onSelect: (id: string) => void }
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
 const ComplimentaryScreen: React.FC<Props> = ({ navigation }) => {
-  const [selectedService, setSelectedService] = useState('');
-  const [selectedTime, setSelectedTime]       = useState('');
-  const [selectedStaff, setSelectedStaff]     = useState('any');
+  const { bookingData, updateComplimentary, setStep, isLoading, setLoading } = useBookingStore();
+  const [complimentaryTests, setComplimentaryTests] = useState<any[]>([]);
+  const [selectedService, setSelectedService] = useState<string[]>(bookingData.complimentaryTests || []);
+  const [selectedTime, setSelectedTime] = useState(bookingData.selectedTime || '');
+  const [selectedStaff, setSelectedStaff] = useState(bookingData.selectedStaff || 'any');
 
   const sheetY  = useRef(new Animated.Value(60)).current;
   const sheetOp = useRef(new Animated.Value(0)).current;
   const headerY = useRef(new Animated.Value(-16)).current;
   const headerOp= useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const fetchComplimentaryTests = async () => {
+      try {
+        setLoading(true);
+        const response = await bookingAPI.getComplimentaryTests();
+        setComplimentaryTests(response.data);
+      } catch (error) {
+        console.error('Failed to fetch complimentary tests:', error);
+        // Fallback to mock data
+        setComplimentaryTests([
+          { id: 'sugar', name: 'Blood Sugar', icon: '🍬', desc: 'Random / Fasting' },
+          { id: 'group', name: 'Blood Group', icon: '🩸', desc: 'ABO & Rh Typing' },
+          { id: 'hb', name: 'Haemoglobin', icon: '⚗️', desc: 'Hb Level Check' },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchComplimentaryTests();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -176,15 +181,13 @@ const ComplimentaryScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('Required', 'Please select your preferred time slot.');
       return;
     }
-    Alert.alert(
-      'Booking Confirmed!',
-      `Your booking has been confirmed.\n\n` +
-      `Free Service: ${selectedService ? COMPLIMENTARY.find(c => c.id === selectedService)?.name : 'None'}\n` +
-      `Time: ${selectedTime}\n` +
-      `Staff: ${STAFF.find(s => s.id === selectedStaff)?.name}\n\n` +
-      `A confirmation SMS will be sent to your registered mobile.`,
-      [{ text: 'OK', onPress: () => navigation.navigate('MainTab') }]
-    );
+
+    // Save complimentary tests and slot preferences
+    updateComplimentary(selectedService as ('sugar' | 'group' | 'hb')[]);
+    // Note: We'll handle slot booking in the next screen
+
+    setStep(5);
+    navigation.navigate('Insurance');
   };
 
   const canConfirm = !!selectedTime;
@@ -232,12 +235,17 @@ const ComplimentaryScreen: React.FC<Props> = ({ navigation }) => {
           {/* ── Complimentary ────────────────────────────────────── */}
           <SectionLabel title="Free Complimentary Service" sub="Choose any one — on us!" />
           <View style={styles.compRow}>
-            {COMPLIMENTARY.map(item => (
+            {complimentaryTests.map(item => (
               <CompCard
                 key={item.id}
                 item={item}
-                selected={selectedService === item.id}
-                onPress={() => setSelectedService(selectedService === item.id ? '' : item.id)}
+                selected={selectedService.includes(item.id)}
+                onPress={() => {
+                  const newSelected = selectedService.includes(item.id)
+                    ? selectedService.filter(id => id !== item.id)
+                    : [...selectedService, item.id].slice(0, 3); // Max 3
+                  setSelectedService(newSelected);
+                }}
               />
             ))}
           </View>
