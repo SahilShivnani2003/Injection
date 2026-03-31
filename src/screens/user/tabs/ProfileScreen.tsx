@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../../theme/colors';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
+import { TabParamList } from '../../../navigation/TabNavigator';
 
-type ProfileProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+type ProfileProps = NativeBottomTabScreenProps<TabParamList, 'Profile'>;
 
 const ProfileScreen = ({ navigation }: ProfileProps) => {
   return (

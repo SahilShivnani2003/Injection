@@ -8,17 +8,21 @@ import {
   ScrollView,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import * as DocumentPicker from '@react-native-documents/picker';
+import type { DocumentPickerResponse } from '@react-native-documents/picker';
 
 type UploadPrescriptionProps = NativeStackScreenProps<RootStackParamList, 'UploadPrescription'>;
 
 const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<DocumentPickerResponse | null>(null);
   const [selectedTests, setSelectedTests] = useState<number[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const mockTestsFromPrescription = [
     { id: 1, name: 'Complete Blood Count (CBC)', price: 500 },
@@ -27,10 +31,35 @@ const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
     { id: 4, name: 'Blood Sugar (Fasting)', price: 200 },
   ];
 
-  const handleUpload = () => {
-    // Mock upload - in real app, use image picker
-    setUploadedImage('https://via.placeholder.com/300x200?text=Prescription');
-    Alert.alert('Success', 'Prescription uploaded successfully!');
+  const handleUpload = async () => {
+    try {
+      setIsUploading(true);
+
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.pdf, DocumentPicker.types.images],
+        allowMultiSelection: false,
+      });
+
+      if (result && result.length > 0) {
+        const file = result[0];
+
+        // Check file size (5MB limit)
+        if (file.size && file.size > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'File size must be less than 5MB');
+          return;
+        }
+
+        setUploadedFile(file);
+        Alert.alert('Success', 'Prescription uploaded successfully!');
+      }
+    } catch (err: any) {
+      if (err?.code !== 'DOCUMENT_PICKER_CANCELED') {
+        Alert.alert('Error', 'Failed to pick document. Please try again.');
+        console.error('Document picker error:', err);
+      }
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const toggleTest = (id: number) => {
@@ -40,7 +69,7 @@ const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
   };
 
   const handleContinue = () => {
-    if (!uploadedImage && selectedTests.length === 0) {
+    if (!uploadedFile && selectedTests.length === 0) {
       Alert.alert('Error', 'Please upload prescription or select tests manually');
       return;
     }
@@ -72,20 +101,39 @@ const UploadPrescriptionScreen = ({ navigation }: UploadPrescriptionProps) => {
           Upload your doctor's prescription to automatically detect required tests, or select manually.
         </Text>
 
-        <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload} activeOpacity={0.8}>
-          <Text style={styles.uploadIcon}>📎</Text>
-          <Text style={styles.uploadText}>Upload Doctor's Slip</Text>
+        <TouchableOpacity
+          style={[styles.uploadBtn, isUploading && styles.uploadBtnDisabled]}
+          onPress={handleUpload}
+          activeOpacity={0.8}
+          disabled={isUploading}
+        >
+          <Text style={styles.uploadIcon}>{isUploading ? '⏳' : '📎'}</Text>
+          <Text style={styles.uploadText}>
+            {isUploading ? 'Picking Document...' : 'Upload Doctor\'s Slip'}
+          </Text>
           <Text style={styles.uploadSub}>JPG, PNG, PDF up to 5MB</Text>
         </TouchableOpacity>
 
-        {uploadedImage && (
-          <View style={styles.imagePreview}>
-            <Image source={{ uri: uploadedImage }} style={styles.previewImage} />
-            <Text style={styles.previewText}>Prescription Uploaded</Text>
+        {uploadedFile && (
+          <View style={styles.filePreview}>
+            {uploadedFile.type?.startsWith('image/') ? (
+              <Image source={{ uri: uploadedFile.uri }} style={styles.previewImage} />
+            ) : (
+              <View style={styles.pdfPreview}>
+                <Text style={styles.pdfIcon}>📄</Text>
+                <Text style={styles.pdfText}>PDF Document</Text>
+              </View>
+            )}
+            <Text style={styles.previewText}>
+              {uploadedFile.name || 'Document'} uploaded
+            </Text>
+            <Text style={styles.fileSize}>
+              Size: {uploadedFile.size ? (uploadedFile.size / 1024 / 1024).toFixed(2) : 'Unknown'} MB
+            </Text>
           </View>
         )}
 
-        {uploadedImage && (
+        {uploadedFile && (
           <View style={styles.testsSection}>
             <Text style={styles.sectionTitle}>Detected Tests from Prescription</Text>
             {mockTestsFromPrescription.map(test => (
@@ -173,6 +221,24 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     marginBottom: 20,
   },
+  uploadBtnDisabled: {
+    opacity: 0.6,
+  },
+  filePreview: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  pdfPreview: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    backgroundColor: Colors.inputBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pdfIcon: { fontSize: 48, marginBottom: 8 },
+  pdfText: { fontSize: 16, color: Colors.textMedium },
   uploadIcon: { fontSize: 32, marginBottom: 8 },
   uploadText: { fontSize: 18, fontWeight: '600', color: Colors.textDark, marginBottom: 4 },
   uploadSub: { fontSize: 12, color: Colors.textMuted },
@@ -187,6 +253,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   previewText: { fontSize: 14, color: Colors.textMedium },
+  fileSize: { fontSize: 12, color: Colors.textMuted, marginTop: 4 },
   testsSection: { marginBottom: 24 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.textDark, marginBottom: 12 },
   testItem: {

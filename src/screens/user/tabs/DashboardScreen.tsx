@@ -10,13 +10,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../../theme/colors';
-import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import { NativeStackNavigationProp} from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { TabParamList } from '../../../navigation/TabNavigator';
+import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
 
 const { width } = Dimensions.get('window');
 
-type DashboardProps = NativeStackScreenProps<TabParamList, 'Dashboard'>;
+type DashboardProps = NativeBottomTabScreenProps<TabParamList, 'Dashboard'>;
 
 const metricCards = [
     { label: 'Upcoming Visits', value: '2', color: '#E0F8FF', icon: '📅' },
