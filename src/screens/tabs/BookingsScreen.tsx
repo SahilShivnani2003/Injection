@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../theme/colors';
+import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 
 type BookingsProps = NativeStackScreenProps<RootStackParamList, 'Bookings'>;
 
@@ -83,14 +83,6 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('Dashboard')}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.actionBtnText}>Back to dashboard</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );

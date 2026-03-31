@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer,  NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -6,9 +6,8 @@ import BasicDetailsScreen from '../screens/BasicDetailsScreen';
 import RequirementsScreen from '../screens/RequirementsScreen';
 import ChargesScreen from '../screens/ChargesScreen';
 import ComplimentaryScreen from '../screens/ComplimentaryScreen';
-import DashboardScreen from '../screens/DashboardScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import BookingsScreen from '../screens/BookingsScreen';
+import TabNavigator, { TabParamList } from './TabNavigator';
+import { useColorScheme } from 'react-native';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -17,14 +16,13 @@ export type RootStackParamList = {
   Requirements: undefined;
   Charges: { selectedServices: number[] };
   Complimentary: undefined;
-  Dashboard: undefined;
-  Profile: undefined;
-  Bookings: undefined;
+  MainTab: NavigatorScreenParams<TabParamList>;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
+  const isDarkMode = useColorScheme() === 'dark';
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -33,18 +31,17 @@ export default function AppNavigator() {
           headerShown: false,
           animation: 'slide_from_right',
           gestureEnabled: true,
+          statusBarStyle: isDarkMode ? 'light' : 'dark',
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Bookings" component={BookingsScreen} />
         <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
 
         <Stack.Screen name="Requirements" component={RequirementsScreen} />
         <Stack.Screen name="Charges" component={ChargesScreen} />
         <Stack.Screen name="Complimentary" component={ComplimentaryScreen} />
+        <Stack.Screen name="MainTab" component={TabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>
   );
