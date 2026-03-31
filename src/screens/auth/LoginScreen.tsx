@@ -50,6 +50,7 @@ const OtpCell: React.FC<{ char: string; active: boolean; filled: boolean }> = ({
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 const LoginScreen = ({ navigation }: loginPros) => {
+    const [userType, setUserType] = useState<'patient' | 'labpartner' | 'staff'>('patient');
     const [mobile, setMobile] = useState('');
     const [otp, setOtp] = useState('');
     const [agreed, setAgreed] = useState(false);
@@ -141,9 +142,22 @@ const LoginScreen = ({ navigation }: loginPros) => {
             Alert.alert('Invalid OTP', 'Please enter the correct OTP.');
             return;
         }
-        navigation.navigate('MainTab', {
-            screen: 'Dashboard',
-        });
+
+        // Navigate based on user type
+        switch (userType) {
+            case 'labpartner':
+                navigation.navigate('LabPartner');
+                break;
+            case 'staff':
+                navigation.navigate('StaffPanel');
+                break;
+            case 'patient':
+            default:
+                navigation.navigate('MainTab', {
+                    screen: 'Dashboard',
+                });
+                break;
+        }
     };
 
     const otpTranslateY = otpSlide.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
@@ -206,6 +220,36 @@ const LoginScreen = ({ navigation }: loginPros) => {
                         <Text style={styles.sheetSub}>
                             Enter your mobile number to receive an OTP
                         </Text>
+
+                        {/* User Type Selection */}
+                        <Text style={styles.fieldLabel}>Login as</Text>
+                        <View style={styles.userTypeRow}>
+                            {[
+                                { key: 'patient', label: 'Patient', icon: '👤' },
+                                { key: 'labpartner', label: 'Lab Partner', icon: '🏥' },
+                                { key: 'staff', label: 'Staff', icon: '👨‍⚕️' },
+                            ].map((type) => (
+                                <TouchableOpacity
+                                    key={type.key}
+                                    style={[
+                                        styles.userTypeBtn,
+                                        userType === type.key && styles.userTypeBtnActive,
+                                    ]}
+                                    onPress={() => setUserType(type.key as any)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.userTypeIcon}>{type.icon}</Text>
+                                    <Text
+                                        style={[
+                                            styles.userTypeText,
+                                            userType === type.key && styles.userTypeTextActive,
+                                        ]}
+                                    >
+                                        {type.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
                         {/* Mobile field */}
                         <Text style={styles.fieldLabel}>Mobile Number</Text>
@@ -348,6 +392,17 @@ const LoginScreen = ({ navigation }: loginPros) => {
                         <Text style={styles.footerNote}>
                             Your data is encrypted and never shared.
                         </Text>
+
+                        {/* Register Link */}
+                        <TouchableOpacity
+                            style={styles.registerLink}
+                            onPress={() => navigation.navigate('Register')}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.registerText}>
+                                New user? <Text style={styles.registerLinkText}>Create Account</Text>
+                            </Text>
+                        </TouchableOpacity>
                     </ScrollView>
                 </Animated.View>
             </KeyboardAvoidingView>
@@ -615,6 +670,57 @@ const styles = StyleSheet.create({
         marginTop: 20,
         lineHeight: 17,
         paddingHorizontal: 10,
+    },
+
+    // Register Link
+    registerLink: {
+        alignItems: 'center',
+        marginTop: 16,
+        paddingVertical: 8,
+    },
+    registerText: {
+        fontSize: 14,
+        color: Colors.textMedium,
+    },
+    registerLinkText: {
+        color: Colors.gradientStart,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+
+    // User Type Selection
+    userTypeRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    userTypeBtn: {
+        flex: 1,
+        backgroundColor: Colors.white,
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        marginHorizontal: 4,
+        borderWidth: 2,
+        borderColor: '#E8F0F4',
+    },
+    userTypeBtnActive: {
+        borderColor: Colors.gradientStart,
+        backgroundColor: '#E6FAF5',
+    },
+    userTypeIcon: {
+        fontSize: 24,
+        marginBottom: 6,
+    },
+    userTypeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: Colors.textMedium,
+        textAlign: 'center',
+    },
+    userTypeTextActive: {
+        color: Colors.gradientStart,
     },
 });
 
