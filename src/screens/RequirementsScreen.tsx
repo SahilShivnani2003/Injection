@@ -23,14 +23,14 @@ interface Props {
 }
 
 const SERVICES = [
-  { id: 1, name: 'IV Fluid\nAdministration', icon: '💧' },
-  { id: 2, name: 'Injection\nService',        icon: '💉' },
-  { id: 3, name: 'Blood\nCollection',         icon: '🩸' },
-  { id: 4, name: 'Wound\nDressing',           icon: '🩹' },
-  { id: 5, name: 'BP / Sugar\nMonitoring',    icon: '📊' },
-  { id: 6, name: 'ECG at\nHome',              icon: '❤️' },
-  { id: 7, name: 'Catheter\nCare',            icon: '🏥' },
-  { id: 8, name: 'Physiotherapy\nSession',    icon: '🤸' },
+  { id: 1, name: 'Blood\nTest', icon: '🩸' },
+  { id: 2, name: 'Urine\nTest',        icon: '🧪' },
+  { id: 3, name: 'X-Ray\nScan',         icon: '🦴' },
+  { id: 4, name: 'MRI\nScan',           icon: '🧠' },
+  { id: 5, name: 'ECG\nTest',    icon: '❤️' },
+  { id: 6, name: 'Ultrasound\nScan',              icon: '🔊' },
+  { id: 7, name: 'CT\nScan',            icon: '🩻' },
+  { id: 8, name: 'Thyroid\nTest',    icon: '🦋' },
 ];
 
 // ── Step progress bar ────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('Select Service', 'Please select at least one service.');
       return;
     }
-    navigation.navigate('Charges', { selectedServices: selected });
+    navigation.navigate('Insurance');
   };
 
   const insMaxHeight = insHeight.interpolate({ inputRange: [0, 1], outputRange: [0, 180] });
@@ -194,8 +194,8 @@ const RequirementsScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
 
         <Animated.View style={{ opacity: headerOp, transform: [{ translateY: headerY }] }}>
-          <StepBar current={2} total={4} />
-          <Text style={styles.stepLabel}>Step 2 of 4</Text>
+          <StepBar current={3} total={6} />
+          <Text style={styles.stepLabel}>Step 3 of 6</Text>
           <Text style={styles.headerTitle}>Select Services</Text>
           <Text style={styles.headerSub}>Choose the services you need</Text>
         </Animated.View>

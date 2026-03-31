@@ -183,7 +183,7 @@ const ComplimentaryScreen: React.FC<Props> = ({ navigation }) => {
       `Time: ${selectedTime}\n` +
       `Staff: ${STAFF.find(s => s.id === selectedStaff)?.name}\n\n` +
       `A confirmation SMS will be sent to your registered mobile.`,
-      [{ text: 'OK', onPress: () => navigation.navigate('Splash') }]
+      [{ text: 'OK', onPress: () => navigation.navigate('MainTab') }]
     );
   };
 
@@ -209,7 +209,7 @@ const ComplimentaryScreen: React.FC<Props> = ({ navigation }) => {
 
         <Animated.View style={{ opacity: headerOp, transform: [{ translateY: headerY }] }}>
           <StepBar current={4} total={4} />
-          <Text style={styles.stepLabel}>Step 4 of 4 • Almost done!</Text>
+          <Text style={styles.stepLabel}>Step 6 of 6 • Almost done!</Text>
           <Text style={styles.headerTitle}>Final Preferences</Text>
           <Text style={styles.headerSub}>Pick your slot & complimentary service</Text>
         </Animated.View>

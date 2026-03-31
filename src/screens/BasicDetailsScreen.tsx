@@ -166,7 +166,7 @@ const BasicDetailsScreen= ({ navigation }: bookingProps) => {
       Alert.alert('Required Fields', 'Please fill all required fields.');
       return;
     }
-    navigation.navigate('Requirements');
+    navigation.navigate('UploadPrescription');
   };
 
   const isComplete = !!(form.patientName && form.age && form.sex && form.address && form.pinCode);
@@ -195,8 +195,8 @@ const BasicDetailsScreen= ({ navigation }: bookingProps) => {
         </TouchableOpacity>
 
         <Animated.View style={{ opacity: headerOp, transform: [{ translateY: headerY }] }}>
-          <StepBar current={1} total={4} />
-          <Text style={styles.stepLabel}>Step 1 of 4</Text>
+          <StepBar current={1} total={6} />
+          <Text style={styles.stepLabel}>Step 1 of 6</Text>
           <Text style={styles.headerTitle}>Patient Details</Text>
           <Text style={styles.headerSub}>Tell us about the patient</Text>
         </Animated.View>

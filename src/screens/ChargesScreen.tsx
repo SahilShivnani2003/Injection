@@ -21,14 +21,14 @@ type chargesProps = NativeStackScreenProps<RootStackParamList, 'Charges'>;
 
 
 const ALL_SERVICES = [
-  { id: 1, name: 'IV Fluid Administration',  charge: 350, icon: '💧' },
-  { id: 2, name: 'Injection Service',         charge: 150, icon: '💉' },
-  { id: 3, name: 'Blood Collection',          charge: 200, icon: '🩸' },
-  { id: 4, name: 'Wound Dressing',            charge: 300, icon: '🩹' },
-  { id: 5, name: 'BP / Sugar Monitoring',     charge: 100, icon: '📊' },
-  { id: 6, name: 'ECG at Home',               charge: 500, icon: '❤️' },
-  { id: 7, name: 'Catheter Care',             charge: 400, icon: '🏥' },
-  { id: 8, name: 'Physiotherapy Session',     charge: 600, icon: '🤸' },
+  { id: 1, name: 'Blood Test', charge: 500, icon: '🩸' },
+  { id: 2, name: 'Urine Test', charge: 300, icon: '🧪' },
+  { id: 3, name: 'X-Ray Scan', charge: 800, icon: '🦴' },
+  { id: 4, name: 'MRI Scan', charge: 2500, icon: '🧠' },
+  { id: 5, name: 'ECG Test', charge: 400, icon: '❤️' },
+  { id: 6, name: 'Ultrasound Scan', charge: 1200, icon: '🔊' },
+  { id: 7, name: 'CT Scan', charge: 1800, icon: '🩻' },
+  { id: 8, name: 'Thyroid Test', charge: 600, icon: '🦋' },
 ];
 
 // ── Step progress bar ────────────────────────────────────────────────────────
@@ -131,8 +131,8 @@ const ChargesScreen = ({ navigation, route }: chargesProps) => {
         </TouchableOpacity>
 
         <Animated.View style={{ opacity: headerOp, transform: [{ translateY: headerY }] }}>
-          <StepBar current={3} total={4} />
-          <Text style={styles.stepLabel}>Step 3 of 4</Text>
+          <StepBar current={5} total={6} />
+          <Text style={styles.stepLabel}>Step 5 of 6</Text>
           <Text style={styles.headerTitle}>Charges Summary</Text>
           <Text style={styles.headerSub}>Review your selected services</Text>
         </Animated.View>

@@ -56,7 +56,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.profileBtn, styles.bookingBtn]}
-            onPress={() => navigation.navigate('Bookings')}
+            onPress={() => navigation.navigate('OrderTrackingcking')}
             activeOpacity={0.75}
           >
             <Text style={styles.profileBtnText}>Bookings</Text>
