@@ -4,19 +4,20 @@ import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import EmailLoginScreen from '../screens/auth/EmailLoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
-import BasicDetailsScreen from '../screens/user/BasicDetailsScreen';
-import UploadPrescriptionScreen from '../screens/user/UploadPrescriptionScreen';
-import RequirementsScreen from '../screens/user/RequirementsScreen';
-import InsuranceScreen from '../screens/user/InsuranceScreen';
-import SlotBookingScreen from '../screens/user/SlotBookingScreen';
-import ChargesScreen from '../screens/user/ChargesScreen';
-import ComplimentaryScreen from '../screens/user/ComplimentaryScreen';
+import BasicDetailsScreen from '../screens/user/booking/BasicDetailsScreen';
+import UploadPrescriptionScreen from '../screens/user/booking/UploadPrescriptionScreen';
+import RequirementsScreen from '../screens/user/booking/RequirementsScreen';
+import InsuranceScreen from '../screens/user/booking/InsuranceScreen';
+import SlotBookingScreen from '../screens/user/booking/SlotBookingScreen';
+import ChargesScreen from '../screens/user/booking/ChargesScreen';
+import ComplimentaryScreen from '../screens/user/booking/ComplimentaryScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import LabPartnerScreen from '../screens/vendor/LabPartnerScreen';
 import StaffPanelScreen from '../screens/staff/StaffPanelScreen';
 import TabNavigator, { TabParamList } from './TabNavigator';
 import { useColorScheme } from 'react-native';
 import { AlertProvider } from '../context/AlertContext';
+import BookingScreen from '../screens/user/BookingScreen';
 
 export type RootStackParamList = {
     Splash: undefined;
@@ -34,6 +35,7 @@ export type RootStackParamList = {
     LabPartner: undefined;
     StaffPanel: undefined;
     MainTab: NavigatorScreenParams<TabParamList>;
+    Booking: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -67,6 +69,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="LabPartner" component={LabPartnerScreen} />
                     <Stack.Screen name="StaffPanel" component={StaffPanelScreen} />
                     <Stack.Screen name="MainTab" component={TabNavigator} />
+                    <Stack.Screen name="Booking" component={BookingScreen} />
                 </Stack.Navigator>
             </NavigationContainer>
         </AlertProvider>

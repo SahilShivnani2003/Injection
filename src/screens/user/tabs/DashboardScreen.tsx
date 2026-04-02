@@ -106,9 +106,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                     style={styles.bookFollowUpBtn}
                     activeOpacity={0.8}
                     onPress={() =>
-                        navigation
-                            .getParent<NativeStackNavigationProp<RootStackParamList>>()
-                            .navigate('BasicDetails')
+                        navigation.getParent<NativeStackNavigationProp<RootStackParamList>>().navigate('Booking')
                     }
                 >
                     <LinearGradient

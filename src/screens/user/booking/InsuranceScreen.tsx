@@ -10,16 +10,14 @@ import {
   Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../theme/colors';
+import { Colors } from '../../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
-import { useBookingStore } from '../../store/useBookingStore';
-import { bookingAPI } from '../../service/apis/bookingService';
-import { validateInsuranceVerificationDTO } from '../../types/bookingDTO';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { useBookingStore } from '../../../store/useBookingStore';
+import { bookingAPI } from '../../../service/apis/bookingService';
+import { validateInsuranceVerificationDTO } from '../../../types/bookingDTO';
 
-type InsuranceProps = NativeStackScreenProps<RootStackParamList, 'Insurance'>;
-
-const InsuranceScreen = ({ navigation }: InsuranceProps) => {
+const InsuranceScreen = () => {
   const { bookingData, updateInsurance, setStep, isLoading, setLoading } = useBookingStore();
   const [policyNumber, setPolicyNumber] = useState(bookingData.policyNumber || '');
   const [insuranceDetails, setInsuranceDetails] = useState<any>(bookingData.insuranceDetails || null);
@@ -73,34 +71,18 @@ const InsuranceScreen = ({ navigation }: InsuranceProps) => {
     }
 
     setStep(6);
-    navigation.navigate('SlotBooking');
+    
   };
 
   const handleSkip = () => {
     updateInsurance({ hasInsurance: false });
     setStep(6);
-    navigation.navigate('SlotBooking');
+    
   };
 
   return (
     <View style={styles.root}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-      <LinearGradient
-        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={styles.header}
-      >
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Insurance Details</Text>
-      </LinearGradient>
+      
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.instruction}>
@@ -195,30 +177,6 @@ const InsuranceScreen = ({ navigation }: InsuranceProps) => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FCFF' },
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  backText: { color: Colors.textLight, fontSize: 20, fontWeight: 'bold' },
-  headerTitle: {
-    color: Colors.textLight,
-    fontSize: 20,
-    fontWeight: '700',
-  },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   instruction: {
     fontSize: 16,
