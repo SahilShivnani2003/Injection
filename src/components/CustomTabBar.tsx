@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,177 +8,123 @@ import {
     Dimensions,
     Platform,
 } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import { ITabItem } from '../types/ITabItems';
 import { Colors } from '../theme/colors';
 
-const { width } = Dimensions.get('window');
-const TAB_COUNT = 3;
-const TAB_WIDTH = width / TAB_COUNT;
-const PILL_WIDTH = 64;
-const PILL_HEIGHT = 32;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const TAB_ICONS: Record<string, { active: string; inactive: string }> = {
-    Dashboard: { active: '🏠', inactive: '🏠' },
-    Bookings:  { active: '📅', inactive: '📅' },
-    Profile:   { active: '👤', inactive: '👤' },
-};
+interface CustomTabBarProps {
+    state: any;
+    navigation: any;
+    tabs: ITabItem[];
+}
 
-// Individual tab — scale springs on press
-const TabItem: React.FC<{
-    route: BottomTabBarProps['state']['routes'][0];
-    index: number;
-    isFocused: boolean;
-    label: string | React.ReactNode;
+interface TabItemProps {
+    tab: ITabItem;
+    isActive: boolean;
     onPress: () => void;
     onLongPress: () => void;
-}> = ({ route, index, isFocused, label, onPress, onLongPress }) => {
-    const scale = useRef(new Animated.Value(1)).current;
-    const iconTranslateY = useRef(new Animated.Value(0)).current;
-    const labelOpacity = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+}
+
+const TabItemComponent = ({ tab, isActive, onPress, onLongPress }: TabItemProps) => {
+    // Scale animation for the active indicator bubble
+    const scaleAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+    // Translate-Y animation: icon floats up when active
+    const translateY = useRef(new Animated.Value(isActive ? -6 : 0)).current;
+    // Opacity for label
+    const labelOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
 
     useEffect(() => {
         Animated.parallel([
-            Animated.spring(iconTranslateY, {
-                toValue: isFocused ? -2 : 0,
+            Animated.spring(scaleAnim, {
+                toValue: isActive ? 1 : 0,
                 useNativeDriver: true,
                 tension: 80,
-                friction: 8,
+                friction: 10,
+            }),
+            Animated.spring(translateY, {
+                toValue: isActive ? -6 : 0,
+                useNativeDriver: true,
+                tension: 80,
+                friction: 10,
             }),
             Animated.timing(labelOpacity, {
-                toValue: isFocused ? 1 : 0,
+                toValue: isActive ? 1 : 0,
                 duration: 180,
                 useNativeDriver: true,
             }),
         ]).start();
-    }, [isFocused]);
-
-    const handlePressIn = () => {
-        Animated.spring(scale, {
-            toValue: 0.82,
-            useNativeDriver: true,
-            tension: 200,
-            friction: 10,
-        }).start();
-    };
-
-    const handlePressOut = () => {
-        Animated.spring(scale, {
-            toValue: 1,
-            useNativeDriver: true,
-            tension: 120,
-            friction: 6,
-        }).start();
-    };
-
-    const icons = TAB_ICONS[route.name] ?? { active: '●', inactive: '○' };
+    }, [isActive]);
 
     return (
         <TouchableOpacity
+            style={styles.tabItem}
             onPress={onPress}
             onLongPress={onLongPress}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={1}
-            style={styles.tab}
+            activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: isActive }}
         >
-            <Animated.View style={[styles.tabInner, { transform: [{ scale }] }]}>
-                {/* Active pill behind icon */}
-                {isFocused && (
-                    <LinearGradient
-                        colors={[Colors.gradientStart, Colors.gradientEnd]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.activePill}
-                    />
-                )}
-
-                <Animated.Text
-                    style={[
-                        styles.icon,
-                        { transform: [{ translateY: iconTranslateY }] },
-                    ]}
-                >
-                    {icons.active}
-                </Animated.Text>
-
-                <Animated.Text
-                    style={[
-                        styles.label,
-                        {
-                            opacity: labelOpacity,
-                            color: isFocused ? Colors.gradientStart : Colors.textMuted,
-                            transform: [
-                                {
-                                    translateY: labelOpacity.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [4, 0],
-                                    }),
-                                },
-                            ],
-                        },
-                    ]}
-                >
-                    {typeof label === 'string' ? label : route.name}
-                </Animated.Text>
+            {/* Active glowing bubble behind icon */}
+            <Animated.View
+                style={[
+                    styles.activeBubble,
+                    {
+                        transform: [{ scale: scaleAnim }],
+                        opacity: scaleAnim,
+                    },
+                ]}
+            >
+                <LinearGradient
+                    colors={['rgba(0, 212, 160, 0.15)', 'rgba(0, 212, 160, 0.05)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.activeBubbleGradient}
+                />
             </Animated.View>
+
+            {/* Icon */}
+            <Animated.View style={[styles.iconContainer, { transform: [{ translateY }] }]}>
+                <Ionicons
+                    name={isActive ? tab.icon : tab.iconOff}
+                    size={26}
+                    color={isActive ? Colors.white : Colors.textMuted}
+                />
+            </Animated.View>
+
+            {/* Label fades in under icon when active */}
+            <Animated.Text
+                style={[
+                    styles.tabLabel,
+                    {
+                        opacity: labelOpacity,
+                        color: Colors.gradientStart,
+                    },
+                ]}
+                numberOfLines={1}
+            >
+                {tab.label}
+            </Animated.Text>
         </TouchableOpacity>
     );
 };
 
-const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation, }) => {
-    // Sliding indicator
-    const slideAnim = useRef(new Animated.Value(state.index * TAB_WIDTH)).current;
-
-    useEffect(() => {
-        Animated.spring(slideAnim, {
-            toValue: state.index * TAB_WIDTH + (TAB_WIDTH - PILL_WIDTH) / 2,
-            useNativeDriver: true,
-            tension: 70,
-            friction: 10,
-        }).start();
-    }, [state.index]);
-
+const CustomTabBar = ({ state, navigation, tabs }: CustomTabBarProps) => {
     return (
         <View style={styles.wrapper}>
-            {/* Floating card shadow layer */}
-            <View style={styles.shadowLayer} />
-
+            {/* Floating card container */}
             <View style={styles.container}>
-                {/* Sliding top accent bar */}
-                <Animated.View
-                    style={[
-                        styles.slideIndicator,
-                        { transform: [{ translateX: slideAnim }] },
-                    ]}
-                >
-                    <LinearGradient
-                        colors={[Colors.gradientStart, Colors.gradientEnd]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.slideIndicatorInner}
-                    />
-                </Animated.View>
+                {/* Subtle inner top highlight */}
+                <View style={styles.topHighlight} />
 
-                {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
-                    const label =
-                        options.tabBarLabel !== undefined
-                            ? typeof options.tabBarLabel === 'function'
-                                ? options.tabBarLabel({
-                                      focused: state.index === index,
-                                      color: '',
-                                      position: 'below-icon',
-                                      children: '',
-                                  })
-                                : options.tabBarLabel
-                            : options.title !== undefined
-                            ? options.title
-                            : route.name;
+                {state.routes.map((route: any, index: number) => {
+                    const tab = tabs.find(t => t.name === route.name);
+                    if (!tab) return null;
 
-                    const isFocused = state.index === index;
+                    const isActive = state.index === index;
 
                     const onPress = () => {
                         const event = navigation.emit({
@@ -186,25 +132,20 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                             target: route.key,
                             canPreventDefault: true,
                         });
-                        if (!isFocused && !event.defaultPrevented) {
+                        if (!isActive && !event.defaultPrevented) {
                             navigation.navigate(route.name);
                         }
                     };
 
                     const onLongPress = () => {
-                        navigation.emit({
-                            type: 'tabLongPress',
-                            target: route.key,
-                        });
+                        navigation.emit({ type: 'tabLongPress', target: route.key });
                     };
 
                     return (
-                        <TabItem
+                        <TabItemComponent
                             key={route.key}
-                            route={route}
-                            index={index}
-                            isFocused={isFocused}
-                            label={label}
+                            tab={tab}
+                            isActive={isActive}
                             onPress={onPress}
                             onLongPress={onLongPress}
                         />
@@ -215,82 +156,88 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
     );
 };
 
-const BOTTOM_INSET = Platform.OS === 'ios' ? 20 : 0;
+const TAB_BAR_HEIGHT = 68;
+const HORIZONTAL_MARGIN = 20;
+const BOTTOM_OFFSET = Platform.OS === 'ios' ? 28 : 14;
 
 const styles = StyleSheet.create({
     wrapper: {
-        position: 'relative',
-        backgroundColor: 'transparent',
-    },
-    // Fake shadow card below
-    shadowLayer: {
         position: 'absolute',
-        top: 0,
-        left: 12,
-        right: 12,
-        bottom: -4,
-        backgroundColor: Colors.white,
-        borderRadius: 24,
-        shadowColor: Colors.shadowColor,
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-        elevation: 16,
+        bottom: BOTTOM_OFFSET,
+        left: HORIZONTAL_MARGIN,
+        right: HORIZONTAL_MARGIN,
+        alignItems: 'center',
     },
     container: {
-        flexDirection: 'row',
+        width: '100%',
+        height: TAB_BAR_HEIGHT,
         backgroundColor: Colors.white,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingBottom: BOTTOM_INSET + 6,
-        paddingTop: 0,
+        borderRadius: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        paddingHorizontal: 12,
+        // Multi-layer shadow for a lifted, floating feel
+        shadowColor: Colors.shadowColor,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 20,
+        elevation: 14,
         overflow: 'hidden',
-        borderTopWidth: 0,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 212, 160, 0.12)',
     },
-    // Top sliding gradient bar
-    slideIndicator: {
+    topHighlight: {
         position: 'absolute',
         top: 0,
-        width: PILL_WIDTH,
-        height: 3,
-        borderRadius: 2,
+        left: 20,
+        right: 20,
+        height: 1,
+        backgroundColor: 'rgba(0, 212, 160, 0.25)',
+        borderRadius: 1,
     },
-    slideIndicatorInner: {
+    tabItem: {
         flex: 1,
-        borderRadius: 2,
-    },
-
-    tab: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 12,
-        paddingBottom: 4,
-    },
-    tabInner: {
+        height: '100%',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-        minWidth: 56,
-        minHeight: 48,
     },
-    activePill: {
+    activeBubble: {
         position: 'absolute',
-        top: -4,
-        left: -12,
-        right: -12,
-        bottom: 14,
-        borderRadius: 14,
-        opacity: 0.10,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+        // subtle glow ring
+        shadowColor: Colors.gradientStart,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 10,
+        elevation: 8,
+        opacity: 1,
     },
-    icon: {
-        fontSize: 22,
-        marginBottom: 3,
+    activeBubbleGradient: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 42,
     },
-    label: {
-        fontSize: 11,
+    tabLabel: {
+        fontSize: 10,
         fontWeight: '700',
-        letterSpacing: 0.2,
+        marginTop: 4,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    inactiveDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'transparent',
+        marginTop: 2,
+    },
+    iconContainer: {
+        paddingTop: 18,
     },
 });
 

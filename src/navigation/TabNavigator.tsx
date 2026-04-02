@@ -5,6 +5,7 @@ import ProfileScreen from '../screens/user/tabs/ProfileScreen';
 import CustomTabBar from '../components/CustomTabBar';
 import BookingsScreen from '../screens/user/tabs/BookingsScreen';
 import { ITabItem } from '../types/ITabItems';
+import { View } from 'react-native';
 
 export type TabParamList = {
     Dashboard: undefined;
@@ -30,21 +31,24 @@ const TabItems: ITabItem[] = [
         label: 'Profile',
         icon: 'person',
         iconOff: 'person-outline',
-    }
-]
+    },
+];
 const Tab = createBottomTabNavigator<TabParamList>();
 
 export default function TabNavigator() {
     return (
-        <Tab.Navigator
-            tabBar={props => <CustomTabBar {...props} />}
-            screenOptions={{
-                headerShown: false,
-            }}
-        >
-            <Tab.Screen name="Dashboard" component={DashboardScreen} />
-            <Tab.Screen name="Bookings" component={BookingsScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
-        </Tab.Navigator>
+        <View style={{ flex: 1 }}>
+            <Tab.Navigator
+                tabBar={props => <CustomTabBar {...props} tabs={TabItems} />}
+                screenOptions={{
+                    headerShown: false,
+                    tabBarStyle: { display: 'none' },
+                }}
+            >
+                <Tab.Screen name="Dashboard" component={DashboardScreen} />
+                <Tab.Screen name="Bookings" component={BookingsScreen} />
+                <Tab.Screen name="Profile" component={ProfileScreen} />
+            </Tab.Navigator>
+        </View>
     );
 }
