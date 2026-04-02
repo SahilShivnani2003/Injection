@@ -37,12 +37,37 @@ type IStepType = {
 
 const steps: IStepType[] = [
     { id: 1, title: 'Basic Details', subtitle: 'Your information', icon: 'person-outline' },
-    { id: 2, title: 'Upload Prescription', subtitle: 'Upload your prescription', icon: 'medical-outline' },
-    { id: 3, title: 'Insurance Details', subtitle: 'Provide insurance information', icon: 'card-outline' },
-    { id: 4, title: 'Select Services', subtitle: 'Review & book', icon: 'checkmark-circle-outline' },
-    {id: 5, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline'},
-    {id: 6, title: 'Review & Charges', subtitle: 'Review & confirm', icon: 'checkmark-done-outline'},
-    {id: 7, title: 'Complimentary & Confirmation', subtitle: 'Your appointment is booked', icon: 'checkmark-circle'},
+    {
+        id: 2,
+        title: 'Upload Prescription',
+        subtitle: 'Upload your prescription',
+        icon: 'medical-outline',
+    },
+    {
+        id: 3,
+        title: 'Insurance Details',
+        subtitle: 'Provide insurance information',
+        icon: 'card-outline',
+    },
+    {
+        id: 4,
+        title: 'Select Services',
+        subtitle: 'Review & book',
+        icon: 'checkmark-circle-outline',
+    },
+    { id: 5, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
+    {
+        id: 6,
+        title: 'Review & Charges',
+        subtitle: 'Review & confirm',
+        icon: 'checkmark-done-outline',
+    },
+    {
+        id: 7,
+        title: 'Complimentary & Confirmation',
+        subtitle: 'Your appointment is booked',
+        icon: 'checkmark-circle',
+    },
 ];
 
 type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
@@ -50,6 +75,18 @@ type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 const BookingScreen = ({ navigation }: BookingScreenProps) => {
     const [current, setCurrent] = useState<IStepType>(steps[0]);
     const total = steps.length;
+
+    //Basic Details Data
+    const [basicDetails, setBasicDetails] = useState({
+        patientName: '',
+        age: '',
+        sex: '',
+        address: '',
+        pincode: '',
+        currentLocation: '',
+        phoneNumber: '',
+        email: '',
+    });
 
     // Animation refs
     const sheetY = useRef(new Animated.Value(60)).current;
@@ -109,25 +146,23 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     });
 
     const renderSteps = () => {
-
         switch (current.id) {
             case 1:
-                return <BasicDetailsScreen/>
+                return <BasicDetailsScreen basicDetails={basicDetails} setBasicDetails={setBasicDetails} />;
             case 2:
-                return <UploadPrescriptionScreen/>
-            case 3: 
-                return <InsuranceScreen/>
-            case 4: 
-                return <RequirementsScreen/>
+                return <UploadPrescriptionScreen />;
+            case 3:
+                return <InsuranceScreen />;
+            case 4:
+                return <RequirementsScreen />;
             case 5:
-                return <SlotBookingScreen/>
+                return <SlotBookingScreen />;
             case 6:
-                return <ChargesScreen/>
+                return <ChargesScreen />;
             case 7:
-                return <ComplimentaryScreen/>
+                return <ComplimentaryScreen />;
         }
-
-    }
+    };
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -139,7 +174,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 end={{ x: 0.9, y: 1 }}
                 style={styles.header}
             >
-
                 <Animated.View style={[styles.headerContent, { opacity: headerOpacity }]}>
                     {/* Top bar */}
                     <View style={styles.headerTop}>
@@ -200,7 +234,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={styles.scrollContent}
                     >
-                        
+                        {renderSteps()}
                     </ScrollView>
 
                     {/* ── Bottom Navigation ── */}
@@ -382,7 +416,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     scrollContent: {
-        paddingHorizontal: 24,
+        paddingHorizontal: 16,
         paddingTop: 20,
         paddingBottom: 120,
     },

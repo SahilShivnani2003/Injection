@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../theme/colors';
-import { useBookingStore } from '../../../store/useBookingStore';
-import { validatePatientDetailsDTO } from '../../../types/bookingDTO';
 import { FieldInput } from '../../../components/FieldInput';
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
@@ -52,51 +44,7 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 );
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
-const BasicDetailsScreen = () => {
-    const { bookingData, updateBasicDetails, setStep, isLoading, setLoading } = useBookingStore();
-
-    const [form, setForm] = useState({
-        patientName: bookingData.patientName || '',
-        age: bookingData.age?.toString() || '',
-        sex: bookingData.sex || '',
-        address: bookingData.address || '',
-        pinCode: bookingData.pinCode || '',
-        currentLocation: bookingData.currentLocation || '',
-        alternateMobile: bookingData.alternateMobile || '',
-        email: bookingData.email || '',
-    });
-
-    const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
-
-    const handleNext = async () => {
-        const patientData = {
-            patientName: form.patientName,
-            age: parseInt(form.age),
-            sex: form.sex as 'Male' | 'Female' | 'Other',
-            address: form.address,
-            pinCode: form.pinCode,
-            currentLocation: form.currentLocation,
-            alternateMobile: form.alternateMobile || undefined,
-            email: form.email,
-        };
-
-        const errors = validatePatientDetailsDTO(patientData);
-        if (errors.length > 0) {
-            Alert.alert('Validation Error', errors.join('\n'));
-            return;
-        }
-
-        try {
-            setLoading(true);
-            updateBasicDetails(patientData);
-            setStep(2);
-        } catch (error) {
-            Alert.alert('Error', 'Failed to save patient details. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
+const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
     return (
         <View style={styles.root}>
             {/* ── Personal info ──────────────────────────────────────── */}
@@ -105,8 +53,8 @@ const BasicDetailsScreen = () => {
             <FieldInput
                 label="Patient Name"
                 required
-                value={form.patientName}
-                onChangeText={v => update('patientName', v)}
+                value={basicDetails.patientName}
+                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, patientName: v }))}
             />
 
             <View style={styles.rowTwo}>
@@ -114,14 +62,22 @@ const BasicDetailsScreen = () => {
                     <FieldInput
                         label="Age"
                         required
-                        value={form.age}
-                        onChangeText={v => update('age', v.replace(/[^0-9]/g, ''))}
+                        value={basicDetails.age}
+                        onChangeText={v =>
+                            setBasicDetails((prev: any) => ({
+                                ...prev,
+                                age: v.replace(/[^0-9]/g, ''),
+                            }))
+                        }
                         keyboardType="number-pad"
                         maxLength={3}
                     />
                 </View>
                 <View style={styles.rowHalf}>
-                    <SexSelector value={form.sex} onChange={v => update('sex', v)} />
+                    <SexSelector
+                        value={basicDetails.sex}
+                        onChange={v => setBasicDetails((prev: any) => ({ ...prev, sex: v }))}
+                    />
                 </View>
             </View>
 
@@ -131,8 +87,8 @@ const BasicDetailsScreen = () => {
             <FieldInput
                 label="Address"
                 required
-                value={form.address}
-                onChangeText={v => update('address', v)}
+                value={basicDetails.address}
+                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, address: v }))}
                 multiline
             />
 
@@ -141,8 +97,13 @@ const BasicDetailsScreen = () => {
                     <FieldInput
                         label="Pin Code"
                         required
-                        value={form.pinCode}
-                        onChangeText={v => update('pinCode', v.replace(/[^0-9]/g, ''))}
+                        value={basicDetails.pincode}
+                        onChangeText={v =>
+                            setBasicDetails((prev: any) => ({
+                                ...prev,
+                                pincode: v.replace(/[^0-9]/g, ''),
+                            }))
+                        }
                         keyboardType="number-pad"
                         maxLength={6}
                     />
@@ -150,8 +111,10 @@ const BasicDetailsScreen = () => {
                 <View style={styles.rowHalf}>
                     <FieldInput
                         label="Current Location"
-                        value={form.currentLocation}
-                        onChangeText={v => update('currentLocation', v)}
+                        value={basicDetails.currentLocation}
+                        onChangeText={v =>
+                            setBasicDetails((prev: any) => ({ ...prev, currentLocation: v }))
+                        }
                         rightIcon={<Text style={styles.pinIcon}>📍</Text>}
                     />
                 </View>
@@ -161,17 +124,22 @@ const BasicDetailsScreen = () => {
             <SectionLabel title="Contact (Optional)" />
 
             <FieldInput
-                label="Alternate Mobile"
-                value={form.alternateMobile}
-                onChangeText={v => update('alternateMobile', v.replace(/[^0-9]/g, ''))}
+                label="Phone Number"
+                value={basicDetails.phoneNumber}
+                onChangeText={v =>
+                    setBasicDetails((prev: any) => ({
+                        ...prev,
+                        phoneNumber: v.replace(/[^0-9]/g, ''),
+                    }))
+                }
                 keyboardType="phone-pad"
                 maxLength={10}
             />
 
             <FieldInput
                 label="Email Address"
-                value={form.email}
-                onChangeText={v => update('email', v)}
+                value={basicDetails.email}
+                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, email: v }))}
                 keyboardType="email-address"
             />
         </View>
@@ -179,7 +147,7 @@ const BasicDetailsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#F0F7FA' },
+    root: { flex: 1, backgroundColor: Colors.white },
 
     fieldWrap: { marginBottom: 16 },
     fieldLabel: {
@@ -191,7 +159,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     required: { color: Colors.gradientStart },
-    
+
     // Section divider
     sectionRow: {
         flexDirection: 'row',

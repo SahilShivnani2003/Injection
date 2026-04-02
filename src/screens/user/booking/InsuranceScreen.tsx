@@ -156,27 +156,13 @@ const InsuranceScreen = () => {
           </View>
         )}
 
-        <View style={styles.buttonSection}>
-          <TouchableOpacity style={styles.skipBtn} onPress={handleSkip} activeOpacity={0.8}>
-            <Text style={styles.skipText}>Skip Insurance</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.continueBtn, !insuranceDetails && styles.continueBtnDisabled]}
-            onPress={handleContinue}
-            disabled={!insuranceDetails}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.continueText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FCFF' },
+  root: { flex: 1, backgroundColor: Colors.white },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   instruction: {
     fontSize: 16,
@@ -232,32 +218,7 @@ const styles = StyleSheet.create({
   },
   detailLabel: { fontSize: 14, color: Colors.textMedium, fontWeight: '500' },
   detailValue: { fontSize: 14, color: Colors.textDark, fontWeight: '600' },
-  buttonSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  skipBtn: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-  },
-  skipText: { fontSize: 16, fontWeight: '600', color: Colors.textDark },
-  continueBtn: {
-    flex: 1,
-    backgroundColor: Colors.gradientStart,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  continueBtnDisabled: {
-    backgroundColor: Colors.textMuted,
-  },
-  continueText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  
 });
 
 export default InsuranceScreen;

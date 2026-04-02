@@ -1,10 +1,10 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
 import React from 'react';
 import DashboardScreen from '../screens/user/tabs/DashboardScreen';
 import ProfileScreen from '../screens/user/tabs/ProfileScreen';
 import CustomTabBar from '../components/CustomTabBar';
 import BookingsScreen from '../screens/user/tabs/BookingsScreen';
+import { ITabItem } from '../types/ITabItems';
 
 export type TabParamList = {
     Dashboard: undefined;
@@ -12,6 +12,26 @@ export type TabParamList = {
     Profile: undefined;
 };
 
+const TabItems: ITabItem[] = [
+    {
+        name: 'Dashboard',
+        label: 'Dashboard',
+        icon: 'home',
+        iconOff: 'home-outline',
+    },
+    {
+        name: 'Bookings',
+        label: 'Bookings',
+        icon: 'calendar',
+        iconOff: 'calendar-outline',
+    },
+    {
+        name: 'Profile',
+        label: 'Profile',
+        icon: 'person',
+        iconOff: 'person-outline',
+    }
+]
 const Tab = createBottomTabNavigator<TabParamList>();
 
 export default function TabNavigator() {
