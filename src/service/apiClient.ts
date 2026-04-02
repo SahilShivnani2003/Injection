@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useAuthStore } from "../store/useAuthStore";
 
-const BASE_URL = 'https://ramjikisena-com-new.onrender.com/api';
+const BASE_URL = 'https://injection-grq4.onrender.com/api';
 
 export const publicClient = axios.create({
     baseURL: BASE_URL,

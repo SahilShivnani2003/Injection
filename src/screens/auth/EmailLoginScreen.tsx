@@ -21,12 +21,14 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useAlert } from '../../context/AlertContext';
 import Loader from '../../components/Loader';
 import { userApi } from '../../service/apis/userService';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const { width, height } = Dimensions.get('window');
 
 type EmailLoginProps = NativeStackScreenProps<RootStackParamList, 'EmailLogin'>;
 
 const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
+    const { login } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -75,6 +77,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             const response = await userApi.login({ email, password });
             if (response.status === 200) {
                 alert.success('Login Successful', 'Welcome back!');
+                login(response.data.token, response.data.user);
                 navigation.replace('MainTab', {
                     screen: 'Dashboard',
                 });

@@ -24,12 +24,14 @@ const { width, height } = Dimensions.get('window');
 type loginPros = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 // ── Individual OTP Cell ──────────────────────────────────────────────────────
-const OtpCell: React.FC<{ char: string; active: boolean; filled: boolean }> = ({
-    char,
-    active,
-    filled,
-}) => {
+const OtpCell: React.FC<{
+    char: string;
+    active: boolean;
+    filled: boolean;
+}> = ({ char, active, filled }) => {
     const borderAnim = useRef(new Animated.Value(0)).current;
+    const cursorAnim = useRef(new Animated.Value(1)).current;
+
     useEffect(() => {
         Animated.timing(borderAnim, {
             toValue: active ? 1 : 0,
@@ -37,13 +39,50 @@ const OtpCell: React.FC<{ char: string; active: boolean; filled: boolean }> = ({
             useNativeDriver: false,
         }).start();
     }, [active]);
+
+    // Blinking cursor animation
+    useEffect(() => {
+        if (active && !char) {
+            const blink = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(cursorAnim, {
+                        toValue: 0,
+                        duration: 500,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(cursorAnim, {
+                        toValue: 1,
+                        duration: 500,
+                        useNativeDriver: true,
+                    }),
+                ]),
+            );
+            blink.start();
+            return () => blink.stop();
+        } else {
+            cursorAnim.setValue(1);
+        }
+    }, [active, char]);
+
     const borderColor = borderAnim.interpolate({
         inputRange: [0, 1],
         outputRange: ['#D8E8EE', Colors.gradientStart],
     });
+
     return (
-        <Animated.View style={[styles.otpCell, { borderColor }, filled && styles.otpCellFilled]}>
-            <Text style={styles.otpChar}>{char}</Text>
+        <Animated.View
+            style={[
+                styles.otpCell,
+                { borderColor },
+                filled && styles.otpCellFilled,
+                active && styles.otpCellActive,
+            ]}
+        >
+            {char ? (
+                <Text style={styles.otpChar}>{char}</Text>
+            ) : active ? (
+                <Animated.View style={[styles.cursor, { opacity: cursorAnim }]} />
+            ) : null}
         </Animated.View>
     );
 };
@@ -72,6 +111,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
         outputRange: ['#D8E8EE', Colors.gradientStart],
     });
 
+    // ── Entrance animation ────────────────────────────────────────────────────
     useEffect(() => {
         Animated.parallel([
             Animated.timing(logoY, {
@@ -97,6 +137,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
         ]).start();
     }, []);
 
+    // ── Mobile border focus ───────────────────────────────────────────────────
     useEffect(() => {
         Animated.timing(mobileBorder, {
             toValue: mobileActive ? 1 : 0,
@@ -105,6 +146,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
         }).start();
     }, [mobileActive]);
 
+    // ── OTP section slide-in ──────────────────────────────────────────────────
     useEffect(() => {
         if (otpSent) {
             Animated.parallel([
@@ -115,7 +157,10 @@ const LoginScreen = ({ navigation }: loginPros) => {
                     useNativeDriver: true,
                 }),
                 Animated.timing(otpOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-            ]).start(() => otpRef.current?.focus());
+            ]).start(() => {
+                // Small delay so animation completes before focusing
+                setTimeout(() => otpRef.current?.focus(), 50);
+            });
         } else {
             Animated.parallel([
                 Animated.timing(otpSlide, { toValue: 0, duration: 260, useNativeDriver: true }),
@@ -143,7 +188,6 @@ const LoginScreen = ({ navigation }: loginPros) => {
             return;
         }
 
-        // Navigate based on user type
         switch (userType) {
             case 'labpartner':
                 navigation.navigate('LabPartner');
@@ -153,26 +197,28 @@ const LoginScreen = ({ navigation }: loginPros) => {
                 break;
             case 'patient':
             default:
-                navigation.navigate('MainTab', {
-                    screen: 'Dashboard',
-                });
+                navigation.navigate('MainTab', { screen: 'Dashboard' });
                 break;
         }
     };
 
     const otpTranslateY = otpSlide.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
     const canLogin = agreed && otp.length >= 4 && otpSent;
+
+    // Active index: where the cursor sits (next character position)
+    const activeIndex = otpFocused ? Math.min(otp.length, 5) : -1;
+
     const otpCells = Array.from({ length: 6 }, (_, i) => ({
         char: otp[i] ?? '',
         filled: !!otp[i],
-        active: otpFocused && otp.length === i,
+        active: activeIndex === i,
     }));
 
     return (
         <View style={styles.root}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-            {/* ── Gradient Header ─────────────────────────────────────────────── */}
+            {/* ── Gradient Header ─────────────────────────────────────────── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                 start={{ x: 0.1, y: 0 }}
@@ -200,10 +246,11 @@ const LoginScreen = ({ navigation }: loginPros) => {
                 </Animated.View>
             </LinearGradient>
 
-            {/* ── White Bottom Sheet ──────────────────────────────────────────── */}
+            {/* ── White Bottom Sheet ──────────────────────────────────────── */}
             <KeyboardAvoidingView
                 style={styles.sheetWrapper}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
                 <Animated.View
                     style={[
@@ -215,25 +262,28 @@ const LoginScreen = ({ navigation }: loginPros) => {
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                         bounces={false}
+                        contentContainerStyle={styles.scrollContent}
                     >
                         <Text style={styles.sheetTitle}>Welcome Back</Text>
                         <Text style={styles.sheetSub}>
                             Enter your mobile number to receive an OTP
                         </Text>
 
-                        {/* User Type Selection */}
+                        {/* ── User Type Selection ─────────────────────────── */}
                         <Text style={styles.fieldLabel}>Login as</Text>
                         <View style={styles.userTypeRow}>
                             {[
                                 { key: 'patient', label: 'Patient', icon: '👤' },
                                 { key: 'labpartner', label: 'Lab Partner', icon: '🏥' },
                                 { key: 'staff', label: 'Staff', icon: '👨‍⚕️' },
-                            ].map((type) => (
+                            ].map((type, index) => (
                                 <TouchableOpacity
                                     key={type.key}
                                     style={[
                                         styles.userTypeBtn,
                                         userType === type.key && styles.userTypeBtnActive,
+                                        index === 0 && styles.userTypeBtnFirst,
+                                        index === 2 && styles.userTypeBtnLast,
                                     ]}
                                     onPress={() => setUserType(type.key as any)}
                                     activeOpacity={0.7}
@@ -251,7 +301,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             ))}
                         </View>
 
-                        {/* Mobile field */}
+                        {/* ── Mobile Field ─────────────────────────────────── */}
                         <Text style={styles.fieldLabel}>Mobile Number</Text>
                         <Animated.View
                             style={[styles.mobileRow, { borderColor: mobileBorderColor }]}
@@ -271,6 +321,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                                 maxLength={10}
                                 onFocus={() => setMobileActive(true)}
                                 onBlur={() => setMobileActive(false)}
+                                returnKeyType="done"
                             />
                             {mobile.length === 10 && (
                                 <View style={styles.validBadge}>
@@ -279,7 +330,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             )}
                         </Animated.View>
 
-                        {/* Send / Resend OTP */}
+                        {/* ── Send / Resend OTP ─────────────────────────────── */}
                         {!otpSent ? (
                             <TouchableOpacity
                                 style={[styles.sendBtn, mobile.length !== 10 && styles.btnDimmed]}
@@ -306,46 +357,60 @@ const LoginScreen = ({ navigation }: loginPros) => {
                                         setOtp('');
                                         setOtpSent(false);
                                     }}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                 >
                                     <Text style={styles.resendText}>Resend</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
-                        {/* OTP entry */}
-                        <Animated.View
-                            style={{ opacity: otpOp, transform: [{ translateY: otpTranslateY }] }}
-                        >
-                            <Text style={[styles.fieldLabel, { marginTop: 24 }]}>
-                                One-Time Password
-                            </Text>
-                            <TextInput
-                                ref={otpRef}
-                                style={styles.hiddenInput}
-                                value={otp}
-                                onChangeText={t => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                onFocus={() => setOtpFocused(true)}
-                                onBlur={() => setOtpFocused(false)}
-                            />
-                            <TouchableOpacity
-                                style={styles.otpRow}
-                                onPress={() => otpRef.current?.focus()}
-                                activeOpacity={1}
+                        {/* ── OTP Entry ─────────────────────────────────────── */}
+                        {otpSent ? (
+                            <Animated.View
+                                pointerEvents={otpSent ? 'auto' : 'none'}
+                                style={[
+                                    styles.otpSection,
+                                    { opacity: otpOp, transform: [{ translateY: otpTranslateY }] },
+                                ]}
                             >
-                                {otpCells.map((c, i) => (
-                                    <OtpCell
-                                        key={i}
-                                        char={c.char}
-                                        active={c.active}
-                                        filled={c.filled}
-                                    />
-                                ))}
-                            </TouchableOpacity>
-                        </Animated.View>
+                                <Text style={[styles.fieldLabel, { marginTop: 24 }]}>
+                                    One-Time Password
+                                </Text>
 
-                        {/* Terms */}
+                                {/* Hidden real input — off-screen, NOT zIndex:-1 */}
+                                <TextInput
+                                    ref={otpRef}
+                                    style={styles.hiddenInput}
+                                    value={otp}
+                                    onChangeText={t => setOtp(t.replace(/[^0-9]/g, '').slice(0, 6))}
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                    onFocus={() => setOtpFocused(true)}
+                                    onBlur={() => setOtpFocused(false)}
+                                    caretHidden
+                                    autoCorrect={false}
+                                    returnKeyType="done"
+                                />
+
+                                {/* Visual OTP cells */}
+                                <TouchableOpacity
+                                    style={styles.otpRow}
+                                    onPress={() => otpRef.current?.focus()}
+                                    activeOpacity={1}
+                                >
+                                    {otpCells.map((c, i) => (
+                                        <OtpCell
+                                            key={i}
+                                            char={c.char}
+                                            active={c.active}
+                                            filled={c.filled}
+                                        />
+                                    ))}
+                                </TouchableOpacity>
+                            </Animated.View>
+                        ) : null}
+
+                        {/* ── Terms ─────────────────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.termsRow}
                             onPress={() => setAgreed(!agreed)}
@@ -361,7 +426,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Login CTA */}
+                        {/* ── Login CTA ─────────────────────────────────────── */}
                         <TouchableOpacity
                             style={[styles.loginBtn, !canLogin && styles.btnDimmed]}
                             onPress={handleLogin}
@@ -393,9 +458,13 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             Your data is encrypted and never shared.
                         </Text>
 
-                        {/* Alternative Login */}
+                        {/* ── Alternative Login ─────────────────────────────── */}
                         <View style={styles.alternativeContainer}>
-                            <Text style={styles.alternativeText}>Or sign in with</Text>
+                            <View style={styles.dividerRow}>
+                                <View style={styles.dividerLine} />
+                                <Text style={styles.alternativeText}>Or sign in with</Text>
+                                <View style={styles.dividerLine} />
+                            </View>
                             <TouchableOpacity
                                 style={styles.emailLoginBtn}
                                 onPress={() => navigation.replace('EmailLogin')}
@@ -405,14 +474,15 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Register Link */}
+                        {/* ── Register Link ─────────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.registerLink}
                             onPress={() => navigation.navigate('Register')}
                             activeOpacity={0.7}
                         >
                             <Text style={styles.registerText}>
-                                New user? <Text style={styles.registerLinkText}>Create Account</Text>
+                                New user?{' '}
+                                <Text style={styles.registerLinkText}>Create Account</Text>
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>
@@ -427,7 +497,7 @@ const RADIUS = 32;
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F0F7FA' },
 
-    // Header
+    // ── Header ─────────────────────────────────────────────────────────────
     header: {
         height: height * 0.38,
         alignItems: 'center',
@@ -501,21 +571,23 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
 
-    // Sheet
+    // ── Sheet ──────────────────────────────────────────────────────────────
     sheetWrapper: { flex: 1, marginTop: -RADIUS },
     sheet: {
         flex: 1,
         backgroundColor: Colors.white,
         borderTopLeftRadius: RADIUS,
         borderTopRightRadius: RADIUS,
-        paddingHorizontal: 28,
-        paddingTop: 32,
-        paddingBottom: 32,
         shadowColor: '#004466',
         shadowOffset: { width: 0, height: -6 },
         shadowOpacity: 0.08,
         shadowRadius: 20,
         elevation: 12,
+    },
+    scrollContent: {
+        paddingHorizontal: 24,
+        paddingTop: 32,
+        paddingBottom: 40,
     },
     sheetTitle: {
         fontSize: 22,
@@ -531,7 +603,7 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
 
-    // Labels
+    // ── Labels ─────────────────────────────────────────────────────────────
     fieldLabel: {
         fontSize: 11,
         fontWeight: '700',
@@ -541,79 +613,119 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
 
-    // Mobile input
+    // ── User Type ──────────────────────────────────────────────────────────
+    userTypeRow: {
+        flexDirection: 'row',
+        marginBottom: 24,
+        gap: 10,
+    },
+    userTypeBtn: {
+        flex: 1,
+        backgroundColor: '#F8FBFC',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#E8F0F4',
+    },
+    userTypeBtnFirst: { marginLeft: 0 },
+    userTypeBtnLast: { marginRight: 0 },
+    userTypeBtnActive: {
+        borderColor: Colors.gradientStart,
+        backgroundColor: '#E6FAF5',
+    },
+    userTypeIcon: {
+        fontSize: 22,
+        marginBottom: 6,
+    },
+    userTypeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.textMuted,
+        textAlign: 'center',
+    },
+    userTypeTextActive: {
+        color: Colors.gradientStart,
+        fontWeight: '700',
+    },
+
+    // ── Mobile Input ───────────────────────────────────────────────────────
     mobileRow: {
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderRadius: 16,
+        borderRadius: 14,
         backgroundColor: '#F8FBFC',
-        marginBottom: 18,
-        height: 56,
+        marginBottom: 16,
+        height: 54,
         overflow: 'hidden',
     },
     prefixBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
+        paddingLeft: 14,
+        paddingRight: 12,
         gap: 6,
     },
     flag: { fontSize: 18 },
     code: { fontSize: 15, fontWeight: '700', color: Colors.textDark },
-    sep: { width: 1.5, height: 28, backgroundColor: '#D8E8EE' },
+    sep: { width: 1.5, height: 26, backgroundColor: '#D8E8EE' },
     mobileInput: {
         flex: 1,
         fontSize: 16,
         color: Colors.textDark,
         fontWeight: '600',
         paddingHorizontal: 14,
+        paddingVertical: 0, // prevents Android vertical clipping
+        height: 54,
     },
     validBadge: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: Colors.gradientStart,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
     },
-    validTick: { color: Colors.white, fontSize: 14, fontWeight: '800' },
+    validTick: { color: Colors.white, fontSize: 13, fontWeight: '800' },
 
-    // Send OTP
+    // ── Send OTP Button ────────────────────────────────────────────────────
     sendBtn: {
-        borderRadius: 16,
+        borderRadius: 14,
         overflow: 'hidden',
         shadowColor: Colors.gradientStart,
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.35,
         shadowRadius: 12,
-        elevation: 8,
+        elevation: 6,
     },
-    btnGrad: { paddingVertical: 16, alignItems: 'center' },
+    btnGrad: { paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
     sendBtnText: {
         color: Colors.white,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '800',
         letterSpacing: 0.8,
     },
     btnDimmed: { opacity: 0.45, shadowOpacity: 0, elevation: 0 },
 
-    // Sent row
+    // ── Sent Row ───────────────────────────────────────────────────────────
     sentRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 4,
+        marginBottom: 8,
+        gap: 12,
     },
     sentBadge: {
+        flex: 1,
         backgroundColor: '#EAF9F4',
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: '#B0E8D4',
-        flex: 1,
-        marginRight: 12,
     },
     sentText: { fontSize: 12, color: '#0F7A58', fontWeight: '600' },
     resendText: {
@@ -623,9 +735,24 @@ const styles = StyleSheet.create({
         textDecorationLine: 'underline',
     },
 
-    // OTP
-    hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0, zIndex: -1 },
-    otpRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
+    // ── OTP ────────────────────────────────────────────────────────────────
+    otpSection: {
+        // Wrapper keeps the section from intercepting touches when hidden
+    },
+    hiddenInput: {
+        position: 'absolute',
+        top: -9999,
+        left: -9999,
+        width: 1,
+        height: 1,
+        opacity: 0,
+    },
+    otpRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 8,
+        marginBottom: 4,
+    },
     otpCell: {
         flex: 1,
         height: 56,
@@ -635,16 +762,34 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    otpCellFilled: { backgroundColor: '#EAF9F4', borderColor: Colors.accent },
-    otpChar: { fontSize: 22, fontWeight: '800', color: Colors.textDark },
+    otpCellActive: {
+        backgroundColor: '#F0FAFA',
+    },
+    otpCellFilled: {
+        backgroundColor: '#EAF9F4',
+        borderColor: Colors.accent,
+    },
+    otpChar: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.textDark,
+        lineHeight: 28,
+    },
+    // Blinking cursor bar shown inside the active empty cell
+    cursor: {
+        width: 2,
+        height: 24,
+        borderRadius: 1,
+        backgroundColor: Colors.gradientStart,
+    },
 
-    // Terms
+    // ── Terms ──────────────────────────────────────────────────────────────
     termsRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 12,
         marginTop: 24,
         marginBottom: 20,
+        gap: 12,
     },
     checkbox: {
         width: 22,
@@ -656,52 +801,69 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 1,
+        flexShrink: 0,
     },
     checkboxOn: { backgroundColor: Colors.accent, borderColor: Colors.accentDark },
     tick: { color: Colors.white, fontSize: 13, fontWeight: '900' },
     termsText: { flex: 1, fontSize: 13, color: Colors.textMuted, lineHeight: 20 },
-    termsLink: { color: Colors.gradientStart, fontWeight: '700', textDecorationLine: 'underline' },
+    termsLink: {
+        color: Colors.gradientStart,
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
 
-    // Login
+    // ── Login CTA ──────────────────────────────────────────────────────────
     loginBtn: {
-        borderRadius: 16,
+        borderRadius: 14,
         overflow: 'hidden',
         shadowColor: Colors.accentDark,
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.38,
         shadowRadius: 14,
-        elevation: 8,
+        elevation: 7,
     },
-    loginBtnText: { color: Colors.white, fontSize: 17, fontWeight: '800', letterSpacing: 0.5 },
+    loginBtnText: { color: Colors.white, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
     loginBtnTextOff: { color: '#A0B8C4' },
 
     footerNote: {
         textAlign: 'center',
         fontSize: 11,
         color: '#A8BEC8',
-        marginTop: 20,
+        marginTop: 18,
         lineHeight: 17,
         paddingHorizontal: 10,
     },
 
-    // Alternative Login
+    // ── Alternative Login ──────────────────────────────────────────────────
     alternativeContainer: {
         alignItems: 'center',
-        marginTop: 24,
+        marginTop: 28,
+        marginBottom: 4,
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
         marginBottom: 16,
+        gap: 10,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E4EEF2',
     },
     alternativeText: {
-        fontSize: 14,
+        fontSize: 13,
         color: Colors.textMuted,
-        marginBottom: 12,
+        paddingHorizontal: 4,
     },
     emailLoginBtn: {
-        backgroundColor: '#F0F7FA',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        backgroundColor: '#F4F9FB',
+        paddingHorizontal: 24,
+        paddingVertical: 13,
         borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E8F0F4',
+        borderWidth: 1.5,
+        borderColor: '#E0EDF2',
     },
     emailLoginText: {
         fontSize: 14,
@@ -709,11 +871,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Register Link
+    // ── Register Link ──────────────────────────────────────────────────────
     registerLink: {
         alignItems: 'center',
-        marginTop: 16,
-        paddingVertical: 8,
+        marginTop: 20,
+        paddingVertical: 4,
     },
     registerText: {
         fontSize: 14,
@@ -721,43 +883,8 @@ const styles = StyleSheet.create({
     },
     registerLinkText: {
         color: Colors.gradientStart,
-        fontWeight: '600',
+        fontWeight: '700',
         textDecorationLine: 'underline',
-    },
-
-    // User Type Selection
-    userTypeRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    userTypeBtn: {
-        flex: 1,
-        backgroundColor: Colors.white,
-        borderRadius: 12,
-        paddingVertical: 16,
-        paddingHorizontal: 8,
-        alignItems: 'center',
-        marginHorizontal: 4,
-        borderWidth: 2,
-        borderColor: '#E8F0F4',
-    },
-    userTypeBtnActive: {
-        borderColor: Colors.gradientStart,
-        backgroundColor: '#E6FAF5',
-    },
-    userTypeIcon: {
-        fontSize: 24,
-        marginBottom: 6,
-    },
-    userTypeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: Colors.textMedium,
-        textAlign: 'center',
-    },
-    userTypeTextActive: {
-        color: Colors.gradientStart,
     },
 });
 

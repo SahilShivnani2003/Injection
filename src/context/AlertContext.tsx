@@ -1,120 +1,210 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { AlertState, AlertConfig, AlertType } from '../types/alert';
+import React, { createContext, useCallback, useContext, useState, useRef } from 'react';
+import CustomAlert, { AlertButton, AlertType } from '../components/CustomAlert';
 
-interface AlertContextType {
-  alerts: AlertState[];
-  success: (title: string, message: string, duration?: number) => void;
-  error: (title: string, message: string, duration?: number) => void;
-  info: (title: string, message: string, duration?: number) => void;
-  warning: (title: string, message: string, duration?: number) => void;
-  confirm: (config: Omit<AlertConfig, 'type'>) => void;
-  show: (config: AlertConfig) => void;
-  dismiss: (id: string) => void;
-  dismissAll: () => void;
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface AlertOptions {
+    type?: AlertType;
+    title: string;
+    message?: string;
+    buttons?: AlertButton[];
+    dismissable?: boolean;
 }
 
-const AlertContext = createContext<AlertContextType | undefined>(undefined);
-
-interface AlertProviderProps {
-  children: ReactNode;
+interface AlertContextValue {
+    show: (options: AlertOptions) => void;
+    success: (title: string, message?: string, buttons?: AlertButton[]) => void;
+    error: (title: string, message?: string, buttons?: AlertButton[]) => void;
+    warning: (title: string, message?: string, buttons?: AlertButton[]) => void;
+    info: (title: string, message?: string, buttons?: AlertButton[]) => void;
+    confirm: (title: string, message?: string) => Promise<boolean>;
+    dismiss: () => void;
 }
 
-export const AlertProvider: React.FC<AlertProviderProps> = ({ children }) => {
-  const [alerts, setAlerts] = useState<AlertState[]>([]);
+// ─── Context ──────────────────────────────────────────────────────────────────
+const AlertContext = createContext<AlertContextValue | null>(null);
 
-  const generateId = () => Math.random().toString(36).substr(2, 9);
+// ─── Provider ─────────────────────────────────────────────────────────────────
+interface AlertState extends AlertOptions {
+    visible: boolean;
+}
 
-  const showAlert = useCallback((config: AlertConfig) => {
-    const id = generateId();
-    const alert: AlertState = {
-      id,
-      ...config,
-      visible: true,
+const DEFAULT_STATE: AlertState = {
+    visible: false,
+    type: 'info',
+    title: '',
+    message: undefined,
+    buttons: undefined,
+    dismissable: true,
+};
+
+export function AlertProvider({ children }: { children: React.ReactNode }) {
+    const [alertState, setAlertState] = useState<AlertState>(DEFAULT_STATE);
+
+    // Holds the resolve function for `confirm()` promises
+    const confirmResolve = useRef<((value: boolean) => void) | null>(null);
+
+    const dismiss = useCallback(() => {
+        setAlertState((prev) => ({ ...prev, visible: false }));
+    }, []);
+
+    const show = useCallback((options: AlertOptions) => {
+        setAlertState({
+            ...DEFAULT_STATE,
+            ...options,
+            visible: true,
+        });
+    }, []);
+
+    const success = useCallback(
+        (title: string, message?: string, buttons?: AlertButton[]) =>
+            show({
+                type: 'success',
+                title,
+                message,
+                buttons: buttons ?? [{ label: 'Done', onPress: dismiss, style: 'primary' }],
+            }),
+        [show, dismiss],
+    );
+
+    const error = useCallback(
+        (title: string, message?: string, buttons?: AlertButton[]) =>
+            show({
+                type: 'error',
+                title,
+                message,
+                buttons: buttons ?? [{ label: 'OK', onPress: dismiss, style: 'primary' }],
+            }),
+        [show, dismiss],
+    );
+
+    const warning = useCallback(
+        (title: string, message?: string, buttons?: AlertButton[]) =>
+            show({
+                type: 'warning',
+                title,
+                message,
+                buttons: buttons ?? [{ label: 'OK', onPress: dismiss, style: 'primary' }],
+            }),
+        [show, dismiss],
+    );
+
+    const info = useCallback(
+        (title: string, message?: string, buttons?: AlertButton[]) =>
+            show({
+                type: 'info',
+                title,
+                message,
+                buttons: buttons ?? [{ label: 'Got it', onPress: dismiss, style: 'primary' }],
+            }),
+        [show, dismiss],
+    );
+
+    const confirm = useCallback(
+        (title: string, message?: string): Promise<boolean> =>
+            new Promise((resolve) => {
+                confirmResolve.current = resolve;
+
+                show({
+                    type: 'confirm',
+                    title,
+                    message,
+                    dismissable: false,
+                    buttons: [
+                        {
+                            label: 'Cancel',
+                            style: 'ghost',
+                            onPress: () => {
+                                dismiss();
+                                confirmResolve.current?.(false);
+                                confirmResolve.current = null;
+                            },
+                        },
+                        {
+                            label: 'Confirm',
+                            style: 'primary',
+                            onPress: () => {
+                                dismiss();
+                                confirmResolve.current?.(true);
+                                confirmResolve.current = null;
+                            },
+                        },
+                    ],
+                });
+            }),
+        [show, dismiss],
+    );
+
+    const contextValue: AlertContextValue = {
+        show,
+        success,
+        error,
+        warning,
+        info,
+        confirm,
+        dismiss,
     };
 
-    setAlerts(prev => [...prev, alert]);
-  }, []);
+    return (
+        <AlertContext.Provider value={contextValue}>
+            {children}
+            <CustomAlert
+                visible={alertState.visible}
+                type={alertState.type}
+                title={alertState.title}
+                message={alertState.message}
+                buttons={alertState.buttons}
+                dismissable={alertState.dismissable}
+                onDismiss={dismiss}
+            />
+        </AlertContext.Provider>
+    );
+}
 
-  const success = useCallback((title: string, message: string, duration?: number) => {
-    showAlert({
-      type: 'success',
-      title,
-      message,
-      duration,
-    });
-  }, [showAlert]);
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+export function useAlert(): AlertContextValue {
+    const ctx = useContext(AlertContext);
+    if (!ctx) {
+        throw new Error('useAlert must be used within an <AlertProvider>');
+    }
+    return ctx;
+}
 
-  const error = useCallback((title: string, message: string, duration?: number) => {
-    showAlert({
-      type: 'error',
-      title,
-      message,
-      duration,
-    });
-  }, [showAlert]);
 
-  const info = useCallback((title: string, message: string, duration?: number) => {
-    showAlert({
-      type: 'info',
-      title,
-      message,
-      duration,
-    });
-  }, [showAlert]);
-
-  const warning = useCallback((title: string, message: string, duration?: number) => {
-    showAlert({
-      type: 'warning',
-      title,
-      message,
-      duration,
-    });
-  }, [showAlert]);
-
-  const confirm = useCallback((config: Omit<AlertConfig, 'type'>) => {
-    showAlert({
-      ...config,
-      type: 'confirm',
-    });
-  }, [showAlert]);
-
-  const show = useCallback((config: AlertConfig) => {
-    showAlert(config);
-  }, [showAlert]);
-
-  const dismiss = useCallback((id: string) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== id));
-  }, []);
-
-  const dismissAll = useCallback(() => {
-    setAlerts([]);
-  }, []);
-
-  const value: AlertContextType = {
-    alerts,
-    success,
-    error,
-    info,
-    warning,
-    confirm,
-    show,
-    dismiss,
-    dismissAll,
-  };
-
-  return (
-    <AlertContext.Provider value={value}>
-      {children}
-    </AlertContext.Provider>
-  );
-};
-
-export const useAlert = (): AlertContextType => {
-  const context = useContext(AlertContext);
-  if (context === undefined) {
-    throw new Error('useAlert must be used within an AlertProvider');
-  }
-  return context;
-};
-
-export default AlertContext;
+// ─── Usage Example ────────────────────────────────────────────────────────────
+//
+// 1. Wrap your app (or navigator root) with <AlertProvider>:
+//
+//    export default function App() {
+//      return (
+//        <AlertProvider>
+//          <NavigationContainer>
+//            {/* ... */}
+//          </NavigationContainer>
+//        </AlertProvider>
+//      );
+//    }
+//
+// 2. Call from any component:
+//
+//    const alert = useAlert();
+//
+//    // Simple helpers
+//    alert.success('Saved!', 'Your changes have been saved.');
+//    alert.error('Oops', 'Something went wrong.');
+//    alert.warning('Heads up', 'Only 2 slots remaining.');
+//    alert.info('New feature', 'You can now save favourites.');
+//
+//    // Full control
+//    alert.show({
+//      type: 'confirm',
+//      title: 'Delete item?',
+//      message: 'This cannot be undone.',
+//      buttons: [
+//        { label: 'Cancel',  onPress: alert.dismiss, style: 'ghost'   },
+//        { label: 'Delete',  onPress: handleDelete,  style: 'danger'  },
+//      ],
+//    });
+//
+//    // Async confirm (await-able)
+//    const confirmed = await alert.confirm('Cancel booking?', 'This cannot be undone.');
+//    if (confirmed) { /* proceed */ }
