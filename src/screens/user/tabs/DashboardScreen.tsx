@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,8 @@ import {
     TouchableOpacity,
     Dimensions,
     Animated,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../../theme/colors';
@@ -15,37 +17,39 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { TabParamList } from '../../../navigation/TabNavigator';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
+import { dashboardService } from '@/service/apis/dashboardService';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
 type DashboardProps = NativeBottomTabScreenProps<TabParamList, 'Dashboard'>;
 
-const metricCards = [
-    { label: 'Upcoming Visits', value: '2', bg: '#E8F9FF', accent: '#00B4E8', icon: '📅' },
-    { label: 'Prescriptions', value: '5', bg: '#E6FFF5', accent: '#00D4A0', icon: '💊' },
-];
-
-const activityFeed = [
-    { icon: '💊', text: 'Prescription refilled', time: '2h ago', color: '#E6FFF5', dot: '#00D4A0' },
-    {
-        icon: '📋',
-        text: 'Care plan updated by Dr. Smith',
-        time: 'Yesterday',
-        color: '#E8F9FF',
-        dot: '#00B4E8',
-    },
-    {
-        icon: '✅',
-        text: 'Wound care visit completed',
-        time: 'Mar 30',
-        color: '#FFF8E6',
-        dot: '#F5A623',
-    },
-];
+interface DashboardData {
+    counts: {
+        users: number;
+        vendors: number;
+        services: number;
+        bookings: number;
+        labEntries: number;
+    };
+    bookingsByStatus: any[];
+    revenue: number;
+    labRevenue: number;
+    monthlyBookings: any[];
+    labsByStatus: any[];
+    recentBookings: any[];
+    topServices: any[];
+}
 
 // Animated metric card
-const MetricCard = ({ card, delay }: { card: (typeof metricCards)[0]; delay: number }) => {
+const MetricCard = ({
+    card,
+    delay,
+}: {
+    card: { label: string; value: string; bg: string; accent: string; icon: string };
+    delay: number;
+}) => {
     const anim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -87,6 +91,11 @@ const MetricCard = ({ card, delay }: { card: (typeof metricCards)[0]; delay: num
 };
 
 const DashboardScreen = ({ navigation }: DashboardProps) => {
+    const { user } = useAuthStore();
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
 
@@ -105,6 +114,231 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             }),
         ]).start();
     }, []);
+
+    const fetchDashboardData = async (isRefreshing = false) => {
+        try {
+            if (!isRefreshing) setLoading(true);
+
+            const response = await dashboardService.dashboardStats();
+
+            if (response.data?.success) {
+                setDashboardData(response.data);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+            if (isRefreshing) setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchDashboardData(true);
+    };
+
+    // Get greeting based on time
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 17) return 'Good afternoon';
+        return 'Good evening';
+    };
+
+    // Get user initials
+    const getUserInitials = () => {
+        if (!user?.name) return 'U';
+        const names = user.name.split(' ');
+        if (names.length >= 2) {
+            return `${names[0][0]}${names[1][0]}`.toUpperCase();
+        }
+        return user.name.substring(0, 2).toUpperCase();
+    };
+
+    // Calculate health metrics (mock for now - can be made dynamic)
+    const healthScore = 87; // This could come from user health data
+    const adherence = 94;
+    const nurseRating = 4.8;
+    const streak = 12;
+
+    // Get metric cards based on dashboard data
+    const getMetricCards = () => {
+        if (!dashboardData) return [];
+
+        // For patients, show visits and prescriptions
+        if (!user?.isStaff && user?.role !== 'admin') {
+            const upcomingBookings =
+                dashboardData.recentBookings?.filter(
+                    (booking: any) =>
+                        booking.status === 'confirmed' || booking.status === 'scheduled',
+                ).length || 0;
+
+            return [
+                {
+                    label: 'Upcoming Visits',
+                    value: upcomingBookings.toString(),
+                    bg: '#E8F9FF',
+                    accent: '#00B4E8',
+                    icon: '📅',
+                },
+                {
+                    label: 'Total Bookings',
+                    value: (dashboardData.counts?.bookings || 0).toString(),
+                    bg: '#E6FFF5',
+                    accent: '#00D4A0',
+                    icon: '💊',
+                },
+            ];
+        }
+
+        // For staff/admin, show admin metrics
+        return [
+            {
+                label: 'Total Bookings',
+                value: (dashboardData.counts?.bookings || 0).toString(),
+                bg: '#E8F9FF',
+                accent: '#00B4E8',
+                icon: '📅',
+            },
+            {
+                label: 'Total Services',
+                value: (dashboardData.counts?.services || 0).toString(),
+                bg: '#E6FFF5',
+                accent: '#00D4A0',
+                icon: '🏥',
+            },
+            {
+                label: 'Total Users',
+                value: (dashboardData.counts?.users || 0).toString(),
+                bg: '#FFF8E6',
+                accent: '#F5A623',
+                icon: '👥',
+            },
+            {
+                label: 'Lab Entries',
+                value: (dashboardData.counts?.labEntries || 0).toString(),
+                bg: '#FFE8F5',
+                accent: '#E91E63',
+                icon: '🔬',
+            },
+        ];
+    };
+
+    // Format activity feed from recent bookings
+    const getActivityFeed = () => {
+        if (!dashboardData?.recentBookings) return [];
+
+        return dashboardData.recentBookings.slice(0, 3).map((booking: any) => {
+            const getIcon = (status: string) => {
+                switch (status) {
+                    case 'completed':
+                        return '✅';
+                    case 'confirmed':
+                        return '📋';
+                    case 'cancelled':
+                        return '❌';
+                    default:
+                        return '📅';
+                }
+            };
+
+            const getColor = (status: string) => {
+                switch (status) {
+                    case 'completed':
+                        return { bg: '#E6FFF5', dot: '#00D4A0' };
+                    case 'confirmed':
+                        return { bg: '#E8F9FF', dot: '#00B4E8' };
+                    case 'cancelled':
+                        return { bg: '#FFE8E8', dot: '#E53935' };
+                    default:
+                        return { bg: '#FFF8E6', dot: '#F5A623' };
+                }
+            };
+
+            const colors = getColor(booking.status);
+            const timeAgo = getTimeAgo(new Date(booking.createdAt));
+
+            return {
+                icon: getIcon(booking.status),
+                text: `${booking.serviceName || 'Service'} - ${booking.status}`,
+                time: timeAgo,
+                color: colors.bg,
+                dot: colors.dot,
+            };
+        });
+    };
+
+    // Helper to calculate time ago
+    const getTimeAgo = (date: Date) => {
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays === 1) return 'Yesterday';
+        return `${diffDays}d ago`;
+    };
+
+    // Get next appointment
+    const getNextAppointment = () => {
+        if (!dashboardData?.recentBookings) return null;
+
+        const upcoming = dashboardData.recentBookings.find(
+            (booking: any) =>
+                (booking.status === 'confirmed' || booking.status === 'scheduled') &&
+                new Date(booking.bookingDate) > new Date(),
+        );
+
+        return upcoming;
+    };
+
+    const handleViewBooking = (booking: any) => {
+        if (booking) {
+            navigation
+                .getParent<NativeStackNavigationProp<RootStackParamList>>()
+                .navigate('BookingDetail', { booking });
+        }
+    };
+
+    // Format date
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    };
+
+    // Format time
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+        });
+    };
+
+    if (loading && !dashboardData) {
+        return (
+            <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.gradientStart} />
+                <Text style={[styles.menuLabel, { marginTop: 12 }]}>Loading dashboard...</Text>
+            </View>
+        );
+    }
+
+    const metricCards = getMetricCards();
+    const activityFeed = getActivityFeed();
+    const nextAppointment = getNextAppointment();
 
     return (
         <View style={styles.root}>
@@ -139,43 +373,85 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                 >
                     <View style={styles.headerRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.greeting}>Good morning 👋</Text>
-                            <Text style={styles.name}>Jane Doe</Text>
+                            <Text style={styles.greeting}>{getGreeting()} 👋</Text>
+                            <Text style={styles.name}>{user?.name || 'User'}</Text>
                             <View style={styles.statusPill}>
                                 <View style={styles.statusDot} />
-                                <Text style={styles.statusText}>Care plan active</Text>
+                                <Text style={styles.statusText}>
+                                    {user?.isActive ? 'Active account' : 'Inactive'}
+                                </Text>
                             </View>
                         </View>
                         <View style={styles.avatarWrap}>
                             <View style={styles.avatarRing} />
                             <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>JD</Text>
+                                <Text style={styles.avatarText}>{getUserInitials()}</Text>
                             </View>
                         </View>
                     </View>
 
-                    {/* Health score banner */}
-                    <View style={styles.healthBanner}>
-                        <View style={styles.healthScoreBlock}>
-                            <Text style={styles.healthScoreNum}>87</Text>
-                            <Text style={styles.healthScoreLabel}>Health{'\n'}Score</Text>
+                    {/* Health score banner - show for patients */}
+                    {!user?.isStaff && user?.role !== 'admin' && (
+                        <View style={styles.healthBanner}>
+                            <View style={styles.healthScoreBlock}>
+                                <Text style={styles.healthScoreNum}>{healthScore}</Text>
+                                <Text style={styles.healthScoreLabel}>Health{'\n'}Score</Text>
+                            </View>
+                            <View style={styles.healthDivider} />
+                            <View style={styles.healthStatsRow}>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>{adherence}%</Text>
+                                    <Text style={styles.healthStatKey}>Adherence</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>{nurseRating}</Text>
+                                    <Text style={styles.healthStatKey}>Rating</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>{streak}d</Text>
+                                    <Text style={styles.healthStatKey}>Streak</Text>
+                                </View>
+                            </View>
                         </View>
-                        <View style={styles.healthDivider} />
-                        <View style={styles.healthStatsRow}>
-                            <View style={styles.healthStat}>
-                                <Text style={styles.healthStatVal}>94%</Text>
-                                <Text style={styles.healthStatKey}>Adherence</Text>
+                    )}
+
+                    {/* Revenue banner - show for staff/admin */}
+                    {(user?.isStaff || user?.role === 'admin') && dashboardData && (
+                        <View style={styles.healthBanner}>
+                            <View style={styles.healthScoreBlock}>
+                                <Text style={styles.healthScoreNum}>
+                                    ₹
+                                    {(
+                                        (dashboardData.revenue + dashboardData.labRevenue) /
+                                        1000
+                                    ).toFixed(0)}
+                                    K
+                                </Text>
+                                <Text style={styles.healthScoreLabel}>Total{'\n'}Revenue</Text>
                             </View>
-                            <View style={styles.healthStat}>
-                                <Text style={styles.healthStatVal}>4.8</Text>
-                                <Text style={styles.healthStatKey}>Nurse Rating</Text>
-                            </View>
-                            <View style={styles.healthStat}>
-                                <Text style={styles.healthStatVal}>12d</Text>
-                                <Text style={styles.healthStatKey}>Streak</Text>
+                            <View style={styles.healthDivider} />
+                            <View style={styles.healthStatsRow}>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>
+                                        ₹{(dashboardData.revenue / 1000).toFixed(0)}K
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Services</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>
+                                        ₹{(dashboardData.labRevenue / 1000).toFixed(0)}K
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Lab</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>
+                                        {dashboardData.counts?.bookings || 0}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Bookings</Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
+                    )}
                 </Animated.View>
             </LinearGradient>
 
@@ -199,6 +475,14 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                 <ScrollView
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={Colors.gradientStart}
+                            colors={[Colors.gradientStart]}
+                        />
+                    }
                 >
                     {/* Metric Cards */}
                     <Text style={styles.sectionLabel}>Overview</Text>
@@ -231,107 +515,166 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                 style={styles.quickActionGradient}
                             >
                                 <Text style={styles.quickActionIcon}>📅</Text>
-                                <Text style={styles.quickActionText}>Book Follow-up</Text>
+                                <Text style={styles.quickActionText}>Book Service</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
 
                     {/* Next Appointment */}
-                    <Text style={styles.sectionLabel}>Next Appointment</Text>
-                    <View style={styles.appointmentCard}>
-                        <LinearGradient
-                            colors={['#00D4A022', '#00B4E811']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.appointmentGradientBg}
-                        />
-                        <View style={styles.appointmentHeader}>
-                            <View style={styles.apptIconWrap}>
-                                <Text style={styles.apptIconEmoji}>🏥</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.apptType}>Nursing Visit</Text>
-                                <Text style={styles.apptSub}>Wound care · Home visit</Text>
-                            </View>
-                            <View style={styles.apptBadge}>
-                                <Text style={styles.apptBadgeText}>Confirmed</Text>
-                            </View>
-                        </View>
+                    {nextAppointment && (
+                        <>
+                            <Text style={styles.sectionLabel}>Next Appointment</Text>
+                            <View style={styles.appointmentCard}>
+                                <LinearGradient
+                                    colors={['#00D4A022', '#00B4E811']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.appointmentGradientBg}
+                                />
+                                <View style={styles.appointmentHeader}>
+                                    <View style={styles.apptIconWrap}>
+                                        <Text style={styles.apptIconEmoji}>🏥</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.apptType}>
+                                            {nextAppointment.serviceName || 'Service'}
+                                        </Text>
+                                        <Text style={styles.apptSub}>
+                                            {nextAppointment.serviceType || 'Health Service'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.apptBadge}>
+                                        <Text style={styles.apptBadgeText}>
+                                            {nextAppointment.status?.charAt(0).toUpperCase() +
+                                                nextAppointment.status?.slice(1) || 'Confirmed'}
+                                        </Text>
+                                    </View>
+                                </View>
 
-                        <View style={styles.apptTimeRow}>
-                            <View style={styles.apptTimeChip}>
-                                <Text style={styles.apptTimeIcon}>📅</Text>
-                                <Text style={styles.apptTimeText}>Apr 2, 2026</Text>
-                            </View>
-                            <View style={styles.apptTimeChip}>
-                                <Text style={styles.apptTimeIcon}>⏰</Text>
-                                <Text style={styles.apptTimeText}>10:30 AM</Text>
-                            </View>
-                            <View style={styles.apptTimeChip}>
-                                <Text style={styles.apptTimeIcon}>⏱</Text>
-                                <Text style={styles.apptTimeText}>~45 min</Text>
-                            </View>
-                        </View>
+                                <View style={styles.apptTimeRow}>
+                                    <View style={styles.apptTimeChip}>
+                                        <Text style={styles.apptTimeIcon}>📅</Text>
+                                        <Text style={styles.apptTimeText}>
+                                            {formatDate(nextAppointment.bookingDate)}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.apptTimeChip}>
+                                        <Text style={styles.apptTimeIcon}>⏰</Text>
+                                        <Text style={styles.apptTimeText}>
+                                            {nextAppointment.bookingTime ||
+                                                formatTime(nextAppointment.bookingDate)}
+                                        </Text>
+                                    </View>
+                                </View>
 
-                        <View style={styles.apptNurseRow}>
-                            <View style={styles.nurseAvatar}>
-                                <Text style={styles.nurseAvatarText}>SN</Text>
-                            </View>
-                            <View>
-                                <Text style={styles.nurseName}>Sarah Nguyen, RN</Text>
-                                <Text style={styles.nurseRating}>⭐ 4.9 · 127 visits</Text>
-                            </View>
-                        </View>
+                                {nextAppointment.vendorName && (
+                                    <View style={styles.apptNurseRow}>
+                                        <View style={styles.nurseAvatar}>
+                                            <Text style={styles.nurseAvatarText}>
+                                                {nextAppointment.vendorName
+                                                    .substring(0, 2)
+                                                    .toUpperCase()}
+                                            </Text>
+                                        </View>
+                                        <View>
+                                            <Text style={styles.nurseName}>
+                                                {nextAppointment.vendorName}
+                                            </Text>
+                                            <Text style={styles.nurseRating}>Service Provider</Text>
+                                        </View>
+                                    </View>
+                                )}
 
-                        <TouchableOpacity style={styles.viewDetailsBtn} activeOpacity={0.78}>
-                            <LinearGradient
-                                colors={[Colors.gradientStart, Colors.gradientEnd]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.viewDetailsBtnInner}
-                            >
-                                <Text style={styles.viewDetailsBtnText}>View Full Details</Text>
-                                <Text style={styles.viewDetailsBtnArrow}>→</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
+                                <TouchableOpacity
+                                    style={styles.viewDetailsBtn}
+                                    activeOpacity={0.78}
+                                    onPress={() => handleViewBooking(nextAppointment)}
+                                >
+                                    <LinearGradient
+                                        colors={[Colors.gradientStart, Colors.gradientEnd]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.viewDetailsBtnInner}
+                                    >
+                                        <Text style={styles.viewDetailsBtnText}>
+                                            View Full Details
+                                        </Text>
+                                        <Text style={styles.viewDetailsBtnArrow}>→</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    )}
 
                     {/* Activity Feed */}
-                    <Text style={styles.sectionLabel}>Recent Activity</Text>
-                    <View style={styles.activityFeed}>
-                        {activityFeed.map((item, idx) => (
-                            <View
-                                key={idx}
-                                style={[
-                                    styles.activityItem,
-                                    idx < activityFeed.length - 1 && styles.activityItemBorder,
-                                ]}
-                            >
-                                <View
-                                    style={[
-                                        styles.activityIconWrap,
-                                        { backgroundColor: item.color },
-                                    ]}
-                                >
-                                    <Text style={styles.activityEmoji}>{item.icon}</Text>
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.activityText}>{item.text}</Text>
-                                    <Text style={styles.activityTime}>{item.time}</Text>
-                                </View>
-                                <View style={[styles.activityDot, { backgroundColor: item.dot }]} />
+                    {activityFeed.length > 0 && (
+                        <>
+                            <Text style={styles.sectionLabel}>Recent Activity</Text>
+                            <View style={styles.activityFeed}>
+                                {activityFeed.map((item, idx) => (
+                                    <View
+                                        key={idx}
+                                        style={[
+                                            styles.activityItem,
+                                            idx < activityFeed.length - 1 &&
+                                                styles.activityItemBorder,
+                                        ]}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.activityIconWrap,
+                                                { backgroundColor: item.color },
+                                            ]}
+                                        >
+                                            <Text style={styles.activityEmoji}>{item.icon}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.activityText}>{item.text}</Text>
+                                            <Text style={styles.activityTime}>{item.time}</Text>
+                                        </View>
+                                        <View
+                                            style={[
+                                                styles.activityDot,
+                                                { backgroundColor: item.dot },
+                                            ]}
+                                        />
+                                    </View>
+                                ))}
                             </View>
-                        ))}
-                    </View>
+                        </>
+                    )}
 
                     {/* Bottom tip */}
-                    <View style={styles.tipCard}>
-                        <Text style={styles.tipIcon}>🏆</Text>
-                        <Text style={styles.tipText}>
-                            You're on a <Text style={styles.tipHighlight}>12-day streak</Text>! 4
-                            nurse visits completed last week. Keep it up!
-                        </Text>
-                    </View>
+                    {!user?.isStaff && user?.role !== 'admin' && (
+                        <View style={styles.tipCard}>
+                            <Text style={styles.tipIcon}>🏆</Text>
+                            <Text style={styles.tipText}>
+                                Welcome to your health dashboard! Book appointments and track your
+                                health journey.
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Empty state */}
+                    {(!dashboardData || dashboardData.counts?.bookings === 0) && (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyIcon}>📋</Text>
+                            <Text style={styles.emptyTitle}>No bookings yet</Text>
+                            <Text style={styles.emptyText}>
+                                Start your health journey by booking your first service
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.emptyButton}
+                                onPress={() =>
+                                    navigation
+                                        .getParent<NativeStackNavigationProp<RootStackParamList>>()
+                                        .navigate('Booking')
+                                }
+                            >
+                                <Text style={styles.emptyButtonText}>Book Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </ScrollView>
             </Animated.View>
         </View>
@@ -694,29 +1037,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
     },
-    quickActionStack: {
-        flex: 1,
-        gap: 10,
-    },
-    quickActionSmall: {
-        flex: 1,
-        backgroundColor: Colors.white,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 3,
-        gap: 4,
-    },
-    quickActionSmallIcon: { fontSize: 20 },
-    quickActionSmallText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: Colors.textDark,
-    },
 
     // Activity feed
     activityFeed: {
@@ -785,6 +1105,47 @@ const styles = StyleSheet.create({
     tipHighlight: {
         fontWeight: '700',
         color: '#00A07A',
+    },
+    menuLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.textDark,
+    },
+
+    // Empty state
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+    },
+    emptyIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: Colors.textDark,
+        marginBottom: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: Colors.textMuted,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    emptyButton: {
+        backgroundColor: Colors.gradientStart,
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 12,
+    },
+    emptyButtonText: {
+        color: Colors.white,
+        fontSize: 15,
+        fontWeight: '700',
     },
 });
 

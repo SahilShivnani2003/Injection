@@ -27,6 +27,7 @@ export type PreferredLanguage =
 export type UserRole = 'user' | 'admin' | 'staff';
 
 export interface User {
+    _id?: string;
     name: string;
     email: string;
     password: string;

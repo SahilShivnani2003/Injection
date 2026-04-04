@@ -77,7 +77,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             const response = await userApi.login({ email, password });
             if (response.status === 200) {
                 alert.success('Login Successful', 'Welcome back!');
-                setAuth(response.data.token, response.data.user);
+                setAuth(response.data.data.user, response.data.data.token );
                 navigation.replace('MainTab', {
                     screen: 'Dashboard',
                 });

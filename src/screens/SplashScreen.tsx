@@ -64,7 +64,7 @@ const Particle: React.FC<{
 };
 
 const SplashScreen: React.FC<Props> = ({ navigation }) => {
-    const { loadAuthState } = useAuthStore();
+    const { loadAuth  } = useAuthStore();
     // Core animation refs
     const ring1Scale = useRef(new Animated.Value(0.6)).current;
     const ring1Opacity = useRef(new Animated.Value(0)).current;
@@ -96,7 +96,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
     ];
 
     const handleNavigation = async () => {
-        await loadAuthState();
+        await loadAuth();
 
         const { isAuthenticated, user } = useAuthStore.getState();
 

@@ -4,17 +4,17 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../../theme/colors';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
 import { TabParamList } from '../../../navigation/TabNavigator';
-import { IBooking } from '../../../types/booking';
 import { useAlert } from '../../../context/AlertContext';
 import { bookingAPI } from '../../../service/apis/bookingService';
 import Loader from '../../../components/Loader';
+import { Booking } from '@/types/booking';
 
 type BookingsProps = NativeBottomTabScreenProps<TabParamList, 'Bookings'>;
 
 const BookingsScreen = ({ navigation }: BookingsProps) => {
   const alert = useAlert();
   const [loading, setLoading] = useState(false);
-  const [bookings, setBookings] = useState<IBooking[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     fetchBookings();
@@ -32,7 +32,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
       setLoading(false);
     }
   };
-  const renderItem = ({ item }: { item: IBooking }) => {
+  const renderItem = ({ item }: { item: Booking }) => {
     const getStatusColor = (status?: string) => {
       switch (status) {
         case 'pending':
@@ -98,7 +98,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
         </View>
 
         <Text style={styles.datetime}>
-          {`${formatDate(item.createdAt)} • ${formatTime(item.preferredTimeSlot)}`}
+          {`${item.createdAt} • ${formatTime(item.preferredTimeSlot)}`}
         </Text>
 
         <View style={styles.detailsRow}>
@@ -168,7 +168,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                 ) : (
                     <FlatList
                         data={bookings}
-                        keyExtractor={item => item.id || Math.random().toString()}
+                        keyExtractor={item => item.userId || Math.random().toString()}
                         renderItem={renderItem}
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}

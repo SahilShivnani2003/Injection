@@ -1,43 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    StatusBar,
-    ScrollView,
-    Alert,
-    Animated,
-    Dimensions,
-    Platform,
-} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../../theme/colors';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../navigation/AppNavigator';
-import { useBookingStore } from '../../../store/useBookingStore';
-import { bookingAPI } from '../../../service/apis/bookingService';
-import { CreateBookingRequestDTO, validateCreateBookingRequestDTO } from '../../../types/bookingDTO';
+import { SelectedService } from '@/types/booking';
 
-// ── Service row in the charges list ─────────────────────────────────────────
+/* ─────────────────────── Props ─────────────────────── */
+
+interface ChargesScreenProps {
+    selectedServices: SelectedService[];
+}
+
+/* ─────────────────────── Sub-components ─────────────────────── */
+
 const ServiceRow: React.FC<{
     index: number;
-    name: string;
-    icon: string;
-    charge: number;
+    service: SelectedService;
     isLast: boolean;
-}> = ({ index, name, icon, charge, isLast }) => (
+}> = ({ index, service, isLast }) => (
     <View style={[styles.serviceRow, !isLast && styles.serviceRowBorder]}>
         <View style={styles.serviceIndexBox}>
             <Text style={styles.serviceIndex}>{index + 1}</Text>
         </View>
-        <Text style={styles.serviceRowIcon}>{icon}</Text>
-        <Text style={styles.serviceRowName}>{name}</Text>
-        <Text style={styles.serviceRowCharge}>₹{charge}</Text>
+        <View style={styles.serviceInfo}>
+            <Text style={styles.serviceRowName}>{service.serviceName}</Text>
+            {service.quantity > 1 && <Text style={styles.serviceQty}>x{service.quantity}</Text>}
+        </View>
+        <Text style={styles.serviceRowCharge}>
+            ₹{(service.price * service.quantity).toLocaleString('en-IN')}
+        </Text>
     </View>
 );
 
-// ── Summary row ──────────────────────────────────────────────────────────────
 const SummaryRow: React.FC<{
     label: string;
     value: string;
@@ -66,107 +58,81 @@ const SummaryRow: React.FC<{
     </View>
 );
 
-// ── Main Screen ──────────────────────────────────────────────────────────────
-const ChargesScreen = () => {
-    const { bookingData, setLoading, isLoading, resetBooking } = useBookingStore();
-    const selectedIds: number[] = bookingData.selectedServices || [];
-    const selected = selectedIds.map(id => ({ id, name: `Service ${id}`, charge: 500 })); // Mock service data
-    const subtotal = bookingData.subtotal || 0;
-    const gst = bookingData.gst || 0;
-    const grandTotal = bookingData.total || 0;
-    const insuranceCoverage = bookingData.insuranceCoverage || 0;
-    const finalAmount = bookingData.finalAmount || 0;
+/* ─────────────────────── Main Screen ─────────────────────── */
+
+const ChargesScreen: React.FC<ChargesScreenProps> = ({ selectedServices }) => {
+    const subtotal = selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0);
+    const gstAmount = Math.round(subtotal * 0.18);
+    const grandTotal = subtotal + gstAmount;
+
+    const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
+    if (selectedServices.length === 0) {
+        return (
+            <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyTitle}>No Services Selected</Text>
+                <Text style={styles.emptyText}>
+                    Go back to Step 2 to select your required services.
+                </Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.root}>
-            {/* ── Services list ─────────────────────────────────────── */}
+            {/* ── Services list ── */}
             <View style={styles.sectionHeader}>
                 <View style={styles.sectionAccent} />
                 <Text style={styles.sectionTitle}>Selected Services</Text>
                 <View style={styles.countBadge}>
-                    <Text style={styles.countBadgeText}>{selected.length}</Text>
+                    <Text style={styles.countBadgeText}>{selectedServices.length}</Text>
                 </View>
             </View>
 
             <View style={styles.servicesList}>
-                {selected.length > 0 ? (
-                    selected.map((s, i) => (
-                        <ServiceRow
-                            key={s.id}
-                            index={i}
-                            name={s.name}
-                            icon={s.icon}
-                            charge={s.charge}
-                            isLast={i === selected.length - 1}
-                        />
-                    ))
-                ) : (
-                    <View style={styles.emptyRow}>
-                        <Text style={styles.emptyText}>No services selected</Text>
-                    </View>
-                )}
+                {selectedServices.map((s, i) => (
+                    <ServiceRow
+                        key={s.serviceId}
+                        index={i}
+                        service={s}
+                        isLast={i === selectedServices.length - 1}
+                    />
+                ))}
             </View>
 
-            {/* ── Bill summary ──────────────────────────────────────── */}
+            {/* ── Bill summary ── */}
             <View style={styles.sectionHeader}>
                 <View style={styles.sectionAccent} />
                 <Text style={styles.sectionTitle}>Bill Summary</Text>
             </View>
 
             <View style={styles.billCard}>
-                <SummaryRow label="Subtotal" value={`₹${subtotal.toLocaleString('en-IN')}`} />
+                <SummaryRow label="Subtotal" value={fmt(subtotal)} />
                 <View style={styles.billDivider} />
-                <SummaryRow
-                    label="GST & Other Tax (18%)"
-                    value={`₹${gst.toLocaleString('en-IN')}`}
-                />
+                <SummaryRow label="GST & Other Tax (18%)" value={fmt(gstAmount)} />
                 <View style={styles.billDividerThick} />
-                <SummaryRow
-                    label="Grand Total"
-                    value={`₹${grandTotal.toLocaleString('en-IN')}`}
-                    bold
-                    accent
-                />
+                <SummaryRow label="Grand Total" value={fmt(grandTotal)} bold accent />
             </View>
 
-            {/* ── Info chips ────────────────────────────────────────── */}
+            {/* ── Info chips ── */}
             <View style={styles.chipRow}>
-                <View style={styles.chip}>
-                    <Text style={styles.chipIcon}>🛒</Text>
-                    <Text style={styles.chipText}>
-                        {selected.length} service{selected.length !== 1 ? 's' : ''}
-                    </Text>
-                </View>
-                <View style={styles.chip}>
-                    <Text style={styles.chipIcon}>🕐</Text>
-                    <Text style={styles.chipText}>Est. 45 mins</Text>
-                </View>
-                <View style={styles.chip}>
-                    <Text style={styles.chipIcon}>🏠</Text>
-                    <Text style={styles.chipText}>At Home</Text>
-                </View>
-            </View>
-
-            {/* ── Confirm button ────────────────────────────────────── */}
-            <TouchableOpacity
-                style={styles.confirmBtn}
-                activeOpacity={0.85}
-                disabled={isLoading}
-            >
-                <LinearGradient
-                    colors={isLoading ? ['#A0B8C4', '#8FA3AE'] : [Colors.accent, Colors.accentDark]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.confirmBtnGrad}
-                >
-                    <Text style={styles.confirmBtnText}>
-                        {isLoading ? 'Creating Booking...' : 'Confirm Booking'}
-                    </Text>
-                    <View style={styles.confirmArrow}>
-                        <Text style={styles.confirmArrowText}>{isLoading ? '⏳' : '✓'}</Text>
+                {[
+                    {
+                        icon: '🛒',
+                        label: `${selectedServices.length} service${
+                            selectedServices.length !== 1 ? 's' : ''
+                        }`,
+                    },
+                    { icon: '🕐', label: 'Est. 45 mins' },
+                    { icon: '🏠', label: 'At Home' },
+                ].map(c => (
+                    <View key={c.label} style={styles.chip}>
+                        <Text style={styles.chipIcon}>{c.icon}</Text>
+                        <Text style={styles.chipText}>{c.label}</Text>
                     </View>
-                </LinearGradient>
-            </TouchableOpacity>
+                ))}
+            </View>
 
             <Text style={styles.disclaimer}>
                 Prices include visiting charges. GST applicable as per government norms.
@@ -175,30 +141,16 @@ const ChargesScreen = () => {
     );
 };
 
+/* ─────────────────────── Styles ─────────────────────── */
+
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F0F7FA' },
 
-    // Total pill floating in header
-    totalPill: {
-        position: 'absolute',
-        right: 24,
-        bottom: 22,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.45)',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        alignItems: 'flex-end',
-    },
-    totalPillLabel: {
-        fontSize: 10,
-        color: 'rgba(255,255,255,0.75)',
-        fontWeight: '600',
-        letterSpacing: 0.8,
-    },
-    totalPillValue: { fontSize: 18, color: Colors.white, fontWeight: '900', letterSpacing: 0.3 },
-    // Section headers
+    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+    emptyIcon: { fontSize: 48, marginBottom: 16 },
+    emptyTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
+    emptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 22 },
+
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -206,12 +158,7 @@ const styles = StyleSheet.create({
         marginBottom: 14,
         marginTop: 4,
     },
-    sectionAccent: {
-        width: 4,
-        height: 18,
-        borderRadius: 2,
-        backgroundColor: Colors.gradientStart,
-    },
+    sectionAccent: { width: 4, height: 18, borderRadius: 2, backgroundColor: Colors.gradientStart },
     sectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.textDark, flex: 1 },
     countBadge: {
         width: 24,
@@ -223,7 +170,6 @@ const styles = StyleSheet.create({
     },
     countBadgeText: { color: Colors.white, fontSize: 12, fontWeight: '800' },
 
-    // Services list
     servicesList: {
         borderRadius: 16,
         borderWidth: 1.5,
@@ -249,13 +195,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     serviceIndex: { fontSize: 11, fontWeight: '700', color: Colors.textMuted },
-    serviceRowIcon: { fontSize: 18 },
+    serviceInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
     serviceRowName: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.textDark },
+    serviceQty: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
     serviceRowCharge: { fontSize: 15, fontWeight: '800', color: Colors.gradientStart },
-    emptyRow: { paddingVertical: 24, alignItems: 'center' },
-    emptyText: { fontSize: 14, color: Colors.textMuted },
 
-    // Bill card
     billCard: {
         borderRadius: 16,
         borderWidth: 1.5,
@@ -281,12 +225,7 @@ const styles = StyleSheet.create({
     billDivider: { height: 1, backgroundColor: '#EEF5F8', marginHorizontal: 16 },
     billDividerThick: { height: 2, backgroundColor: '#D8E8EE' },
 
-    // Chips
-    chipRow: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 24,
-    },
+    chipRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
     chip: {
         flex: 1,
         flexDirection: 'row',
@@ -303,42 +242,7 @@ const styles = StyleSheet.create({
     chipIcon: { fontSize: 14 },
     chipText: { fontSize: 11, fontWeight: '600', color: Colors.textMuted },
 
-    // Confirm button
-    confirmBtn: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        shadowColor: Colors.accentDark,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 14,
-        elevation: 8,
-        marginBottom: 16,
-    },
-    confirmBtnGrad: {
-        flexDirection: 'row',
-        paddingVertical: 16,
-        paddingHorizontal: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    },
-    confirmBtnText: { color: Colors.white, fontSize: 17, fontWeight: '800', letterSpacing: 0.4 },
-    confirmArrow: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    confirmArrowText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
-
-    disclaimer: {
-        color: Colors.textMuted,
-        fontSize: 11,
-        textAlign: 'center',
-        lineHeight: 17,
-    },
+    disclaimer: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', lineHeight: 17 },
 });
 
 export default ChargesScreen;

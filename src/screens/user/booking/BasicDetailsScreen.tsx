@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { FieldInput } from '../../../components/FieldInput';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
 
@@ -45,6 +46,7 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
 const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
+    
     return (
         <View style={styles.root}>
             {/* ── Personal info ──────────────────────────────────────── */}
@@ -62,7 +64,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                     <FieldInput
                         label="Age"
                         required
-                        value={basicDetails.age}
+                        value={String(basicDetails.age)}
                         onChangeText={v =>
                             setBasicDetails((prev: any) => ({
                                 ...prev,

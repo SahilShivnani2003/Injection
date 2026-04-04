@@ -16,6 +16,9 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../../../theme/colors';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
 import { TabParamList } from '../../../navigation/TabNavigator';
+import { useAuthStore } from '@/store/useAuthStore';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/navigation/AppNavigator';
 
 type ProfileProps = NativeBottomTabScreenProps<TabParamList, 'Profile'>;
 
@@ -57,15 +60,57 @@ const SectionHeader = ({ title }: { title: string }) => (
 );
 
 const ProfileScreen = ({ navigation }: ProfileProps) => {
+    const { removeAuth, user } = useAuthStore();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [biometricEnabled, setBiometricEnabled] = useState(false);
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         setLogoutModalVisible(false);
-        // Replace with your actual logout logic / navigation reset
-        Alert.alert('Logged out', 'You have been signed out.');
+        await removeAuth();
+
+        navigation.getParent<NativeStackNavigationProp<RootStackParamList>>().reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+        });
     };
+
+    // Helper to get role display text
+    const getRoleDisplay = () => {
+        if (!user) return '👤 User';
+        if (user.role === 'admin') return '👨‍💼 Admin';
+        if (user.isStaff) return '👨‍⚕️ Staff';
+        return '🏥 Patient';
+    };
+
+    // Helper to format date of birth from age
+    const getDateOfBirth = () => {
+        if (!user?.age) return 'Not provided';
+        const currentYear = new Date().getFullYear();
+        const birthYear = currentYear - user.age;
+        return `Age: ${user.age} years`;
+    };
+
+    // Helper to get location
+    const getLocation = () => {
+        if (user?.currentLocation) return user.currentLocation;
+        if (user?.address) return user.address;
+        return 'Not provided';
+    };
+
+    // Calculate stats (these would come from actual data in production)
+    const stats = {
+        visits: 0, // Could be fetched from booking history
+        reports: 0, // Could be fetched from medical records
+        upcoming: 0, // Could be fetched from upcoming appointments
+    };
+
+    if (!user) {
+        return (
+            <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={styles.menuLabel}>Loading profile...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.root}>
@@ -101,29 +146,37 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Avatar Card ── */}
                 <View style={styles.avatarCard}>
                     <View style={styles.avatarRing}>
-                        <Image
-                            source={{ uri: 'https://i.pravatar.cc/150?img=12' }}
-                            style={styles.avatar}
-                        />
+                        {user.profileImage ? (
+                            <Image
+                                source={{ uri: user.profileImage }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <Text style={styles.avatarText}>
+                                    {user.name.charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
                     </View>
-                    <Text style={styles.name}>Jane Doe</Text>
+                    <Text style={styles.name}>{user.name}</Text>
                     <View style={styles.rolePill}>
-                        <Text style={styles.roleText}>🏥 Patient</Text>
+                        <Text style={styles.roleText}>{getRoleDisplay()}</Text>
                     </View>
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statValue}>12</Text>
+                            <Text style={styles.statValue}>{stats.visits}</Text>
                             <Text style={styles.statLabel}>Visits</Text>
                         </View>
                         <View style={styles.statDivider} />
                         <View style={styles.statItem}>
-                            <Text style={styles.statValue}>4</Text>
+                            <Text style={styles.statValue}>{stats.reports}</Text>
                             <Text style={styles.statLabel}>Reports</Text>
                         </View>
                         <View style={styles.statDivider} />
                         <View style={styles.statItem}>
-                            <Text style={styles.statValue}>2</Text>
+                            <Text style={styles.statValue}>{stats.upcoming}</Text>
                             <Text style={styles.statLabel}>Upcoming</Text>
                         </View>
                     </View>
@@ -132,14 +185,142 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Personal Info ── */}
                 <SectionHeader title="PERSONAL INFORMATION" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="✉" label="Email" sublabel="jane.doe@example.com" />
+                    <MenuRow icon="✉" label="Email" sublabel={user.email} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📞" label="Phone" sublabel="+91 98765 43210" />
+                    <MenuRow icon="📞" label="Phone" sublabel={user.phone} />
+                    {user.alternateMobile && (
+                        <>
+                            <View style={styles.rowDivider} />
+                            <MenuRow icon="📱" label="Alternate Phone" sublabel={user.alternateMobile} />
+                        </>
+                    )}
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📍" label="Location" sublabel="Bangalore, India" />
+                    <MenuRow icon="📍" label="Location" sublabel={getLocation()} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="🎂" label="Date of Birth" sublabel="14 March 1992" />
+                    <MenuRow icon="🎂" label="Age" sublabel={getDateOfBirth()} />
+                    <View style={styles.rowDivider} />
+                    <MenuRow icon="⚧" label="Gender" sublabel={user.gender} />
+                    {user.bloodGroup && user.bloodGroup !== 'Unknown' && (
+                        <>
+                            <View style={styles.rowDivider} />
+                            <MenuRow icon="🩸" label="Blood Group" sublabel={user.bloodGroup} />
+                        </>
+                    )}
                 </View>
+
+                {/* ── Medical Information ── */}
+                {(user.allergies?.length || user.chronicDiseases?.length || user.currentMedications?.length) && (
+                    <>
+                        <SectionHeader title="MEDICAL INFORMATION" />
+                        <View style={styles.menuCard}>
+                            {user.allergies && user.allergies.length > 0 && (
+                                <>
+                                    <MenuRow
+                                        icon="⚠️"
+                                        label="Allergies"
+                                        sublabel={user.allergies.join(', ')}
+                                    />
+                                    <View style={styles.rowDivider} />
+                                </>
+                            )}
+                            {user.chronicDiseases && user.chronicDiseases.length > 0 && (
+                                <>
+                                    <MenuRow
+                                        icon="🏥"
+                                        label="Chronic Diseases"
+                                        sublabel={user.chronicDiseases.join(', ')}
+                                    />
+                                    <View style={styles.rowDivider} />
+                                </>
+                            )}
+                            {user.currentMedications && user.currentMedications.length > 0 && (
+                                <MenuRow
+                                    icon="💊"
+                                    label="Current Medications"
+                                    sublabel={user.currentMedications.join(', ')}
+                                />
+                            )}
+                        </View>
+                    </>
+                )}
+
+                {/* ── Insurance Information ── */}
+                {user.hasInsurance && (
+                    <>
+                        <SectionHeader title="INSURANCE" />
+                        <View style={styles.menuCard}>
+                            <MenuRow
+                                icon="🛡"
+                                label="Insurance Type"
+                                sublabel={user.insuranceType}
+                            />
+                            {user.insuranceProvider && (
+                                <>
+                                    <View style={styles.rowDivider} />
+                                    <MenuRow
+                                        icon="🏢"
+                                        label="Provider"
+                                        sublabel={user.insuranceProvider}
+                                    />
+                                </>
+                            )}
+                            {user.insurancePolicyNumber && (
+                                <>
+                                    <View style={styles.rowDivider} />
+                                    <MenuRow
+                                        icon="🔢"
+                                        label="Policy Number"
+                                        sublabel={user.insurancePolicyNumber}
+                                    />
+                                </>
+                            )}
+                            {user.insuranceExpiryDate && (
+                                <>
+                                    <View style={styles.rowDivider} />
+                                    <MenuRow
+                                        icon="📅"
+                                        label="Expiry Date"
+                                        sublabel={user.insuranceExpiryDate}
+                                    />
+                                </>
+                            )}
+                        </View>
+                    </>
+                )}
+
+                {/* ── Emergency Contact ── */}
+                {user.emergencyContactName && (
+                    <>
+                        <SectionHeader title="EMERGENCY CONTACT" />
+                        <View style={styles.menuCard}>
+                            <MenuRow
+                                icon="👤"
+                                label="Contact Name"
+                                sublabel={user.emergencyContactName}
+                            />
+                            {user.emergencyContactPhone && (
+                                <>
+                                    <View style={styles.rowDivider} />
+                                    <MenuRow
+                                        icon="📞"
+                                        label="Contact Phone"
+                                        sublabel={user.emergencyContactPhone}
+                                    />
+                                </>
+                            )}
+                            {user.emergencyContactRelation && (
+                                <>
+                                    <View style={styles.rowDivider} />
+                                    <MenuRow
+                                        icon="❤️"
+                                        label="Relationship"
+                                        sublabel={user.emergencyContactRelation}
+                                    />
+                                </>
+                            )}
+                        </View>
+                    </>
+                )}
 
                 {/* ── Account ── */}
                 <SectionHeader title="ACCOUNT" />
@@ -157,6 +338,12 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 <SectionHeader title="PREFERENCES" />
                 <View style={styles.menuCard}>
                     <MenuRow
+                        icon="🌐"
+                        label="Preferred Language"
+                        sublabel={user.preferredLanguage}
+                    />
+                    <View style={styles.rowDivider} />
+                    <MenuRow
                         icon="🔔"
                         label="Push Notifications"
                         rightElement={
@@ -168,7 +355,6 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                             />
                         }
                     />
-                    <View style={styles.rowDivider} />
                 </View>
 
                 {/* ── Support ── */}
@@ -192,11 +378,13 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                         danger
                         onPress={() => setLogoutModalVisible(true)}
                     />
-                    <View style={styles.rowDivider} />
                 </View>
 
                 {/* App version */}
-                <Text style={styles.version}>HealthApp v2.4.1 • Build 2025.06</Text>
+                <Text style={styles.version}>
+                    HealthApp v2.4.1 • Build 2025.06
+                    {user.lastLoginAt && `\nLast login: ${new Date(user.lastLoginAt).toLocaleDateString()}`}
+                </Text>
             </ScrollView>
 
             {/* ── Logout Confirmation Modal ── */}
@@ -311,6 +499,16 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     avatar: { width: '100%', height: '100%', borderRadius: 50 },
+    avatarPlaceholder: {
+        backgroundColor: Colors.gradientStart,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        fontSize: 36,
+        fontWeight: '700',
+        color: Colors.white,
+    },
     name: { fontSize: 22, fontWeight: '800', color: Colors.textDark, letterSpacing: 0.3 },
     rolePill: {
         marginTop: 6,
@@ -390,6 +588,7 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
         marginTop: 28,
         letterSpacing: 0.4,
+        lineHeight: 16,
     },
 
     // ── Modal ──

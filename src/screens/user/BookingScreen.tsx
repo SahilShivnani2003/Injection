@@ -10,6 +10,7 @@ import {
     ScrollView,
     Easing,
     StatusBar,
+    Alert,
 } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../theme/colors';
 import LinearGradient from 'react-native-linear-gradient';
@@ -18,90 +19,134 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import BasicDetailsScreen from './booking/BasicDetailsScreen';
-import UploadPrescriptionScreen from './booking/UploadPrescriptionScreen';
-import InsuranceScreen from './booking/InsuranceScreen';
 import ChargesScreen from './booking/ChargesScreen';
 import ComplimentaryScreen from './booking/ComplimentaryScreen';
 import SlotBookingScreen from './booking/SlotBookingScreen';
 import RequirementsScreen from './booking/RequirementsScreen';
+import { useAuthStore } from '@/store/useAuthStore';
+import { bookingAPI } from '@/service/apis/bookingService';
+import {
+    Booking,
+    ComplimentaryService,
+    Gender,
+    SelectedService,
+    StaffPreference,
+} from '@/types/booking';
 
 const RADIUS = 32;
 const { width, height } = Dimensions.get('window');
 
-type IStepType = {
-    id: number;
-    title: string;
-    subtitle: string;
-    icon: string;
-};
+/* ─────────────────────── Types ─────────────────────── */
+
+export interface UploadedFile {
+    name: string;
+    uri: string;
+    type: 'image' | 'document';
+}
+
+/** All form data collected across all 5 steps */
+export interface BookingFormData {
+    // Step 1 — Basic Details
+    patientName: string;
+    age: string;
+    sex: string;
+    address: string;
+    pincode: string;
+    currentLocation: string;
+    phoneNumber: string;
+    email: string;
+
+    // Step 2 — Requirements
+    selectedServices: SelectedService[];
+    additionalRequirements: string;
+    uploadedFile: UploadedFile | null;
+    hasInsurance: boolean;
+    insurancePolicyNumber: string;
+
+    // Step 3 — Slot
+    selectedDate: string | null;
+    selectedTime: string | null;
+    staffPreference: StaffPreference;
+
+    // Step 5 — Complimentary
+    freeComplimentaryService: ComplimentaryService;
+}
+
+/* ─────────────────────── Steps config ─────────────────────── */
+
+type IStepType = { id: number; title: string; subtitle: string; icon: string };
 
 const steps: IStepType[] = [
     { id: 1, title: 'Basic Details', subtitle: 'Your information', icon: 'person-outline' },
     {
         id: 2,
-        title: 'Upload Prescription',
-        subtitle: 'Upload your prescription',
-        icon: 'medical-outline',
-    },
-    {
-        id: 3,
-        title: 'Insurance Details',
-        subtitle: 'Provide insurance information',
-        icon: 'card-outline',
-    },
-    {
-        id: 4,
         title: 'Select Services',
-        subtitle: 'Review & book',
+        subtitle: 'Choose your tests',
         icon: 'checkmark-circle-outline',
     },
-    { id: 5, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
+    { id: 3, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
     {
-        id: 6,
+        id: 4,
         title: 'Review & Charges',
         subtitle: 'Review & confirm',
         icon: 'checkmark-done-outline',
     },
     {
-        id: 7,
-        title: 'Complimentary & Confirmation',
+        id: 5,
+        title: 'Confirmation',
         subtitle: 'Your appointment is booked',
         icon: 'checkmark-circle',
     },
 ];
 
+/* ─────────────────────── Component ─────────────────────── */
+
 type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const BookingScreen = ({ navigation }: BookingScreenProps) => {
+    const { user } = useAuthStore();
     const [current, setCurrent] = useState<IStepType>(steps[0]);
+    const [submitting, setSubmitting] = useState(false);
     const total = steps.length;
 
-    //Basic Details Data
-    const [basicDetails, setBasicDetails] = useState({
-        patientName: '',
-        age: '',
-        sex: '',
-        address: '',
-        pincode: '',
+    /* ── Consolidated form state ── */
+    const [formData, setFormData] = useState<BookingFormData>({
+        // Step 1
+        patientName: user?.name ?? '',
+        age: user?.age ? String(user.age) : '',
+        sex: user?.gender ?? '',
+        address: user?.address ?? '',
+        pincode: user?.pincode ?? '',
         currentLocation: '',
-        phoneNumber: '',
-        email: '',
+        phoneNumber: user?.phone ?? '',
+        email: user?.email ?? '',
+        // Step 2
+        selectedServices: [],
+        additionalRequirements: '',
+        uploadedFile: null,
+        hasInsurance: false,
+        insurancePolicyNumber: '',
+        // Step 3
+        selectedDate: null,
+        selectedTime: null,
+        staffPreference: 'Any Available',
+        // Step 5
+        freeComplimentaryService: 'None',
     });
 
-    // Animation refs
+    /** Partial updater — merges any subset of BookingFormData */
+    const update = (patch: Partial<BookingFormData>) =>
+        setFormData(prev => ({ ...prev, ...patch }));
+
+    /* ── Animation refs ── */
     const sheetY = useRef(new Animated.Value(60)).current;
     const sheetOp = useRef(new Animated.Value(0)).current;
     const headerOpacity = useRef(new Animated.Value(0)).current;
     const progressWidth = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Entrance animations
         Animated.parallel([
-            Animated.timing(headerOpacity, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            }),
+            Animated.timing(headerOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
             Animated.timing(sheetY, {
                 toValue: 0,
                 duration: 580,
@@ -119,7 +164,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     }, []);
 
     useEffect(() => {
-        // Animate progress bar
         Animated.timing(progressWidth, {
             toValue: (current.id / total) * 100,
             duration: 400,
@@ -128,46 +172,196 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
         }).start();
     }, [current.id]);
 
+    /* ── Step validation ── */
+    const validateStep = (): boolean => {
+        switch (current.id) {
+            case 1:
+                if (!formData.patientName.trim()) return warn('Please enter patient name.');
+                if (!formData.age || isNaN(Number(formData.age)))
+                    return warn('Please enter a valid age.');
+                if (!formData.sex) return warn('Please select sex.');
+                if (!formData.address.trim()) return warn('Please enter address.');
+                if (formData.pincode.length !== 6)
+                    return warn('Please enter a valid 6-digit pincode.');
+                return true;
+
+            case 2:
+                if (formData.selectedServices.length === 0)
+                    return warn('Please select at least one service.');
+                return true;
+
+            case 3:
+                if (!formData.selectedDate) return warn('Please select a preferred date.');
+                if (!formData.selectedTime) return warn('Please select a preferred time slot.');
+                return true;
+
+            default:
+                return true;
+        }
+    };
+
+    const warn = (msg: string): false => {
+        Alert.alert('Required', msg);
+        return false;
+    };
+
+    /* ── Navigation ── */
     const handleNext = () => {
-        if (current.id < total) {
-            setCurrent(steps[current.id]);
+        if (!validateStep()) return;
+        if (current.id === total) {
+            handleConfirm();
+        } else {
+            setCurrent(steps[current.id]); // steps is 0-indexed; current.id == next index
         }
     };
 
     const handlePrevious = () => {
-        if (current.id > 1) {
-            setCurrent(steps[current.id - 2]);
+        if (current.id > 1) setCurrent(steps[current.id - 2]);
+    };
+
+    /* ── Submit ── */
+    const handleConfirm = async () => {
+        try {
+            setSubmitting(true);
+
+            const subtotal = formData.selectedServices.reduce(
+                (sum, s) => sum + s.price * s.quantity,
+                0,
+            );
+            const gstAmount = Math.round(subtotal * 0.18);
+            const grandTotal = subtotal + gstAmount;
+
+            const payload: Booking = {
+                patientName: formData.patientName.trim(),
+                age: parseInt(formData.age, 10),
+                sex: formData.sex as Gender,
+                address: formData.address.trim(),
+                pincode: formData.pincode.trim(),
+                currentLocation: formData.currentLocation.trim(),
+                alternateMobile: formData.phoneNumber || undefined,
+                email: formData.email.trim(),
+
+                selectedServices: formData.selectedServices,
+                additionalRequirements: formData.additionalRequirements || undefined,
+
+                // prescription is handled by prescriptionService separately
+                prescriptions: [],
+
+                hasInsurance: formData.hasInsurance,
+                insurancePolicyNumber: formData.hasInsurance
+                    ? formData.insurancePolicyNumber
+                    : undefined,
+
+                subtotal,
+                gstAmount,
+                grandTotal,
+
+                freeComplimentaryService: formData.freeComplimentaryService,
+                preferredTimeSlot: `${formData.selectedDate} ${formData.selectedTime}`,
+                staffPreference: formData.staffPreference,
+                serviceLocation: formData.address.trim(),
+                estimatedDuration: 45,
+
+                userId: user?._id ?? '',
+                vendorId: null,
+                bookingStatus: 'pending',
+                reportUrl: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            await bookingAPI.createBooking(payload);
+
+            Alert.alert(
+                'Booking Confirmed! 🎉',
+                `Your appointment on ${formData.selectedDate} at ${formData.selectedTime} has been booked successfully.`,
+                [{ text: 'Done', onPress: () => navigation.goBack() }],
+            );
+        } catch (error: any) {
+            Alert.alert('Error', error?.message ?? 'Failed to create booking. Please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
+    /* ── Progress bar ── */
     const progressWidthInterpolated = progressWidth.interpolate({
         inputRange: [0, 100],
         outputRange: ['0%', '100%'],
     });
 
-    const renderSteps = () => {
+    /* ── Screen renderer ── */
+    const renderStep = () => {
         switch (current.id) {
             case 1:
-                return <BasicDetailsScreen basicDetails={basicDetails} setBasicDetails={setBasicDetails} />;
+                return (
+                    <BasicDetailsScreen
+                        basicDetails={{
+                            patientName: formData.patientName,
+                            age: formData.age,
+                            sex: formData.sex,
+                            address: formData.address,
+                            pincode: formData.pincode,
+                            currentLocation: formData.currentLocation,
+                            phoneNumber: formData.phoneNumber,
+                            email: formData.email,
+                        }}
+                        setBasicDetails={(patch: any) =>
+                            setFormData(prev => ({ ...prev, ...patch }))
+                        }
+                    />
+                );
             case 2:
-                return <UploadPrescriptionScreen />;
+                return (
+                    <RequirementsScreen
+                        selectedServices={formData.selectedServices}
+                        setSelectedServices={v => update({ selectedServices: v })}
+                        additionalRequirements={formData.additionalRequirements}
+                        setAdditionalRequirements={v => update({ additionalRequirements: v })}
+                        uploadedFile={formData.uploadedFile}
+                        setUploadedFile={v => update({ uploadedFile: v })}
+                        hasInsurance={formData.hasInsurance}
+                        setHasInsurance={v => update({ hasInsurance: v })}
+                        insurancePolicyNumber={formData.insurancePolicyNumber}
+                        setInsurancePolicyNumber={v => update({ insurancePolicyNumber: v })}
+                    />
+                );
             case 3:
-                return <InsuranceScreen />;
+                return (
+                    <SlotBookingScreen
+                        selectedDate={formData.selectedDate}
+                        setSelectedDate={v => update({ selectedDate: v })}
+                        selectedTime={formData.selectedTime}
+                        setSelectedTime={v => update({ selectedTime: v })}
+                        staffPreference={formData.staffPreference}
+                        setStaffPreference={v => update({ staffPreference: v })}
+                    />
+                );
             case 4:
-                return <RequirementsScreen />;
+                return <ChargesScreen selectedServices={formData.selectedServices} />;
             case 5:
-                return <SlotBookingScreen />;
-            case 6:
-                return <ChargesScreen />;
-            case 7:
-                return <ComplimentaryScreen />;
+                return (
+                    <ComplimentaryScreen
+                        freeComplimentaryService={formData.freeComplimentaryService}
+                        setFreeComplimentaryService={v => update({ freeComplimentaryService: v })}
+                        bookingSummary={{
+                            date: formData.selectedDate ?? '',
+                            time: formData.selectedTime ?? '',
+                            serviceCount: formData.selectedServices.length,
+                            patientName: formData.patientName,
+                        }}
+                    />
+                );
+            default:
+                return null;
         }
     };
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* ── Header with Gradient ── */}
+            {/* ── Header ── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                 start={{ x: 0.1, y: 0 }}
@@ -175,11 +369,12 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 style={styles.header}
             >
                 <Animated.View style={[styles.headerContent, { opacity: headerOpacity }]}>
-                    {/* Top bar */}
                     <View style={styles.headerTop}>
                         <TouchableOpacity
                             style={styles.iconBtn}
-                            onPress={() => navigation.goBack()}
+                            onPress={() =>
+                                current.id > 1 ? handlePrevious() : navigation.goBack()
+                            }
                             activeOpacity={0.8}
                         >
                             <Ionicons name="arrow-back" size={22} color={Colors.white} />
@@ -190,7 +385,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Step info */}
                     <View style={styles.stepInfoContainer}>
                         <View style={styles.stepIconWrapper}>
                             <Ionicons name={current.icon as any} size={28} color={Colors.white} />
@@ -204,7 +398,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         </View>
                     </View>
 
-                    {/* Progress bar with segments */}
                     <View style={styles.progressContainer}>
                         <View style={styles.progressTrack}>
                             <Animated.View
@@ -215,7 +408,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 </Animated.View>
             </LinearGradient>
 
-            {/* ── Form Container ── */}
+            {/* ── Form sheet ── */}
             <KeyboardAvoidingView
                 style={styles.formContainer}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -226,7 +419,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         { opacity: sheetOp, transform: [{ translateY: sheetY }] },
                     ]}
                 >
-                    {/* Sheet handle */}
                     <View style={styles.sheetHandle} />
 
                     <ScrollView
@@ -234,12 +426,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={styles.scrollContent}
                     >
-                        {renderSteps()}
+                        {renderStep()}
                     </ScrollView>
 
-                    {/* ── Bottom Navigation ── */}
+                    {/* ── Bottom navigation ── */}
                     <View style={styles.bottomNav}>
-                        <View style={styles.bottomNavGradientBorder} />
                         <View style={styles.bottomNavContent}>
                             {current.id > 1 ? (
                                 <TouchableOpacity
@@ -259,9 +450,13 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                             )}
 
                             <TouchableOpacity
-                                style={styles.btnPrimaryContainer}
+                                style={[
+                                    styles.btnPrimaryContainer,
+                                    submitting && styles.btnDisabled,
+                                ]}
                                 onPress={handleNext}
                                 activeOpacity={0.85}
+                                disabled={submitting}
                             >
                                 <LinearGradient
                                     colors={[Colors.gradientStart, Colors.gradientMid]}
@@ -270,7 +465,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                                     style={styles.btnPrimary}
                                 >
                                     <Text style={styles.btnPrimaryText}>
-                                        {current.id === total ? 'Confirm' : 'Next'}
+                                        {submitting
+                                            ? 'Booking...'
+                                            : current.id === total
+                                            ? 'Confirm'
+                                            : 'Next'}
                                     </Text>
                                     <Ionicons
                                         name={
@@ -291,17 +490,14 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F0F8F8',
-    },
+/* ─────────────────────── Styles ─────────────────────── */
 
-    // ── Header Styles ──
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#F0F8F8' },
+
     header: {
         height: height * 0.28,
         paddingTop: Spacing.xxl,
-        position: 'relative',
         overflow: 'hidden',
     },
     headerContent: {
@@ -333,7 +529,6 @@ const styles = StyleSheet.create({
         letterSpacing: -0.5,
     },
 
-    // ── Step Info ──
     stepInfoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -350,9 +545,7 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: 'rgba(255,255,255,0.3)',
     },
-    stepTextContainer: {
-        flex: 1,
-    },
+    stepTextContainer: { flex: 1 },
     stepLabel: {
         fontSize: 12,
         color: 'rgba(255,255,255,0.8)',
@@ -368,33 +561,18 @@ const styles = StyleSheet.create({
         letterSpacing: -0.3,
         marginBottom: 2,
     },
-    stepSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.75)',
-        fontWeight: '500',
-    },
+    stepSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
 
-    // ── Progress Bar ──
-    progressContainer: {
-        gap: 12,
-    },
+    progressContainer: { gap: 12 },
     progressTrack: {
         height: 5,
         backgroundColor: 'rgba(255,255,255,0.25)',
         borderRadius: 3,
         overflow: 'hidden',
     },
-    progressFill: {
-        height: '100%',
-        backgroundColor: Colors.white,
-        borderRadius: 3,
-    },
+    progressFill: { height: '100%', backgroundColor: Colors.white, borderRadius: 3 },
 
-    // ── Form Container ──
-    formContainer: {
-        flex: 1,
-        marginTop: -RADIUS,
-    },
+    formContainer: { flex: 1, marginTop: -RADIUS },
     formSheet: {
         flex: 1,
         backgroundColor: Colors.white,
@@ -415,78 +593,8 @@ const styles = StyleSheet.create({
         marginTop: 12,
         marginBottom: 8,
     },
-    scrollContent: {
-        paddingHorizontal: 16,
-        paddingTop: 20,
-        paddingBottom: 120,
-    },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 120 },
 
-    // ── Placeholder Content ──
-    placeholderContent: {
-        gap: 16,
-    },
-    placeholderIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 20,
-        backgroundColor: `${Colors.gradientStart}15`,
-        alignItems: 'center',
-        justifyContent: 'center',
-        alignSelf: 'center',
-        marginBottom: 8,
-        borderWidth: 2,
-        borderColor: `${Colors.gradientStart}30`,
-    },
-    placeholderTitle: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: Colors.textDark,
-        textAlign: 'center',
-        letterSpacing: -0.3,
-        marginBottom: 4,
-    },
-    placeholderText: {
-        fontSize: 15,
-        color: Colors.textMuted,
-        textAlign: 'center',
-        marginBottom: 24,
-        lineHeight: 22,
-    },
-
-    // ── Demo Cards ──
-    demoCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 18,
-        backgroundColor: '#F9FAFB',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        gap: 14,
-    },
-    demoCardIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: `${Colors.gradientStart}15`,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    demoCardContent: {
-        flex: 1,
-    },
-    demoCardTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: Colors.textDark,
-        marginBottom: 2,
-    },
-    demoCardSubtitle: {
-        fontSize: 13,
-        color: Colors.textMuted,
-    },
-
-    // ── Bottom Navigation ──
     bottomNav: {
         position: 'absolute',
         bottom: 0,
@@ -497,10 +605,6 @@ const styles = StyleSheet.create({
         borderTopColor: '#F0F0F0',
         paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     },
-    bottomNavGradientBorder: {
-        height: 3,
-        width: '100%',
-    },
     bottomNavContent: {
         flexDirection: 'row',
         paddingHorizontal: 24,
@@ -509,7 +613,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 
-    // ── Buttons ──
     btnSecondary: {
         flex: 1,
         flexDirection: 'row',
@@ -528,9 +631,8 @@ const styles = StyleSheet.create({
         color: Colors.gradientMid,
         letterSpacing: 0.2,
     },
-    btnPrimaryContainer: {
-        flex: 2,
-    },
+    btnPrimaryContainer: { flex: 2 },
+    btnDisabled: { opacity: 0.6 },
     btnPrimary: {
         flexDirection: 'row',
         alignItems: 'center',

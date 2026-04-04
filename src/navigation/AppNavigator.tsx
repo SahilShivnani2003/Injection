@@ -5,9 +5,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import EmailLoginScreen from '../screens/auth/EmailLoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import BasicDetailsScreen from '../screens/user/booking/BasicDetailsScreen';
-import UploadPrescriptionScreen from '../screens/user/booking/UploadPrescriptionScreen';
 import RequirementsScreen from '../screens/user/booking/RequirementsScreen';
-import InsuranceScreen from '../screens/user/booking/InsuranceScreen';
 import SlotBookingScreen from '../screens/user/booking/SlotBookingScreen';
 import ChargesScreen from '../screens/user/booking/ChargesScreen';
 import ComplimentaryScreen from '../screens/user/booking/ComplimentaryScreen';
@@ -18,6 +16,8 @@ import TabNavigator, { TabParamList } from './TabNavigator';
 import { useColorScheme } from 'react-native';
 import { AlertProvider } from '../context/AlertContext';
 import BookingScreen from '../screens/user/BookingScreen';
+import { Booking } from '@/types/booking';
+import BookingDetailScreen from '@/screens/user/BookingDetailScreen';
 
 export type RootStackParamList = {
     Splash: undefined;
@@ -36,6 +36,9 @@ export type RootStackParamList = {
     StaffPanel: undefined;
     MainTab: NavigatorScreenParams<TabParamList>;
     Booking: undefined;
+    BookingDetail: {
+        booking: Booking;
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,9 +62,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
                     <Stack.Screen name="Register" component={RegisterScreen} />
                     <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
-                    <Stack.Screen name="UploadPrescription" component={UploadPrescriptionScreen} />
                     <Stack.Screen name="Requirements" component={RequirementsScreen} />
-                    <Stack.Screen name="Insurance" component={InsuranceScreen} />
                     <Stack.Screen name="SlotBooking" component={SlotBookingScreen} />
                     <Stack.Screen name="Charges" component={ChargesScreen} />
                     <Stack.Screen name="Complimentary" component={ComplimentaryScreen} />
@@ -70,6 +71,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="StaffPanel" component={StaffPanelScreen} />
                     <Stack.Screen name="MainTab" component={TabNavigator} />
                     <Stack.Screen name="Booking" component={BookingScreen} />
+                    <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />
                 </Stack.Navigator>
             </NavigationContainer>
         </AlertProvider>
