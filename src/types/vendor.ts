@@ -1,12 +1,4 @@
-export interface IVendor {
-    id?: string;
-    name: string;
-    email: string;
-    password: string;
-    phone: string;
-    alternatePhone?: string;
-    businessName: string;
-    businessType:
+export type BusinessType =
     | 'Individual'
     | 'Clinic'
     | 'Hospital'
@@ -14,34 +6,7 @@ export interface IVendor {
     | 'Pharmacy'
     | 'Other';
 
-    registrationNumber?: string;
-    gstNumber?: string;
-    servicesOffered: ServiceType[];
-    qualifications?: Qualification[];
-    experience?: number;
-    specialization?: string;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    serviceAreas?: string[];
-    documents?: Documents;
-    availability?: Availability;
-    pricing?: Pricing;
-    isVerified?: boolean;
-    isActive?: boolean;
-    verificationStatus?: 'pending' | 'verified' | 'rejected';
-    verificationDate?: Date;
-    rating?: number;
-    totalReviews?: number;
-    profileImage?: string | null;
-    bio?: string;
-    bankDetails?: BankDetails;
-    createdAt?: Date;
-    updatedAt?: Date;
-}
-
-export type ServiceType =
+export type ServiceOffered =
     | 'Home Injections'
     | 'IV Drip Services'
     | 'Wound Dressing'
@@ -61,37 +26,7 @@ export type ServiceType =
     | 'Dissertation Program'
     | 'Placement Services';
 
-
-export interface Qualification {
-    degree?: string;
-    institution?: string;
-    year?: number;
-}
-
-export interface DocumentFile {
-    type?: string;
-    url?: string;
-}
-
-export interface Documents {
-    identityProof?: DocumentFile;
-    qualificationCertificate?: DocumentFile;
-    businessLicense?: DocumentFile;
-    insuranceCertificate?: DocumentFile;
-}
-
-export interface TimeSlot {
-    from: string;
-    to: string;
-}
-
-export interface Availability {
-    days: Day[];
-    timeSlots: TimeSlot[];
-    emergencyAvailable?: boolean;
-}
-
-export type Day =
+export type WeekDay =
     | 'Monday'
     | 'Tuesday'
     | 'Wednesday'
@@ -100,16 +35,102 @@ export type Day =
     | 'Saturday'
     | 'Sunday';
 
-export interface Pricing {
-    consultationFee?: number;
-    homeVisitFee?: number;
-    emergencyFee?: number;
-}
+export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
-export interface BankDetails {
-    accountHolderName?: string;
-    accountNumber?: string;
-    ifscCode?: string;
-    bankName?: string;
-    branch?: string;
+export interface Vendor {
+    // Basic
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    alternatePhone?: string;
+
+    // Business
+    businessName: string;
+    businessType: BusinessType;
+    registrationNumber?: string;
+    gstNumber?: string;
+
+    // Services
+    servicesOffered?: ServiceOffered[];
+
+    // Professional
+    qualifications?: {
+        degree?: string;
+        institution?: string;
+        year?: number;
+    }[];
+
+    experience?: number;
+    specialization?: string;
+
+    // Location
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    serviceAreas?: string[];
+
+    // Documents
+    documents?: {
+        identityProof?: {
+            type?: string;
+            url?: string;
+        };
+        qualificationCertificate?: {
+            type?: string;
+            url?: string;
+        };
+        businessLicense?: {
+            type?: string;
+            url?: string;
+        };
+        insuranceCertificate?: {
+            type?: string;
+            url?: string;
+        };
+    };
+
+    // Availability
+    availability?: {
+        days?: WeekDay[];
+        timeSlots?: {
+            from?: string;
+            to?: string;
+        }[];
+        emergencyAvailable: boolean;
+    };
+
+    // Pricing
+    pricing?: {
+        consultationFee?: number;
+        homeVisitFee?: number;
+        emergencyFee?: number;
+    };
+
+    // Status
+    isVerified: boolean;
+    isActive: boolean;
+    verificationStatus: VerificationStatus;
+    verificationDate?: string;
+
+    // Ratings
+    rating: number;
+    totalReviews: number;
+
+    // Profile
+    profileImage: string | null;
+    bio?: string;
+
+    // Bank
+    bankDetails?: {
+        accountHolderName?: string;
+        accountNumber?: string;
+        ifscCode?: string;
+        bankName?: string;
+        branch?: string;
+    };
+
+    createdAt: string;
+    updatedAt: string;
 }

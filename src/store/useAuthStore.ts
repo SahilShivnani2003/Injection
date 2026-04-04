@@ -1,32 +1,76 @@
+import { User } from "@/types/user";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 
-interface authState {
+type AuthState = {
     isAuthenticated: boolean;
     token: string | null;
-    user: any | null;
-    login: (token: string, user: any) => void;
-    logout: () => void;
-    loadAuthState: () => Promise<void>;
-}
+    user: User | null;
+    setAuth: (user: User, token: string) => void;
+    removeAuth: () => void;
+    loadAuth: () => void;
+};
 
-export const useAuthStore = create<authState>((set) => ({
+const STORAGE_KEY = 'auth';
+
+export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
     token: null,
     user: null,
-    login: (token, user) => {
-        set({ token, user, isAuthenticated: true });
-        AsyncStorage.setItem('auth', JSON.stringify({ token, user }));
-    }   ,
-    logout: () => {
-        set({ token: null, user: null, isAuthenticated: false });           
-        AsyncStorage.removeItem('auth');
-    },
-    loadAuthState: async () => {
-        const auth = await AsyncStorage.getItem('auth');
-        if (auth) {
-            const { token, user } = JSON.parse(auth);
-            set({ token, user, isAuthenticated: true });
+    setAuth: async (user: User, token: string) => {
+
+        try {
+            if (!user || !token) {
+                console.error('AUTH DATA MISSING ');
+                return;
+            }
+
+            const data = JSON.stringify({ user, token });
+
+            await AsyncStorage.setItem(STORAGE_KEY, data);
+
+            set({
+                isAuthenticated: true,
+                user: user,
+                token: token
+            })
+
+        } catch (error: any) {
+            console.error('ERROR WHILE SAVING AUTH : ', error);
         }
-    }
-}));
+    },
+    removeAuth: async () => {
+        try {
+
+            await AsyncStorage.removeItem(STORAGE_KEY);
+
+            set({
+                isAuthenticated: false,
+                user: null,
+                token: null
+            })
+        } catch (error: any) {
+            console.error('ERROW WHILE REMOVING AUTH : ', error);
+        }
+    },
+    loadAuth: async () => {
+        try {
+
+            const data = await AsyncStorage.getItem(STORAGE_KEY);
+
+            if (data) {
+                const auth = JSON.parse(data);
+
+                set({
+                    isAuthenticated: true,
+                    user: auth?.user,
+                    token: auth?.token
+                })
+            } else {
+                console.warn('NO USER DATA FOUND.')
+            }
+        } catch (error: any) {
+            console.error('ERROR WHILE LOADING AUTH : ', error);
+        }
+    },
+}))

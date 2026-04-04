@@ -28,7 +28,7 @@ const { width, height } = Dimensions.get('window');
 type EmailLoginProps = NativeStackScreenProps<RootStackParamList, 'EmailLogin'>;
 
 const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
-    const { login } = useAuthStore();
+    const { setAuth } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -77,7 +77,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             const response = await userApi.login({ email, password });
             if (response.status === 200) {
                 alert.success('Login Successful', 'Welcome back!');
-                login(response.data.token, response.data.user);
+                setAuth(response.data.token, response.data.user);
                 navigation.replace('MainTab', {
                     screen: 'Dashboard',
                 });
@@ -185,21 +185,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
                         {/* Forgot Password */}
                         <TouchableOpacity
-                            style={styles.forgotPassword}
-                            onPress={() => {
-                                alert.confirm({
-                                    title: 'Reset Password',
-                                    message: 'Send password reset link to your email?',
-                                    confirmText: 'Send',
-                                    cancelText: 'Cancel',
-                                    onConfirm: () => {
-                                        alert.info(
-                                            'Password Reset',
-                                            'Check your email for reset instructions',
-                                        );
-                                    },
-                                });
-                            }}
+                            style={styles.forgotPassword}                            
                             activeOpacity={0.7}
                         >
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>

@@ -4,7 +4,7 @@ import DashboardScreen from '../screens/user/tabs/DashboardScreen';
 import ProfileScreen from '../screens/user/tabs/ProfileScreen';
 import CustomTabBar from '../components/CustomTabBar';
 import BookingsScreen from '../screens/user/tabs/BookingsScreen';
-import { ITabItem } from '../types/ITabItems';
+import { ITabItem } from '../types/TabItem';
 import { View } from 'react-native';
 
 export type TabParamList = {

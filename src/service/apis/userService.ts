@@ -1,4 +1,4 @@
-import { CreateUserDTO } from "../../types/user";
+import { CreateUser } from "@/types/user";
 import { publicClient } from "../apiClient";
 
 export const userApi = {
@@ -6,7 +6,7 @@ export const userApi = {
         email: string,
         password: string
     }) => publicClient.post('/users/login', data),
-    register: (data: CreateUserDTO) => publicClient.post('/users/register', data),
+    register: (data: CreateUser) => publicClient.post('/users/register', data),
     getProfile: () => publicClient.get('/users/me'),
     updateProfile: (data: any) => publicClient.put('/users/profile', data),
 };

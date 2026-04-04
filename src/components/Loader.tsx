@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../theme/colors';
-import { LoaderType, LoaderSize, LoaderProps } from '../types/loader';
+import { LoaderType, LoaderSize, LoaderProps } from '../types/Loader';
 
 const { width, height } = Dimensions.get('window');
 
