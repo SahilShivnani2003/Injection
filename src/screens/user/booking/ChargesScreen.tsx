@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { SelectedService } from '@/types/booking';
 
@@ -80,7 +80,7 @@ const ChargesScreen: React.FC<ChargesScreenProps> = ({ selectedServices }) => {
     }
 
     return (
-        <View style={styles.root}>
+        <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
             {/* ── Services list ── */}
             <View style={styles.sectionHeader}>
                 <View style={styles.sectionAccent} />
@@ -137,7 +137,9 @@ const ChargesScreen: React.FC<ChargesScreenProps> = ({ selectedServices }) => {
             <Text style={styles.disclaimer}>
                 Prices include visiting charges. GST applicable as per government norms.
             </Text>
-        </View>
+
+            <View style={{ height: 20 }} />
+        </ScrollView>
     );
 };
 

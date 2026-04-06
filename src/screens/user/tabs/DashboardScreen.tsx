@@ -25,24 +25,70 @@ const CARD_WIDTH = (width - 48) / 2;
 
 type DashboardProps = NativeBottomTabScreenProps<TabParamList, 'Dashboard'>;
 
-interface DashboardData {
-    counts: {
-        users: number;
-        vendors: number;
-        services: number;
-        bookings: number;
-        labEntries: number;
-    };
-    bookingsByStatus: any[];
-    revenue: number;
-    labRevenue: number;
-    monthlyBookings: any[];
-    labsByStatus: any[];
-    recentBookings: any[];
-    topServices: any[];
+// ── Types matching API response ──────────────────────────────────────────────
+
+interface SelectedService {
+    serviceId: string;
+    serviceName: string;
+    price: number;
+    quantity: number;
+    _id: string;
 }
 
-// Animated metric card
+interface VendorInfo {
+    _id: string;
+    name: string;
+    phone: string;
+    businessName: string;
+}
+
+interface Booking {
+    _id: string;
+    patientName: string;
+    selectedServices: SelectedService[];
+    grandTotal: number;
+    preferredTimeSlot: string;
+    vendorId: VendorInfo;
+    bookingStatus: string;
+    createdAt: string;
+}
+
+interface BookingByStatus {
+    _id: string;
+    count: number;
+}
+
+interface MostUsedService {
+    _id: string;
+    count: number;
+    totalSpent: number;
+}
+
+interface MonthlyBooking {
+    _id: { year: number; month: number };
+    count: number;
+    spent: number;
+}
+
+interface Summary {
+    totalBookings: number;
+    completedBookings: number;
+    cancelledBookings: number;
+    upcomingBookingsCount: number;
+    totalSpent: number;
+}
+
+interface DashboardData {
+    summary: Summary;
+    bookingsByStatus: BookingByStatus[];
+    recentBookings: Booking[];
+    upcomingBookings: Booking[];
+    mostUsedServices: MostUsedService[];
+    monthlyBookings: MonthlyBooking[];
+}
+
+// ── Animated metric card ─────────────────────────────────────────────────────
+
 const MetricCard = ({
     card,
     delay,
@@ -90,6 +136,8 @@ const MetricCard = ({
     );
 };
 
+// ── Screen ───────────────────────────────────────────────────────────────────
+
 const DashboardScreen = ({ navigation }: DashboardProps) => {
     const { user } = useAuthStore();
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -121,8 +169,10 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
 
             const response = await dashboardService.dashboardStats();
 
+            // API returns { success, data: { summary, recentBookings, ... } }
             if (response.data?.success) {
-                setDashboardData(response.data);
+                console.log('dashboad response : ',response.data.data);
+                setDashboardData(response.data.data as DashboardData);
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -141,7 +191,8 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         fetchDashboardData(true);
     };
 
-    // Get greeting based on time
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good morning';
@@ -149,183 +200,158 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         return 'Good evening';
     };
 
-    // Get user initials
     const getUserInitials = () => {
         if (!user?.name) return 'U';
         const names = user.name.split(' ');
-        if (names.length >= 2) {
-            return `${names[0][0]}${names[1][0]}`.toUpperCase();
-        }
+        if (names.length >= 2) return `${names[0][0]}${names[1][0]}`.toUpperCase();
         return user.name.substring(0, 2).toUpperCase();
     };
 
-    // Calculate health metrics (mock for now - can be made dynamic)
-    const healthScore = 87; // This could come from user health data
-    const adherence = 94;
-    const nurseRating = 4.8;
-    const streak = 12;
-
-    // Get metric cards based on dashboard data
-    const getMetricCards = () => {
-        if (!dashboardData) return [];
-
-        // For patients, show visits and prescriptions
-        if (!user?.isStaff && user?.role !== 'admin') {
-            const upcomingBookings =
-                dashboardData.recentBookings?.filter(
-                    (booking: any) =>
-                        booking.status === 'confirmed' || booking.status === 'scheduled',
-                ).length || 0;
-
-            return [
-                {
-                    label: 'Upcoming Visits',
-                    value: upcomingBookings.toString(),
-                    bg: '#E8F9FF',
-                    accent: '#00B4E8',
-                    icon: '📅',
-                },
-                {
-                    label: 'Total Bookings',
-                    value: (dashboardData.counts?.bookings || 0).toString(),
-                    bg: '#E6FFF5',
-                    accent: '#00D4A0',
-                    icon: '💊',
-                },
-            ];
-        }
-
-        // For staff/admin, show admin metrics
-        return [
-            {
-                label: 'Total Bookings',
-                value: (dashboardData.counts?.bookings || 0).toString(),
-                bg: '#E8F9FF',
-                accent: '#00B4E8',
-                icon: '📅',
-            },
-            {
-                label: 'Total Services',
-                value: (dashboardData.counts?.services || 0).toString(),
-                bg: '#E6FFF5',
-                accent: '#00D4A0',
-                icon: '🏥',
-            },
-            {
-                label: 'Total Users',
-                value: (dashboardData.counts?.users || 0).toString(),
-                bg: '#FFF8E6',
-                accent: '#F5A623',
-                icon: '👥',
-            },
-            {
-                label: 'Lab Entries',
-                value: (dashboardData.counts?.labEntries || 0).toString(),
-                bg: '#FFE8F5',
-                accent: '#E91E63',
-                icon: '🔬',
-            },
-        ];
+    /** Primary service name from a booking's selectedServices array */
+    const getPrimaryServiceName = (booking: Booking): string => {
+        if (!booking.selectedServices?.length) return 'Service';
+        const first = booking.selectedServices[0].serviceName;
+        const extra = booking.selectedServices.length - 1;
+        return extra > 0 ? `${first} +${extra} more` : first;
     };
 
-    // Format activity feed from recent bookings
-    const getActivityFeed = () => {
-        if (!dashboardData?.recentBookings) return [];
-
-        return dashboardData.recentBookings.slice(0, 3).map((booking: any) => {
-            const getIcon = (status: string) => {
-                switch (status) {
-                    case 'completed':
-                        return '✅';
-                    case 'confirmed':
-                        return '📋';
-                    case 'cancelled':
-                        return '❌';
-                    default:
-                        return '📅';
-                }
-            };
-
-            const getColor = (status: string) => {
-                switch (status) {
-                    case 'completed':
-                        return { bg: '#E6FFF5', dot: '#00D4A0' };
-                    case 'confirmed':
-                        return { bg: '#E8F9FF', dot: '#00B4E8' };
-                    case 'cancelled':
-                        return { bg: '#FFE8E8', dot: '#E53935' };
-                    default:
-                        return { bg: '#FFF8E6', dot: '#F5A623' };
-                }
-            };
-
-            const colors = getColor(booking.status);
-            const timeAgo = getTimeAgo(new Date(booking.createdAt));
-
-            return {
-                icon: getIcon(booking.status),
-                text: `${booking.serviceName || 'Service'} - ${booking.status}`,
-                time: timeAgo,
-                color: colors.bg,
-                dot: colors.dot,
-            };
-        });
-    };
-
-    // Helper to calculate time ago
     const getTimeAgo = (date: Date) => {
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
+        const diffMs = Date.now() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
-
         if (diffMins < 60) return `${diffMins}m ago`;
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays === 1) return 'Yesterday';
         return `${diffDays}d ago`;
     };
 
-    // Get next appointment
-    const getNextAppointment = () => {
-        if (!dashboardData?.recentBookings) return null;
-
-        const upcoming = dashboardData.recentBookings.find(
-            (booking: any) =>
-                (booking.status === 'confirmed' || booking.status === 'scheduled') &&
-                new Date(booking.bookingDate) > new Date(),
-        );
-
-        return upcoming;
-    };
-
-    const handleViewBooking = (booking: any) => {
-        if (booking) {
-            navigation
-                .getParent<NativeStackNavigationProp<RootStackParamList>>()
-                .navigate('BookingDetail', { booking });
-        }
-    };
-
-    // Format date
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+    const formatDate = (dateString: string) =>
+        new Date(dateString).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
         });
+
+    // ── Metric cards ─────────────────────────────────────────────────────────
+
+    const getMetricCards = () => {
+        if (!dashboardData) return [];
+        const { summary } = dashboardData;
+
+        if (!user?.isStaff && user?.role !== 'admin') {
+            // Patient view
+            return [
+                {
+                    label: 'Upcoming',
+                    value: summary.upcomingBookingsCount.toString(),
+                    bg: '#E8F9FF',
+                    accent: '#00B4E8',
+                    icon: '📅',
+                },
+                {
+                    label: 'Total Bookings',
+                    value: summary.totalBookings.toString(),
+                    bg: '#E6FFF5',
+                    accent: '#00D4A0',
+                    icon: '📋',
+                },
+                {
+                    label: 'Completed',
+                    value: summary.completedBookings.toString(),
+                    bg: '#FFF8E6',
+                    accent: '#F5A623',
+                    icon: '✅',
+                },
+                {
+                    label: 'Cancelled',
+                    value: summary.cancelledBookings.toString(),
+                    bg: '#FFE8F5',
+                    accent: '#E91E63',
+                    icon: '❌',
+                },
+            ];
+        }
+
+        // Admin / staff view
+        return [
+            {
+                label: 'Total Bookings',
+                value: summary.totalBookings.toString(),
+                bg: '#E8F9FF',
+                accent: '#00B4E8',
+                icon: '📅',
+            },
+            {
+                label: 'Upcoming',
+                value: summary.upcomingBookingsCount.toString(),
+                bg: '#E6FFF5',
+                accent: '#00D4A0',
+                icon: '🗓️',
+            },
+            {
+                label: 'Completed',
+                value: summary.completedBookings.toString(),
+                bg: '#FFF8E6',
+                accent: '#F5A623',
+                icon: '✅',
+            },
+            {
+                label: 'Cancelled',
+                value: summary.cancelledBookings.toString(),
+                bg: '#FFE8F5',
+                accent: '#E91E63',
+                icon: '❌',
+            },
+        ];
     };
 
-    // Format time
-    const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
+    // ── Activity feed ─────────────────────────────────────────────────────────
+
+    const getActivityFeed = () => {
+        if (!dashboardData?.recentBookings?.length) return [];
+
+        const statusMeta: Record<string, { icon: string; bg: string; dot: string }> = {
+            completed: { icon: '✅', bg: '#E6FFF5', dot: '#00D4A0' },
+            confirmed: { icon: '📋', bg: '#E8F9FF', dot: '#00B4E8' },
+            cancelled: { icon: '❌', bg: '#FFE8E8', dot: '#E53935' },
+            pending:   { icon: '⏳', bg: '#FFF8E6', dot: '#F5A623' },
+        };
+
+        return dashboardData.recentBookings.slice(0, 3).map((booking) => {
+            const meta = statusMeta[booking.bookingStatus] ?? statusMeta.pending;
+            return {
+                icon: meta.icon,
+                text: `${getPrimaryServiceName(booking)} — ${booking.bookingStatus}`,
+                time: getTimeAgo(new Date(booking.createdAt)),
+                color: meta.bg,
+                dot: meta.dot,
+                patientName: booking.patientName,
+            };
         });
     };
+
+    // ── Next appointment — taken from upcomingBookings ────────────────────────
+
+    const getNextAppointment = (): Booking | null => {
+        if (!dashboardData?.upcomingBookings?.length) return null;
+        return dashboardData.upcomingBookings[0];
+    };
+
+    const handleViewBooking = (booking: Booking) => {
+        navigation
+            .getParent<NativeStackNavigationProp<RootStackParamList>>()
+            .navigate('BookingDetail', { bookingId: booking._id });
+    };
+
+    // ── Revenue totals for admin banner ──────────────────────────────────────
+
+    const getTotalRevenue = () => {
+        if (!dashboardData) return 0;
+        return dashboardData.monthlyBookings.reduce((sum, m) => sum + m.spent, 0);
+    };
+
+    // ── Render ────────────────────────────────────────────────────────────────
 
     if (loading && !dashboardData) {
         return (
@@ -339,6 +365,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     const metricCards = getMetricCards();
     const activityFeed = getActivityFeed();
     const nextAppointment = getNextAppointment();
+    const summary = dashboardData?.summary;
 
     return (
         <View style={styles.root}>
@@ -351,7 +378,6 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                 end={{ x: 1.0, y: 1 }}
                 style={styles.header}
             >
-                {/* Decorative blobs */}
                 <View style={styles.blobTopRight} />
                 <View style={styles.blobBottomLeft} />
 
@@ -390,42 +416,45 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         </View>
                     </View>
 
-                    {/* Health score banner - show for patients */}
-                    {!user?.isStaff && user?.role !== 'admin' && (
+                    {/* Patient summary banner */}
+                    {!user?.isStaff && user?.role !== 'admin' && summary && (
                         <View style={styles.healthBanner}>
                             <View style={styles.healthScoreBlock}>
-                                <Text style={styles.healthScoreNum}>{healthScore}</Text>
-                                <Text style={styles.healthScoreLabel}>Health{'\n'}Score</Text>
+                                <Text style={styles.healthScoreNum}>
+                                    {summary.totalBookings}
+                                </Text>
+                                <Text style={styles.healthScoreLabel}>Total{'\n'}Bookings</Text>
                             </View>
                             <View style={styles.healthDivider} />
                             <View style={styles.healthStatsRow}>
                                 <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>{adherence}%</Text>
-                                    <Text style={styles.healthStatKey}>Adherence</Text>
+                                    <Text style={styles.healthStatVal}>
+                                        {summary.upcomingBookingsCount}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Upcoming</Text>
                                 </View>
                                 <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>{nurseRating}</Text>
-                                    <Text style={styles.healthStatKey}>Rating</Text>
+                                    <Text style={styles.healthStatVal}>
+                                        {summary.completedBookings}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Done</Text>
                                 </View>
                                 <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>{streak}d</Text>
-                                    <Text style={styles.healthStatKey}>Streak</Text>
+                                    <Text style={styles.healthStatVal}>
+                                        ₹{summary.totalSpent.toLocaleString()}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Spent</Text>
                                 </View>
                             </View>
                         </View>
                     )}
 
-                    {/* Revenue banner - show for staff/admin */}
-                    {(user?.isStaff || user?.role === 'admin') && dashboardData && (
+                    {/* Admin / staff revenue banner */}
+                    {(user?.isStaff || user?.role === 'admin') && summary && (
                         <View style={styles.healthBanner}>
                             <View style={styles.healthScoreBlock}>
                                 <Text style={styles.healthScoreNum}>
-                                    ₹
-                                    {(
-                                        (dashboardData.revenue + dashboardData.labRevenue) /
-                                        1000
-                                    ).toFixed(0)}
-                                    K
+                                    ₹{(getTotalRevenue() / 1000).toFixed(1)}K
                                 </Text>
                                 <Text style={styles.healthScoreLabel}>Total{'\n'}Revenue</Text>
                             </View>
@@ -433,21 +462,21 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                             <View style={styles.healthStatsRow}>
                                 <View style={styles.healthStat}>
                                     <Text style={styles.healthStatVal}>
-                                        ₹{(dashboardData.revenue / 1000).toFixed(0)}K
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Services</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        ₹{(dashboardData.labRevenue / 1000).toFixed(0)}K
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Lab</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {dashboardData.counts?.bookings || 0}
+                                        {summary.totalBookings}
                                     </Text>
                                     <Text style={styles.healthStatKey}>Bookings</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>
+                                        {summary.completedBookings}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Completed</Text>
+                                </View>
+                                <View style={styles.healthStat}>
+                                    <Text style={styles.healthStatVal}>
+                                        {summary.upcomingBookingsCount}
+                                    </Text>
+                                    <Text style={styles.healthStatKey}>Upcoming</Text>
                                 </View>
                             </View>
                         </View>
@@ -505,11 +534,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                             }
                         >
                             <LinearGradient
-                                colors={[
-                                    Colors.gradientStart,
-                                    Colors.gradientMid,
-                                    Colors.gradientEnd,
-                                ]}
+                                colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.quickActionGradient}
@@ -520,7 +545,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Next Appointment */}
+                    {/* Next Appointment — from upcomingBookings[0] */}
                     {nextAppointment && (
                         <>
                             <Text style={styles.sectionLabel}>Next Appointment</Text>
@@ -537,16 +562,16 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.apptType}>
-                                            {nextAppointment.serviceName || 'Service'}
+                                            {getPrimaryServiceName(nextAppointment)}
                                         </Text>
                                         <Text style={styles.apptSub}>
-                                            {nextAppointment.serviceType || 'Health Service'}
+                                            Patient: {nextAppointment.patientName}
                                         </Text>
                                     </View>
                                     <View style={styles.apptBadge}>
                                         <Text style={styles.apptBadgeText}>
-                                            {nextAppointment.status?.charAt(0).toUpperCase() +
-                                                nextAppointment.status?.slice(1) || 'Confirmed'}
+                                            {nextAppointment.bookingStatus.charAt(0).toUpperCase() +
+                                                nextAppointment.bookingStatus.slice(1)}
                                         </Text>
                                     </View>
                                 </View>
@@ -555,32 +580,41 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                     <View style={styles.apptTimeChip}>
                                         <Text style={styles.apptTimeIcon}>📅</Text>
                                         <Text style={styles.apptTimeText}>
-                                            {formatDate(nextAppointment.bookingDate)}
+                                            {formatDate(nextAppointment.createdAt)}
                                         </Text>
                                     </View>
                                     <View style={styles.apptTimeChip}>
                                         <Text style={styles.apptTimeIcon}>⏰</Text>
                                         <Text style={styles.apptTimeText}>
-                                            {nextAppointment.bookingTime ||
-                                                formatTime(nextAppointment.bookingDate)}
+                                            {nextAppointment.preferredTimeSlot}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {nextAppointment.vendorName && (
+                                {/* Grand total chip */}
+                                <View style={styles.apptTotalRow}>
+                                    <Text style={styles.apptTotalLabel}>Total Amount</Text>
+                                    <Text style={styles.apptTotalValue}>
+                                        ₹{nextAppointment.grandTotal.toLocaleString()}
+                                    </Text>
+                                </View>
+
+                                {nextAppointment.vendorId && (
                                     <View style={styles.apptNurseRow}>
                                         <View style={styles.nurseAvatar}>
                                             <Text style={styles.nurseAvatarText}>
-                                                {nextAppointment.vendorName
+                                                {nextAppointment.vendorId.name
                                                     .substring(0, 2)
                                                     .toUpperCase()}
                                             </Text>
                                         </View>
                                         <View>
                                             <Text style={styles.nurseName}>
-                                                {nextAppointment.vendorName}
+                                                {nextAppointment.vendorId.name}
                                             </Text>
-                                            <Text style={styles.nurseRating}>Service Provider</Text>
+                                            <Text style={styles.nurseRating}>
+                                                {nextAppointment.vendorId.businessName}
+                                            </Text>
                                         </View>
                                     </View>
                                 )}
@@ -596,9 +630,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                         end={{ x: 1, y: 0 }}
                                         style={styles.viewDetailsBtnInner}
                                     >
-                                        <Text style={styles.viewDetailsBtnText}>
-                                            View Full Details
-                                        </Text>
+                                        <Text style={styles.viewDetailsBtnText}>View Full Details</Text>
                                         <Text style={styles.viewDetailsBtnArrow}>→</Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
@@ -606,7 +638,39 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         </>
                     )}
 
-                    {/* Activity Feed */}
+                    {/* Most Used Services */}
+                    {(dashboardData?.mostUsedServices as MostUsedService[])?.length > 0 && (
+                        <>
+                            <Text style={styles.sectionLabel}>Top Services</Text>
+                            <View style={styles.activityFeed}>
+                                {dashboardData?.mostUsedServices.slice(0, 3).map((svc, idx, arr) => (
+                                    <View
+                                        key={svc._id}
+                                        style={[
+                                            styles.activityItem,
+                                            idx < arr.length - 1 && styles.activityItemBorder,
+                                        ]}
+                                    >
+                                        <View
+                                            style={[styles.activityIconWrap, { backgroundColor: '#E8F9FF' }]}
+                                        >
+                                            <Text style={styles.activityEmoji}>🏥</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.activityText}>{svc._id}</Text>
+                                            <Text style={styles.activityTime}>
+                                                {svc.count} booking{svc.count !== 1 ? 's' : ''} · ₹
+                                                {svc.totalSpent.toLocaleString()}
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.activityDot, { backgroundColor: '#00B4E8' }]} />
+                                    </View>
+                                ))}
+                            </View>
+                        </>
+                    )}
+
+                    {/* Recent Activity */}
                     {activityFeed.length > 0 && (
                         <>
                             <Text style={styles.sectionLabel}>Recent Activity</Text>
@@ -616,8 +680,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                         key={idx}
                                         style={[
                                             styles.activityItem,
-                                            idx < activityFeed.length - 1 &&
-                                                styles.activityItemBorder,
+                                            idx < activityFeed.length - 1 && styles.activityItemBorder,
                                         ]}
                                     >
                                         <View
@@ -633,10 +696,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                             <Text style={styles.activityTime}>{item.time}</Text>
                                         </View>
                                         <View
-                                            style={[
-                                                styles.activityDot,
-                                                { backgroundColor: item.dot },
-                                            ]}
+                                            style={[styles.activityDot, { backgroundColor: item.dot }]}
                                         />
                                     </View>
                                 ))}
@@ -644,7 +704,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         </>
                     )}
 
-                    {/* Bottom tip */}
+                    {/* Patient tip */}
                     {!user?.isStaff && user?.role !== 'admin' && (
                         <View style={styles.tipCard}>
                             <Text style={styles.tipIcon}>🏆</Text>
@@ -656,7 +716,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                     )}
 
                     {/* Empty state */}
-                    {(!dashboardData || dashboardData.counts?.bookings === 0) && (
+                    {summary?.totalBookings === 0 && (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyIcon}>📋</Text>
                             <Text style={styles.emptyTitle}>No bookings yet</Text>
@@ -681,10 +741,12 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     );
 };
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F2F7FA' },
 
-    // ── Header ──
+    // Header
     header: {
         paddingTop: 56,
         paddingHorizontal: 20,
@@ -712,15 +774,8 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         backgroundColor: 'rgba(255,255,255,0.07)',
     },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    greeting: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 15,
-    },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    greeting: { color: 'rgba(255,255,255,0.85)', fontSize: 15 },
     name: {
         color: '#FFFFFF',
         fontSize: 26,
@@ -739,21 +794,9 @@ const styles = StyleSheet.create({
         marginTop: 8,
         gap: 6,
     },
-    statusDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: '#AAFFD2',
-    },
-    statusText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    avatarWrap: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#AAFFD2' },
+    statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+    avatarWrap: { alignItems: 'center', justifyContent: 'center' },
     avatarRing: {
         position: 'absolute',
         width: 64,
@@ -772,7 +815,7 @@ const styles = StyleSheet.create({
     },
     avatarText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 
-    // Health banner
+    // Banner
     healthBanner: {
         backgroundColor: 'rgba(255,255,255,0.15)',
         borderRadius: 18,
@@ -784,12 +827,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.2)',
     },
     healthScoreBlock: { alignItems: 'center', minWidth: 52 },
-    healthScoreNum: {
-        color: '#FFFFFF',
-        fontSize: 36,
-        fontWeight: '900',
-        lineHeight: 38,
-    },
+    healthScoreNum: { color: '#FFFFFF', fontSize: 32, fontWeight: '900', lineHeight: 34 },
     healthScoreLabel: {
         color: 'rgba(255,255,255,0.80)',
         fontSize: 11,
@@ -797,29 +835,13 @@ const styles = StyleSheet.create({
         lineHeight: 14,
         marginTop: 2,
     },
-    healthDivider: {
-        width: 1,
-        height: 48,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-    },
-    healthStatsRow: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
+    healthDivider: { width: 1, height: 48, backgroundColor: 'rgba(255,255,255,0.25)' },
+    healthStatsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
     healthStat: { alignItems: 'center' },
-    healthStatVal: {
-        color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '800',
-    },
-    healthStatKey: {
-        color: 'rgba(255,255,255,0.75)',
-        fontSize: 10,
-        marginTop: 2,
-    },
+    healthStatVal: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+    healthStatKey: { color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 },
 
-    // ── Content ──
+    // Content
     content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 0 },
     sectionLabel: {
         fontSize: 13,
@@ -832,11 +854,7 @@ const styles = StyleSheet.create({
     },
 
     // Metric cards
-    cardGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
+    cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     metricCard: {
         width: CARD_WIDTH,
         borderRadius: 18,
@@ -859,17 +877,8 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     metricIcon: { fontSize: 20 },
-    metricValue: {
-        fontSize: 30,
-        fontWeight: '900',
-        lineHeight: 32,
-    },
-    metricLabel: {
-        fontSize: 12,
-        color: Colors.textMedium,
-        marginTop: 4,
-        fontWeight: '500',
-    },
+    metricValue: { fontSize: 30, fontWeight: '900', lineHeight: 32 },
+    metricLabel: { fontSize: 12, color: Colors.textMedium, marginTop: 4, fontWeight: '500' },
     metricAccentBar: {
         position: 'absolute',
         bottom: 0,
@@ -894,14 +903,8 @@ const styles = StyleSheet.create({
         elevation: 6,
         gap: 14,
     },
-    appointmentGradientBg: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    appointmentHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
+    appointmentGradientBg: { ...StyleSheet.absoluteFillObject },
+    appointmentHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     apptIconWrap: {
         width: 46,
         height: 46,
@@ -911,33 +914,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     apptIconEmoji: { fontSize: 22 },
-    apptType: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: Colors.textDark,
-    },
-    apptSub: {
-        fontSize: 12,
-        color: Colors.textMuted,
-        marginTop: 2,
-    },
+    apptType: { fontSize: 16, fontWeight: '700', color: Colors.textDark },
+    apptSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
     apptBadge: {
-        backgroundColor: '#E6FFF5',
+        backgroundColor: '#FFF8E6',
         borderRadius: 10,
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderWidth: 1,
-        borderColor: '#00D4A044',
+        borderColor: '#F5A62344',
     },
-    apptBadgeText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#00A07A',
-    },
-    apptTimeRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
+    apptBadgeText: { fontSize: 11, fontWeight: '700', color: '#C07A00' },
+    apptTimeRow: { flexDirection: 'row', gap: 8 },
     apptTimeChip: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -950,11 +938,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     apptTimeIcon: { fontSize: 12 },
-    apptTimeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: Colors.textDark,
+    apptTimeText: { fontSize: 12, fontWeight: '600', color: Colors.textDark },
+    apptTotalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F2F7FA',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
     },
+    apptTotalLabel: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
+    apptTotalValue: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
     apptNurseRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -971,25 +966,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    nurseAvatarText: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: Colors.gradientMid,
-    },
-    nurseName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: Colors.textDark,
-    },
-    nurseRating: {
-        fontSize: 12,
-        color: Colors.textMuted,
-        marginTop: 1,
-    },
-    viewDetailsBtn: {
-        borderRadius: 14,
-        overflow: 'hidden',
-    },
+    nurseAvatarText: { fontSize: 13, fontWeight: '700', color: Colors.gradientMid },
+    nurseName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
+    nurseRating: { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
+    viewDetailsBtn: { borderRadius: 14, overflow: 'hidden' },
     viewDetailsBtnInner: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -997,22 +977,11 @@ const styles = StyleSheet.create({
         paddingVertical: 13,
         gap: 8,
     },
-    viewDetailsBtnText: {
-        color: '#fff',
-        fontWeight: '700',
-        fontSize: 15,
-    },
-    viewDetailsBtnArrow: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '700',
-    },
+    viewDetailsBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+    viewDetailsBtnArrow: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
     // Quick Actions
-    quickActionsRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
+    quickActionsRow: { flexDirection: 'row', gap: 12 },
     quickActionBtn: {
         borderRadius: 18,
         overflow: 'hidden',
@@ -1031,12 +1000,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     quickActionIcon: { fontSize: 26 },
-    quickActionText: {
-        color: '#fff',
-        fontWeight: '700',
-        fontSize: 14,
-        textAlign: 'center',
-    },
+    quickActionText: { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'center' },
 
     // Activity feed
     activityFeed: {
@@ -1055,10 +1019,7 @@ const styles = StyleSheet.create({
         padding: 14,
         gap: 12,
     },
-    activityItemBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F4F8',
-    },
+    activityItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F4F8' },
     activityIconWrap: {
         width: 40,
         height: 40,
@@ -1067,21 +1028,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     activityEmoji: { fontSize: 18 },
-    activityText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: Colors.textDark,
-    },
-    activityTime: {
-        fontSize: 11,
-        color: Colors.textMuted,
-        marginTop: 2,
-    },
-    activityDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
+    activityText: { fontSize: 13, fontWeight: '600', color: Colors.textDark },
+    activityTime: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+    activityDot: { width: 8, height: 8, borderRadius: 4 },
 
     // Tip
     tipCard: {
@@ -1096,21 +1045,8 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(0, 212, 160, 0.20)',
     },
     tipIcon: { fontSize: 22 },
-    tipText: {
-        flex: 1,
-        fontSize: 13,
-        color: Colors.textMedium,
-        lineHeight: 20,
-    },
-    tipHighlight: {
-        fontWeight: '700',
-        color: '#00A07A',
-    },
-    menuLabel: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: Colors.textDark,
-    },
+    tipText: { flex: 1, fontSize: 13, color: Colors.textMedium, lineHeight: 20 },
+    menuLabel: { fontSize: 15, fontWeight: '600', color: Colors.textDark },
 
     // Empty state
     emptyState: {
@@ -1119,16 +1055,8 @@ const styles = StyleSheet.create({
         paddingVertical: 40,
         paddingHorizontal: 20,
     },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: 16,
-    },
-    emptyTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: Colors.textDark,
-        marginBottom: 8,
-    },
+    emptyIcon: { fontSize: 64, marginBottom: 16 },
+    emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.textDark, marginBottom: 8 },
     emptyText: {
         fontSize: 14,
         color: Colors.textMuted,
@@ -1142,11 +1070,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 12,
     },
-    emptyButtonText: {
-        color: Colors.white,
-        fontSize: 15,
-        fontWeight: '700',
-    },
+    emptyButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
 });
 
 export default DashboardScreen;

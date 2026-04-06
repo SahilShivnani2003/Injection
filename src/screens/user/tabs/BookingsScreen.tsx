@@ -8,116 +8,126 @@ import { useAlert } from '../../../context/AlertContext';
 import { bookingAPI } from '../../../service/apis/bookingService';
 import Loader from '../../../components/Loader';
 import { Booking } from '@/types/booking';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/navigation/AppNavigator';
 
 type BookingsProps = NativeBottomTabScreenProps<TabParamList, 'Bookings'>;
 
 const BookingsScreen = ({ navigation }: BookingsProps) => {
-  const alert = useAlert();
-  const [loading, setLoading] = useState(false);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+    const alert = useAlert();
+    const [loading, setLoading] = useState(false);
+    const [bookings, setBookings] = useState<Booking[]>([]);
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
+    useEffect(() => {
+        fetchBookings();
+    }, []);
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      const response = await bookingAPI.userBookings();
-      setBookings(response.data);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-      alert.error('Error', 'Failed to load bookings. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  const renderItem = ({ item }: { item: Booking }) => {
-    const getStatusColor = (status?: string) => {
-      switch (status) {
-        case 'pending':
-          return Colors.accent; // Orange for pending
-        case 'accepted':
-          return Colors.gradientStart; // Green for accepted
-        case 'in-progress':
-          return Colors.gradientMid; // Blue for in progress
-        case 'completed':
-          return Colors.textMuted; // Gray for completed
-        case 'cancelled':
-          return '#FF4757'; // Red for cancelled
-        default:
-          return Colors.textMedium;
-      }
+    const fetchBookings = async () => {
+        try {
+            setLoading(true);
+            const response = await bookingAPI.userBookings();
+            
+            setBookings(response.data?.data);
+        } catch (error) {
+            console.error('Error fetching bookings:', error);
+            alert.error('Error', 'Failed to load bookings. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
     };
+    const renderItem = ({ item }: { item: Booking }) => {
+        const getStatusColor = (status?: string) => {
+            switch (status) {
+                case 'pending':
+                    return Colors.accent; // Orange for pending
+                case 'accepted':
+                    return Colors.gradientStart; // Green for accepted
+                case 'in-progress':
+                    return Colors.gradientMid; // Blue for in progress
+                case 'completed':
+                    return Colors.textMuted; // Gray for completed
+                case 'cancelled':
+                    return '#FF4757'; // Red for cancelled
+                default:
+                    return Colors.textMedium;
+            }
+        };
 
-    const getStatusText = (status?: string) => {
-      switch (status) {
-        case 'pending':
-          return 'Pending';
-        case 'accepted':
-          return 'Accepted';
-        case 'in-progress':
-          return 'In Progress';
-        case 'completed':
-          return 'Completed';
-        case 'cancelled':
-          return 'Cancelled';
-        default:
-          return 'Unknown';
-      }
+        const getStatusText = (status?: string) => {
+            switch (status) {
+                case 'pending':
+                    return 'Pending';
+                case 'accepted':
+                    return 'Accepted';
+                case 'in-progress':
+                    return 'In Progress';
+                case 'completed':
+                    return 'Completed';
+                case 'cancelled':
+                    return 'Cancelled';
+                default:
+                    return 'Unknown';
+            }
+        };
+
+        const formatDate = (date?: Date) => {
+            if (!date) return 'Date not set';
+            return new Date(date).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+            });
+        };
+
+        const formatTime = (timeSlot: string) => {
+            // Assuming timeSlot is in format like "10:00-11:00"
+            return timeSlot.split('-')[0] || timeSlot;
+        };
+
+        const getServiceNames = (services: any[]) => {
+            if (!services || services.length === 0) return 'No services';
+            return services.map(service => service.serviceName).join(', ');
+        };
+
+        const handleNavigation = () => {
+            if (item._id) {
+                navigation
+                    .getParent<NativeStackNavigationProp<RootStackParamList>>()
+                    .navigate('BookingDetail', {
+                        bookingId: item._id,
+                    });
+            }
+        };
+        return (
+            <View style={styles.card} onTouchEnd={handleNavigation}>
+                <View style={styles.row}>
+                    <Text style={styles.title} numberOfLines={1}>
+                        {getServiceNames(item.selectedServices)}
+                    </Text>
+                    <Text style={[styles.status, { color: getStatusColor(item.bookingStatus) }]}>
+                        {getStatusText(item.bookingStatus)}
+                    </Text>
+                </View>
+
+                <Text style={styles.datetime}>
+                    {`${item.createdAt} • ${formatTime(item.preferredTimeSlot)}`}
+                </Text>
+
+                <View style={styles.detailsRow}>
+                    <Text style={styles.detailText}>₹{item.grandTotal?.toFixed(2) || '0.00'}</Text>
+                    <Text style={styles.detailText}>
+                        {item.serviceLocation || 'Location not set'}
+                    </Text>
+                </View>
+
+                {item.bookingStatus === 'pending' && (
+                    <TouchableOpacity style={styles.actionBtn}>
+                        <Text style={styles.actionText}>Cancel Booking</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        );
     };
-
-    const formatDate = (date?: Date) => {
-      if (!date) return 'Date not set';
-      return new Date(date).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    };
-
-    const formatTime = (timeSlot: string) => {
-      // Assuming timeSlot is in format like "10:00-11:00"
-      return timeSlot.split('-')[0] || timeSlot;
-    };
-
-    const getServiceNames = (services: any[]) => {
-      if (!services || services.length === 0) return 'No services';
-      return services.map(service => service.serviceName).join(', ');
-    };
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.title} numberOfLines={1}>
-            {getServiceNames(item.selectedServices)}
-          </Text>
-          <Text style={[styles.status, { color: getStatusColor(item.bookingStatus) }]}>
-            {getStatusText(item.bookingStatus)}
-          </Text>
-        </View>
-
-        <Text style={styles.datetime}>
-          {`${item.createdAt} • ${formatTime(item.preferredTimeSlot)}`}
-        </Text>
-
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailText}>
-            ₹{item.grandTotal?.toFixed(2) || '0.00'}
-          </Text>
-          <Text style={styles.detailText}>
-            {item.serviceLocation || 'Location not set'}
-          </Text>
-        </View>
-
-        {item.bookingStatus === 'pending' && (
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionText}>Cancel Booking</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
 
     return (
         <View style={styles.root}>
@@ -152,11 +162,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <Loader
-                            type="dots"
-                            size="large"
-                            text="Loading your bookings..."
-                        />
+                        <Loader type="dots" size="large" text="Loading your bookings..." />
                     </View>
                 ) : bookings.length === 0 ? (
                     <View style={styles.emptyContainer}>

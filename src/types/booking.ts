@@ -68,6 +68,7 @@ export interface Note {
 }
 
 export interface Booking {
+    _id?:string;
     patientName: string;
     age: number;
     sex: Gender;
@@ -115,6 +116,6 @@ export interface Booking {
 
     notes?: Note[];
 
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
 }

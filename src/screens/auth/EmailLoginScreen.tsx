@@ -8,7 +8,6 @@ import {
     StatusBar,
     KeyboardAvoidingView,
     Platform,
-    Alert,
     Animated,
     Easing,
     Dimensions,
@@ -36,7 +35,6 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
     const alert = useAlert();
 
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -67,20 +65,19 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             return;
         }
 
-        // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             alert.warning('Invalid Email', 'Please enter a valid email address');
             return;
         }
+
         try {
+            setIsLoading(true); // ← start loader before API call
             const response = await userApi.login({ email, password });
-            if (response.status === 200) {
+            if (response.data?.success) {
                 alert.success('Login Successful', 'Welcome back!');
-                setAuth(response.data.data.user, response.data.data.token );
-                navigation.replace('MainTab', {
-                    screen: 'Dashboard',
-                });
+                setAuth(response.data.data.user, response.data.data.token);
+                navigation.replace('MainTab', { screen: 'Dashboard' });
             } else {
                 alert.error('Login Failed', 'Invalid email or password. Please try again.');
             }
@@ -91,30 +88,21 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
         }
     };
 
-    const togglePasswordVisibility = () => {
-        setShowPassword(!showPassword);
-    };
-
     return (
         <View style={styles.root}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Header with Gradient Background */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.header}
             >
-                {/* Glow Rings */}
                 <View style={styles.glowRingOuter} />
                 <View style={styles.glowRingInner} />
-
-                {/* Logo/Icon */}
                 <View style={styles.logoRing}>
                     <Text style={styles.logoText}>💉</Text>
                 </View>
-
                 <Text style={styles.title}>Welcome Back</Text>
                 <Text style={styles.subtitle}>Sign in to your account</Text>
             </LinearGradient>
@@ -126,10 +114,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                 <Animated.View
                     style={[
                         styles.formContainer,
-                        {
-                            opacity: fadeAnim,
-                            transform: [{ translateY: slideAnim }],
-                        },
+                        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
                     ]}
                 >
                     <ScrollView
@@ -150,6 +135,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoCorrect={false}
+                                    editable={!isLoading}
                                 />
                                 <View style={styles.inputIcon}>
                                     <Text style={styles.iconText}>📧</Text>
@@ -170,11 +156,13 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                                     secureTextEntry={!showPassword}
                                     autoCapitalize="none"
                                     autoCorrect={false}
+                                    editable={!isLoading}
                                 />
                                 <TouchableOpacity
                                     style={styles.inputIcon}
-                                    onPress={togglePasswordVisibility}
+                                    onPress={() => setShowPassword(p => !p)}
                                     activeOpacity={0.7}
+                                    disabled={isLoading}
                                 >
                                     <Text style={styles.iconText}>
                                         {showPassword ? '👁️' : '🙈'}
@@ -185,8 +173,9 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
                         {/* Forgot Password */}
                         <TouchableOpacity
-                            style={styles.forgotPassword}                            
+                            style={styles.forgotPassword}
                             activeOpacity={0.7}
+                            disabled={isLoading}
                         >
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>
@@ -223,6 +212,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                                 style={styles.mobileLoginBtn}
                                 onPress={() => navigation.replace('Login')}
                                 activeOpacity={0.7}
+                                disabled={isLoading}
                             >
                                 <Text style={styles.mobileLoginText}>📱 Mobile Number</Text>
                             </TouchableOpacity>
@@ -233,6 +223,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             style={styles.registerLink}
                             onPress={() => navigation.navigate('Register')}
                             activeOpacity={0.7}
+                            disabled={isLoading}
                         >
                             <Text style={styles.registerText}>
                                 New user?{' '}
@@ -249,7 +240,6 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F0F7FA' },
 
-    // Header
     header: {
         height: height * 0.38,
         alignItems: 'center',
@@ -290,13 +280,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 8,
     },
-    subtitle: {
-        fontSize: 16,
-        color: 'rgba(255,255,255,0.8)',
-        textAlign: 'center',
-    },
+    subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center' },
 
-    // Container
     container: { flex: 1 },
     formContainer: {
         flex: 1,
@@ -309,7 +294,6 @@ const styles = StyleSheet.create({
     },
     scrollContent: { paddingBottom: 40 },
 
-    // Input Groups
     inputGroup: { marginBottom: 24 },
     inputLabel: {
         fontSize: 14,
@@ -328,32 +312,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         height: 56,
     },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: Colors.textDark,
-        fontWeight: '500',
-    },
-    inputIcon: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    input: { flex: 1, fontSize: 16, color: Colors.textDark, fontWeight: '500' },
+    inputIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
     iconText: { fontSize: 18 },
 
-    // Forgot Password
-    forgotPassword: {
-        alignSelf: 'flex-end',
-        marginBottom: 32,
-    },
-    forgotPasswordText: {
-        fontSize: 14,
-        color: Colors.gradientStart,
-        fontWeight: '600',
-    },
+    forgotPassword: { alignSelf: 'flex-end', marginBottom: 32 },
+    forgotPasswordText: { fontSize: 14, color: Colors.gradientStart, fontWeight: '600' },
 
-    // Login Button
     loginBtn: {
         borderRadius: 16,
         overflow: 'hidden',
@@ -364,28 +329,12 @@ const styles = StyleSheet.create({
         elevation: 8,
         marginBottom: 24,
     },
-    btnGrad: {
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    loginBtnText: {
-        color: Colors.white,
-        fontSize: 16,
-        fontWeight: '800',
-        letterSpacing: 0.8,
-    },
+    btnGrad: { paddingVertical: 16, alignItems: 'center' },
+    loginBtnText: { color: Colors.white, fontSize: 16, fontWeight: '800', letterSpacing: 0.8 },
     btnDimmed: { opacity: 0.45, shadowOpacity: 0, elevation: 0 },
 
-    // Alternative Login
-    alternativeContainer: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    alternativeText: {
-        fontSize: 14,
-        color: Colors.textMuted,
-        marginBottom: 12,
-    },
+    alternativeContainer: { alignItems: 'center', marginBottom: 24 },
+    alternativeText: { fontSize: 14, color: Colors.textMuted, marginBottom: 12 },
     mobileLoginBtn: {
         backgroundColor: '#F0F7FA',
         paddingHorizontal: 20,
@@ -394,22 +343,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E8F0F4',
     },
-    mobileLoginText: {
-        fontSize: 14,
-        color: Colors.textMedium,
-        fontWeight: '600',
-    },
+    mobileLoginText: { fontSize: 14, color: Colors.textMedium, fontWeight: '600' },
 
-    // Register Link
-    registerLink: {
-        alignItems: 'center',
-        marginTop: 16,
-        paddingVertical: 8,
-    },
-    registerText: {
-        fontSize: 14,
-        color: Colors.textMedium,
-    },
+    registerLink: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
+    registerText: { fontSize: 14, color: Colors.textMedium },
     registerLinkText: {
         color: Colors.gradientStart,
         fontWeight: '600',

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { FieldInput } from '../../../components/FieldInput';
-import { useAuthStore } from '@/store/useAuthStore';
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
 
@@ -46,7 +45,48 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
 const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
-    
+    const handlePatientName = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, patientName: v })),
+        [setBasicDetails], // ✅ dependency add karo
+    );
+
+    const handleAge = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, age: v.replace(/[^0-9]/g, '') })),
+        [setBasicDetails],
+    );
+
+    const handleSex = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, sex: v })),
+        [setBasicDetails],
+    );
+
+    const handleAddress = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, address: v })),
+        [setBasicDetails],
+    );
+
+    const handlePincode = useCallback(
+        (v: string) =>
+            setBasicDetails((prev: any) => ({ ...prev, pincode: v.replace(/[^0-9]/g, '') })),
+        [setBasicDetails],
+    );
+
+    const handleCurrentLocation = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, currentLocation: v })),
+        [setBasicDetails],
+    );
+
+    const handlePhone = useCallback(
+        (v: string) =>
+            setBasicDetails((prev: any) => ({ ...prev, phoneNumber: v.replace(/[^0-9]/g, '') })),
+        [setBasicDetails],
+    );
+
+    const handleEmail = useCallback(
+        (v: string) => setBasicDetails((prev: any) => ({ ...prev, email: v })),
+        [setBasicDetails],
+    );
+
     return (
         <View style={styles.root}>
             {/* ── Personal info ──────────────────────────────────────── */}
@@ -56,7 +96,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 label="Patient Name"
                 required
                 value={basicDetails.patientName}
-                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, patientName: v }))}
+                onChangeText={handlePatientName}
             />
 
             <View style={styles.rowTwo}>
@@ -65,21 +105,13 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                         label="Age"
                         required
                         value={String(basicDetails.age)}
-                        onChangeText={v =>
-                            setBasicDetails((prev: any) => ({
-                                ...prev,
-                                age: v.replace(/[^0-9]/g, ''),
-                            }))
-                        }
+                        onChangeText={handleAge}
                         keyboardType="number-pad"
                         maxLength={3}
                     />
                 </View>
                 <View style={styles.rowHalf}>
-                    <SexSelector
-                        value={basicDetails.sex}
-                        onChange={v => setBasicDetails((prev: any) => ({ ...prev, sex: v }))}
-                    />
+                    <SexSelector value={basicDetails.sex} onChange={handleSex} />
                 </View>
             </View>
 
@@ -90,7 +122,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 label="Address"
                 required
                 value={basicDetails.address}
-                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, address: v }))}
+                onChangeText={handleAddress}
                 multiline
             />
 
@@ -100,12 +132,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                         label="Pin Code"
                         required
                         value={basicDetails.pincode}
-                        onChangeText={v =>
-                            setBasicDetails((prev: any) => ({
-                                ...prev,
-                                pincode: v.replace(/[^0-9]/g, ''),
-                            }))
-                        }
+                        onChangeText={handlePincode}
                         keyboardType="number-pad"
                         maxLength={6}
                     />
@@ -113,10 +140,9 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 <View style={styles.rowHalf}>
                     <FieldInput
                         label="Current Location"
+                        required
                         value={basicDetails.currentLocation}
-                        onChangeText={v =>
-                            setBasicDetails((prev: any) => ({ ...prev, currentLocation: v }))
-                        }
+                        onChangeText={handleCurrentLocation}
                         rightIcon={<Text style={styles.pinIcon}>📍</Text>}
                     />
                 </View>
@@ -128,12 +154,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
             <FieldInput
                 label="Phone Number"
                 value={basicDetails.phoneNumber}
-                onChangeText={v =>
-                    setBasicDetails((prev: any) => ({
-                        ...prev,
-                        phoneNumber: v.replace(/[^0-9]/g, ''),
-                    }))
-                }
+                onChangeText={handlePhone}
                 keyboardType="phone-pad"
                 maxLength={10}
             />
@@ -141,7 +162,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
             <FieldInput
                 label="Email Address"
                 value={basicDetails.email}
-                onChangeText={v => setBasicDetails((prev: any) => ({ ...prev, email: v }))}
+                onChangeText={handleEmail}
                 keyboardType="email-address"
             />
         </View>
@@ -179,6 +200,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     pinIcon: { fontSize: 18 },
+
     // Two-column layout
     rowTwo: {
         flexDirection: 'row',

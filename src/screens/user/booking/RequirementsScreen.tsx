@@ -11,14 +11,16 @@ import {
     Dimensions,
     Modal,
     Platform,
+    ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import { Colors } from '../../../theme/colors';
-import { bookingAPI } from '../../../service/apis/bookingService';
 import { SelectedService } from '@/types/booking';
 import { UploadedFile } from '../BookingScreen';
+import { serviceAPI } from '@/service/apis/medicalServices';
+import { Service } from '@/types/Service';
 
 const { width } = Dimensions.get('window');
 
@@ -35,13 +37,6 @@ interface RequirementsScreenProps {
     setHasInsurance: (v: boolean) => void;
     insurancePolicyNumber: string;
     setInsurancePolicyNumber: (v: string) => void;
-}
-
-interface ApiService {
-    id: number;
-    name: string;
-    icon: string;
-    price: number;
 }
 
 /* ─────────────────────── Upload Sheet ─────────────────────── */
@@ -105,7 +100,7 @@ const UploadPickerSheet: React.FC<{
                 type: 'document',
             });
         } catch (err) {
-           console.error(err)
+            console.error(err);
         }
     };
 
@@ -234,7 +229,7 @@ const ss = StyleSheet.create({
 
 /* ─────────────────────── Service Card ─────────────────────── */
 
-const ServiceCard: React.FC<{ service: ApiService; selected: boolean; onPress: () => void }> = ({
+const ServiceCard: React.FC<{ service: Service; selected: boolean; onPress: () => void }> = ({
     service,
     selected,
     onPress,
@@ -256,6 +251,28 @@ const ServiceCard: React.FC<{ service: ApiService; selected: boolean; onPress: (
             Animated.timing(scaleAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
         ]).start();
         onPress();
+    };
+
+    // Get icon based on category or use default
+    const getServiceIcon = () => {
+        if (service.icon) return service.icon;
+
+        // Default icons based on category
+        const categoryIcons: Record<string, string> = {
+            'Home Injections': '💉',
+            'IV Drip Services': '💧',
+            'Wound Dressing': '🩹',
+            'Blood Collection': '🩸',
+            'BP/Sugar Monitoring': '🩺',
+            'ECG at Home': '📊',
+            'Physiotherapy Session': '🏃',
+            'Awareness Activities': '📢',
+            'Lab-based Training': '🔬',
+            'Field Survey Service': '📋',
+            Other: '⚕️',
+        };
+
+        return categoryIcons[service.category] || '⚕️';
     };
 
     return (
@@ -281,12 +298,15 @@ const ServiceCard: React.FC<{ service: ApiService; selected: boolean; onPress: (
                             <Text style={styles.selectedTick}>✓</Text>
                         </View>
                     )}
-                    <Text style={styles.serviceIcon}>{service.icon}</Text>
-                    <Text style={[styles.serviceName, selected && styles.serviceNameSel]}>
-                        {service.name}
+                    <Text style={styles.serviceIcon}>{getServiceIcon()}</Text>
+                    <Text
+                        style={[styles.serviceName, selected && styles.serviceNameSel]}
+                        numberOfLines={2}
+                    >
+                        {service.serviceName}
                     </Text>
                     <Text style={[styles.servicePrice, selected && styles.servicePriceSel]}>
-                        ₹{service.price}
+                        ₹{service.basePrice}
                     </Text>
                 </Animated.View>
             </TouchableOpacity>
@@ -328,38 +348,37 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
     insurancePolicyNumber,
     setInsurancePolicyNumber,
 }) => {
-    const [availableServices, setAvailableServices] = useState<ApiService[]>([]);
+    const [availableServices, setAvailableServices] = useState<Service[]>([]);
+    const [loading, setLoading] = useState(true);
     const [otherFocused, setOtherFocused] = useState(false);
     const [showUploadSheet, setShowUploadSheet] = useState(false);
     const [policyFocused, setPolicyFocused] = useState(false);
     const [policyFetched, setPolicyFetched] = useState(false);
     const [fetchingPolicy, setFetchingPolicy] = useState(false);
 
-    /* Separate animated values to avoid native-driver conflict:
-       insProgress  → useNativeDriver: false (drives maxHeight + opacity)
-       insRotateAnim → useNativeDriver: true  (drives chevron transform)     */
     const insProgress = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
     const insRotateAnim = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
 
     useEffect(() => {
-        (async () => {
-            try {
-                const res = await bookingAPI.getAvailableServices();
-                setAvailableServices(res.data);
-            } catch {
-                setAvailableServices([
-                    { id: 1, name: 'Blood Test', icon: '🩸', price: 500 },
-                    { id: 2, name: 'Urine Test', icon: '🧪', price: 300 },
-                    { id: 3, name: 'X-Ray Scan', icon: '🦴', price: 800 },
-                    { id: 4, name: 'MRI Scan', icon: '🧠', price: 2500 },
-                    { id: 5, name: 'ECG Test', icon: '❤️', price: 400 },
-                    { id: 6, name: 'Ultrasound', icon: '🔊', price: 1200 },
-                    { id: 7, name: 'CT Scan', icon: '🩻', price: 1800 },
-                    { id: 8, name: 'Thyroid Test', icon: '🦋', price: 600 },
-                ]);
-            }
-        })();
+        fetchServices();
     }, []);
+
+    const fetchServices = async () => {
+        try {
+            setLoading(true);
+            const res = await serviceAPI.getAllServices();
+            if (res.data?.success && res.data?.data) {
+                // Filter only active services
+                const activeServices = res.data.data.filter((s: Service) => s.isActive);
+                setAvailableServices(activeServices);
+            }
+        } catch (error) {
+            console.error('Error fetching services:', error);
+            Alert.alert('Error', 'Failed to load services. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const toValue = hasInsurance ? 1 : 0;
@@ -383,14 +402,19 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
         }
     }, [hasInsurance]);
 
-    const toggleService = (svc: ApiService) => {
-        const exists = selectedServices.find(s => s.serviceId === String(svc.id));
+    const toggleService = (svc: Service) => {
+        const exists = selectedServices.find(s => s.serviceId === svc._id);
         if (exists) {
-            setSelectedServices(selectedServices.filter(s => s.serviceId !== String(svc.id)));
+            setSelectedServices(selectedServices.filter(s => s.serviceId !== svc._id));
         } else {
             setSelectedServices([
                 ...selectedServices,
-                { serviceId: String(svc.id), serviceName: svc.name, price: svc.price, quantity: 1 },
+                {
+                    serviceId: svc._id!,
+                    serviceName: svc.serviceName,
+                    price: svc.basePrice,
+                    quantity: 1,
+                },
             ]);
         }
     };
@@ -399,8 +423,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
         if (!insurancePolicyNumber.trim()) return;
         try {
             setFetchingPolicy(true);
-            // Replace with: await insuranceAPI.verifyPolicy(insurancePolicyNumber);
-            await new Promise(r => console.log('fetching'));
+            // Simulate API call - replace with actual insurance API
+            await new Promise(resolve => console.log('dummy call'));
             setPolicyFetched(true);
         } catch {
             Alert.alert('Policy Error', 'Could not verify policy number. Please check and retry.');
@@ -416,6 +440,15 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
         outputRange: ['0deg', '90deg'],
     });
 
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.gradientStart} />
+                <Text style={styles.loadingText}>Loading services...</Text>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.root}>
             <SectionLabel title="Available Services" />
@@ -425,16 +458,24 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                     selected
                 </Text>
             )}
-            <View style={styles.grid}>
-                {availableServices.map(s => (
-                    <ServiceCard
-                        key={s.id}
-                        service={s}
-                        selected={selectedServices.some(sel => sel.serviceId === String(s.id))}
-                        onPress={() => toggleService(s)}
-                    />
-                ))}
-            </View>
+
+            {availableServices.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Text style={styles.emptyIcon}>📋</Text>
+                    <Text style={styles.emptyText}>No services available at the moment</Text>
+                </View>
+            ) : (
+                <View style={styles.grid}>
+                    {availableServices.map(s => (
+                        <ServiceCard
+                            key={s._id}
+                            service={s}
+                            selected={selectedServices.some(sel => sel.serviceId === s._id)}
+                            onPress={() => toggleService(s)}
+                        />
+                    ))}
+                </View>
+            )}
 
             <SectionLabel title="Other Requirement" />
             <View style={[styles.otherBox, otherFocused && styles.otherBoxFocused]}>
@@ -576,6 +617,18 @@ const CARD_W = (width - 48 - 30) / 4;
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: Colors.white },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: Colors.textMuted,
+        fontWeight: '600',
+    },
     sectionRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -596,6 +649,19 @@ const styles = StyleSheet.create({
         color: Colors.gradientStart,
         fontWeight: '700',
         marginBottom: 8,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyIcon: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: Colors.textMuted,
+        textAlign: 'center',
     },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
     cardWrap: { width: CARD_W },

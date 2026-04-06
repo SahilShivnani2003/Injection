@@ -1,5 +1,5 @@
 import { privateClient } from "../apiClient";
 
 export const dashboardService = {
-    dashboardStats: () => privateClient.get('/dashboard/stats'),
+    dashboardStats: () => privateClient.get('/dashboard/user/stats'),
 }

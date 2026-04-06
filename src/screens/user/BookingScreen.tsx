@@ -179,15 +179,23 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 if (!formData.patientName.trim()) return warn('Please enter patient name.');
                 if (!formData.age || isNaN(Number(formData.age)))
                     return warn('Please enter a valid age.');
+                if (Number(formData.age) <= 0 || Number(formData.age) > 150)
+                    return warn('Please enter a valid age between 1 and 150.');
                 if (!formData.sex) return warn('Please select sex.');
                 if (!formData.address.trim()) return warn('Please enter address.');
                 if (formData.pincode.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
+                // Email validation if provided
+                if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+                    return warn('Please enter a valid email address.');
+                }
                 return true;
 
             case 2:
                 if (formData.selectedServices.length === 0)
                     return warn('Please select at least one service.');
+                if (formData.hasInsurance && !formData.insurancePolicyNumber.trim())
+                    return warn('Please enter your insurance policy number.');
                 return true;
 
             case 3:
@@ -231,20 +239,26 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
             const gstAmount = Math.round(subtotal * 0.18);
             const grandTotal = subtotal + gstAmount;
 
+            // Validate sex is a valid Gender type
+            const validGenders: Gender[] = ['Male', 'Female', 'Other'];
+            const gender = validGenders.includes(formData.sex as Gender) 
+                ? (formData.sex as Gender) 
+                : 'Other';
+
             const payload: Booking = {
                 patientName: formData.patientName.trim(),
                 age: parseInt(formData.age, 10),
-                sex: formData.sex as Gender,
+                sex: gender,
                 address: formData.address.trim(),
                 pincode: formData.pincode.trim(),
-                currentLocation: formData.currentLocation.trim(),
+                currentLocation: formData.currentLocation.trim() || formData.address.trim(),
                 alternateMobile: formData.phoneNumber || undefined,
                 email: formData.email.trim(),
 
                 selectedServices: formData.selectedServices,
-                additionalRequirements: formData.additionalRequirements || undefined,
+                additionalRequirements: formData.additionalRequirements.trim() || undefined,
 
-                // prescription is handled by prescriptionService separately
+                // Prescriptions will be uploaded separately if file exists
                 prescriptions: [],
 
                 hasInsurance: formData.hasInsurance,
@@ -266,11 +280,14 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 vendorId: null,
                 bookingStatus: 'pending',
                 reportUrl: null,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
             };
 
-            await bookingAPI.createBooking(payload);
+            const response = await bookingAPI.createBooking(payload);
+
+            // Handle file upload if exists (would need prescription upload API)
+            // if (formData.uploadedFile) {
+            //     await prescriptionAPI.upload(response.data.bookingId, formData.uploadedFile);
+            // }
 
             Alert.alert(
                 'Booking Confirmed! 🎉',
@@ -278,7 +295,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 [{ text: 'Done', onPress: () => navigation.goBack() }],
             );
         } catch (error: any) {
-            Alert.alert('Error', error?.message ?? 'Failed to create booking. Please try again.');
+            console.error('Booking error:', error);
+            const errorMessage = error?.response?.data?.message || 
+                                 error?.message || 
+                                 'Failed to create booking. Please try again.';
+            Alert.alert('Error', errorMessage);
         } finally {
             setSubmitting(false);
         }

@@ -1,4 +1,5 @@
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { bookingAPI } from '@/service/apis/bookingService';
 import { Colors } from '@/theme/colors';
 import { Booking, BookingStatus } from '@/types/booking';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,6 +14,7 @@ import {
     Dimensions,
     Animated,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -20,7 +22,33 @@ const { width } = Dimensions.get('window');
 
 type BookingDetailProps = NativeStackScreenProps<RootStackParamList, 'BookingDetail'>;
 
+// ── Populated sub-types from API (vendorId / userId come as objects) ──────────
+
+interface PopulatedUser {
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+}
+
+interface PopulatedVendor {
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    businessName: string;
+}
+
+// Extend Booking so populated fields are typed properly
+type PopulatedBooking = Omit<Booking, 'userId' | 'vendorId'> & {
+    _id: string;
+    userId: PopulatedUser;
+    vendorId: PopulatedVendor | null;
+};
+
 // ─── Status config ─────────────────────────────────────────────────────────────
+
 const STATUS_CONFIG: Record<
     BookingStatus,
     { label: string; bg: string; text: string; dot: string; icon: string }
@@ -39,6 +67,7 @@ const STATUS_CONFIG: Record<
 };
 
 // ─── Section Header ────────────────────────────────────────────────────────────
+
 const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
     <View style={sectionStyles.row}>
         <View style={sectionStyles.iconBox}>
@@ -71,6 +100,7 @@ const sectionStyles = StyleSheet.create({
 });
 
 // ─── Info Row ──────────────────────────────────────────────────────────────────
+
 const InfoRow = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
     <View style={infoStyles.row}>
         <Text style={infoStyles.label}>{label}</Text>
@@ -99,6 +129,7 @@ const infoStyles = StyleSheet.create({
 });
 
 // ─── Service Row ───────────────────────────────────────────────────────────────
+
 const ServiceRow = ({
     service,
     isLast,
@@ -123,19 +154,58 @@ const srStyles = StyleSheet.create({
     price: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
 });
 
+// ─── Helper: initials from name ───────────────────────────────────────────────
+
+const getInitials = (name: string) =>
+    name
+        .trim()
+        .split(' ')
+        .filter(Boolean)
+        .map(n => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?';
+
 // ─── Main Screen ───────────────────────────────────────────────────────────────
+
 const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
-    // In production: const booking = route.params.booking;
-    const booking = route.params?.booking;
+    const bookingId = route.params?.bookingId;
+
+    const [booking, setBooking] = useState<PopulatedBooking | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [expandedPrescription, setExpandedPrescription] = useState<number | null>(null);
 
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
     const statusScale = useRef(new Animated.Value(0.85)).current;
-    const [expandedPrescription, setExpandedPrescription] = useState<number | null>(null);
 
-    const status = STATUS_CONFIG[booking.bookingStatus];
+    // ── Fetch ──────────────────────────────────────────────────────────────────
 
     useEffect(() => {
+        fetchBookingData();
+    }, [bookingId]);
+
+    const fetchBookingData = async () => {
+        try {
+            setLoading(true);
+            const response = await bookingAPI.getBookingDetails(bookingId);
+            if (response.data?.success) {
+                setBooking(response.data.data as PopulatedBooking);
+            } else {
+                setBooking(null);
+            }
+        } catch (error) {
+            console.error('Error fetching booking detail:', error);
+            setBooking(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ── Animations (run after data loads) ─────────────────────────────────────
+
+    useEffect(() => {
+        if (!booking) return;
         Animated.parallel([
             Animated.timing(headerAnim, { toValue: 1, duration: 450, useNativeDriver: true }),
             Animated.timing(contentAnim, {
@@ -152,12 +222,13 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                 useNativeDriver: true,
             }),
         ]).start();
-    }, []);
+    }, [booking]);
 
-    const formatDate = (iso?: string) => {
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    const formatDate = (iso?: string | null) => {
         if (!iso) return '—';
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-IN', {
+        return new Date(iso).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -173,8 +244,44 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         ]);
     };
 
+    // ── Loading state ──────────────────────────────────────────────────────────
+
+    if (loading) {
+        return (
+            <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.gradientStart} />
+                <Text style={styles.loadingText}>Loading booking details...</Text>
+            </View>
+        );
+    }
+
+    // ── Not found state ────────────────────────────────────────────────────────
+
+    if (!booking) {
+        return (
+            <View
+                style={[
+                    styles.root,
+                    { justifyContent: 'center', alignItems: 'center', padding: 32 },
+                ]}
+            >
+                <Text style={{ fontSize: 48, marginBottom: 16 }}>📋</Text>
+                <Text style={styles.loadingText}>Booking not found.</Text>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backFallbackBtn}
+                >
+                    <Text style={styles.backFallbackText}>Go Back</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    const status = STATUS_CONFIG[booking.bookingStatus] ?? STATUS_CONFIG.pending;
+
     return (
         <View style={styles.root}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             {/* ── Header ── */}
             <LinearGradient
@@ -223,11 +330,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     <View style={styles.patientRow}>
                         <View style={styles.patientAvatar}>
                             <Text style={styles.patientAvatarText}>
-                                {booking.patientName
-                                    .split(' ')
-                                    .map(n => n[0])
-                                    .join('')
-                                    .slice(0, 2)}
+                                {getInitials(booking.patientName)}
                             </Text>
                         </View>
                         <View style={{ flex: 1 }}>
@@ -236,7 +339,6 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 {booking.age} yrs · {booking.sex} · {booking.currentLocation}
                             </Text>
                         </View>
-                        {/* Status badge */}
                         <Animated.View
                             style={[
                                 styles.statusBadge,
@@ -253,7 +355,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* Slot + Duration strip */}
                     <View style={styles.slotStrip}>
                         <View style={styles.slotChip}>
-                            <Text style={styles.slotIcon}>📅</Text>
+                            <Text style={styles.slotIcon}>⏰</Text>
                             <Text style={styles.slotText}>{booking.preferredTimeSlot}</Text>
                         </View>
                         <View style={styles.slotDivider} />
@@ -301,6 +403,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 isLast={i === booking.selectedServices.length - 1}
                             />
                         ))}
+
                         {/* Totals */}
                         <View style={styles.totalBlock}>
                             <View style={styles.totalRow}>
@@ -310,7 +413,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 </Text>
                             </View>
                             <View style={styles.totalRow}>
-                                <Text style={styles.totalLabel}>GST (18%)</Text>
+                                <Text style={styles.totalLabel}>GST</Text>
                                 <Text style={styles.totalVal}>
                                     ₹{booking.gstAmount.toLocaleString()}
                                 </Text>
@@ -345,26 +448,59 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         <InfoRow label="Full Name" value={booking.patientName} />
                         <InfoRow label="Age / Sex" value={`${booking.age} yrs / ${booking.sex}`} />
                         <InfoRow label="Email" value={booking.email} />
-                        {booking.alternateMobile && (
-                            <InfoRow label="Alt. Mobile" value={booking.alternateMobile} />
-                        )}
                         <InfoRow label="Address" value={booking.address} />
                         <InfoRow label="Pincode" value={booking.pincode} />
+                        <InfoRow label="Location" value={booking.currentLocation} />
+                        {!!booking.alternateMobile && (
+                            <InfoRow label="Alt. Mobile" value={booking.alternateMobile} />
+                        )}
                         {booking.hasInsurance && (
                             <InfoRow
                                 label="Insurance Policy"
-                                value={booking.insurancePolicyNumber ?? '—'}
+                                value={booking.insurancePolicyNumber || '—'}
                                 accent
                             />
                         )}
                     </View>
+
+                    {/* ── Vendor / Service Provider ── */}
+                    {booking.vendorId && (
+                        <>
+                            <SectionHeader icon="🏥" title="Service Provider" />
+                            <View style={styles.card}>
+                                <View style={styles.vendorRow}>
+                                    <View style={styles.vendorAvatar}>
+                                        <Text style={styles.vendorAvatarText}>
+                                            {getInitials(booking.vendorId.name)}
+                                        </Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.vendorName}>
+                                            {booking.vendorId.name}
+                                        </Text>
+                                        <Text style={styles.vendorBusiness}>
+                                            {booking.vendorId.businessName}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.callChip} activeOpacity={0.8}>
+                                        <Text style={styles.callChipIcon}>📞</Text>
+                                        <Text style={styles.callChipText}>
+                                            {booking.vendorId.phone}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <InfoRow label="Email" value={booking.vendorId.email} />
+                                <InfoRow label="Location" value={booking.serviceLocation} />
+                            </View>
+                        </>
+                    )}
 
                     {/* ── Prescriptions ── */}
                     {(booking.prescriptions?.length ?? 0) > 0 && (
                         <>
                             <SectionHeader icon="📋" title="Prescriptions" />
                             {booking.prescriptions!.map((rx, idx) => (
-                                <View key={idx} style={styles.card}>
+                                <View key={idx} style={[styles.card, idx > 0 && { marginTop: 10 }]}>
                                     <TouchableOpacity
                                         style={styles.rxHeader}
                                         onPress={() =>
@@ -392,10 +528,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
                                     {expandedPrescription === idx && (
                                         <View style={styles.rxBody}>
-                                            {rx.diagnosis && (
+                                            {!!rx.diagnosis && (
                                                 <InfoRow label="Diagnosis" value={rx.diagnosis} />
                                             )}
-                                            {rx.doctorRegistration && (
+                                            {!!rx.doctorRegistration && (
                                                 <InfoRow
                                                     label="Reg. No."
                                                     value={rx.doctorRegistration}
@@ -419,7 +555,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                                     ))}
                                                 </View>
                                             )}
-                                            {rx.specialInstructions && (
+                                            {!!rx.specialInstructions && (
                                                 <View style={styles.specialNote}>
                                                     <Text style={styles.specialNoteIcon}>⚠️</Text>
                                                     <Text style={styles.specialNoteText}>
@@ -427,7 +563,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                                     </Text>
                                                 </View>
                                             )}
-                                            {rx.followUpDate && (
+                                            {!!rx.followUpDate && (
                                                 <InfoRow
                                                     label="Follow-up"
                                                     value={rx.followUpDate}
@@ -442,7 +578,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     )}
 
                     {/* ── Additional Requirements ── */}
-                    {booking.additionalRequirements && (
+                    {!!booking.additionalRequirements && (
                         <>
                             <SectionHeader icon="📝" title="Special Requirements" />
                             <View style={[styles.card, styles.reqCard]}>
@@ -493,7 +629,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             { label: 'Completed', time: booking.completedAt, dot: '#7B7BFF' },
                             { label: 'Cancelled', time: booking.cancelledAt, dot: '#FF4444' },
                         ]
-                            .filter(t => t.time)
+                            .filter(t => !!t.time)
                             .map((t, i, arr) => (
                                 <View key={i} style={styles.timelineRow}>
                                     <View style={styles.timelineLeft}>
@@ -516,12 +652,14 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {booking.bookingStatus !== 'completed' &&
                         booking.bookingStatus !== 'cancelled' && (
                             <View style={styles.actionsRow}>
-                                <TouchableOpacity style={styles.contactBtn} activeOpacity={0.8}>
-                                    <Text style={styles.contactBtnIcon}>📞</Text>
-                                    <Text style={styles.contactBtnText}>Contact Nurse</Text>
-                                </TouchableOpacity>
+                                {booking.vendorId && (
+                                    <TouchableOpacity style={styles.contactBtn} activeOpacity={0.8}>
+                                        <Text style={styles.contactBtnIcon}>📞</Text>
+                                        <Text style={styles.contactBtnText}>Contact Provider</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity
-                                    style={styles.cancelBtn}
+                                    style={[styles.cancelBtn, !booking.vendorId && { flex: 1 }]}
                                     onPress={handleCancel}
                                     activeOpacity={0.8}
                                 >
@@ -546,10 +684,21 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F2F7FA' },
+    loadingText: { fontSize: 15, fontWeight: '600', color: Colors.textMuted, marginTop: 12 },
+    backFallbackBtn: {
+        marginTop: 20,
+        backgroundColor: Colors.gradientStart,
+        paddingHorizontal: 28,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    backFallbackText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-    // ── Header ──
+    // Header
     header: {
         paddingTop: 24,
         paddingHorizontal: 20,
@@ -630,7 +779,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         borderRadius: 14,
         padding: 12,
-        gap: 0,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.18)',
     },
@@ -645,9 +793,8 @@ const styles = StyleSheet.create({
     slotIcon: { fontSize: 13 },
     slotText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 
-    // ── Content ──
+    // Content
     content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
-
     card: {
         backgroundColor: Colors.white,
         borderRadius: 20,
@@ -658,6 +805,31 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 4,
     },
+
+    // Vendor card
+    vendorRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+    vendorAvatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: Colors.gradientMid + '22',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    vendorAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.gradientMid },
+    vendorName: { fontSize: 15, fontWeight: '700', color: Colors.textDark },
+    vendorBusiness: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+    callChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#E6FFF5',
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+    },
+    callChipIcon: { fontSize: 12 },
+    callChipText: { fontSize: 11, fontWeight: '700', color: '#00A07A' },
 
     // Totals
     totalBlock: {
@@ -697,12 +869,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 8,
     },
-    medRow: {
-        backgroundColor: '#F8FCFF',
-        borderRadius: 10,
-        padding: 10,
-        marginBottom: 7,
-    },
+    medRow: { backgroundColor: '#F8FCFF', borderRadius: 10, padding: 10, marginBottom: 7 },
     medName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
     medDetail: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
     specialNote: {

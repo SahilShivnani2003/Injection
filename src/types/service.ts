@@ -27,28 +27,19 @@ export type ServiceCategory =
 export type ServiceType = 'At Home' | 'At Clinic' | 'Both';
 
 export interface Service {
+    _id?: string;
     serviceName: string;
     description: string;
-
     category: ServiceCategory;
-
     basePrice: number;
-
     duration: number;
-
     serviceType: ServiceType;
-
     vendorId: string;
-
     isActive: boolean;
-
     icon: string | null;
     image: string | null;
-
     tags?: string[];
-
     requirements?: string;
-
     createdAt: string;
     updatedAt: string;
 }

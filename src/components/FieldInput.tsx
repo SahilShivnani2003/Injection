@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Animated, View, Text, TextInput, StyleSheet } from 'react-native';
 import { Colors } from '../theme/colors';
 
@@ -27,6 +27,10 @@ export const FieldInput: React.FC<{
 }) => {
     const [focused, setFocused] = useState(false);
     const borderAnim = useRef(new Animated.Value(0)).current;
+
+    // ✅ Stable references — not recreated on every render
+    const handleFocus = useCallback(() => setFocused(true), []);
+    const handleBlur = useCallback(() => setFocused(false), []);
 
     useEffect(() => {
         Animated.timing(borderAnim, {
@@ -62,8 +66,10 @@ export const FieldInput: React.FC<{
                     numberOfLines={multiline ? 3 : 1}
                     textAlignVertical={multiline ? 'top' : 'center'}
                     editable={editable}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
+                    onFocus={handleFocus} // ✅ stable
+                    onBlur={handleBlur} // ✅ stable
+                    autoCorrect={false}
+                    autoCapitalize="none" // ✅ stops capital/small flicker
                 />
                 {rightIcon && <View style={styles.fieldRight}>{rightIcon}</View>}
             </Animated.View>
@@ -108,5 +114,4 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     fieldRight: { marginLeft: 8 },
-    
 });

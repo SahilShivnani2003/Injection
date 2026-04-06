@@ -5,10 +5,6 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import EmailLoginScreen from '../screens/auth/EmailLoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import BasicDetailsScreen from '../screens/user/booking/BasicDetailsScreen';
-import RequirementsScreen from '../screens/user/booking/RequirementsScreen';
-import SlotBookingScreen from '../screens/user/booking/SlotBookingScreen';
-import ChargesScreen from '../screens/user/booking/ChargesScreen';
-import ComplimentaryScreen from '../screens/user/booking/ComplimentaryScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import LabPartnerScreen from '../screens/vendor/LabPartnerScreen';
 import StaffPanelScreen from '../screens/staff/StaffPanelScreen';
@@ -16,7 +12,6 @@ import TabNavigator, { TabParamList } from './TabNavigator';
 import { useColorScheme } from 'react-native';
 import { AlertProvider } from '../context/AlertContext';
 import BookingScreen from '../screens/user/BookingScreen';
-import { Booking } from '@/types/booking';
 import BookingDetailScreen from '@/screens/user/BookingDetailScreen';
 
 export type RootStackParamList = {
@@ -37,7 +32,7 @@ export type RootStackParamList = {
     MainTab: NavigatorScreenParams<TabParamList>;
     Booking: undefined;
     BookingDetail: {
-        booking: Booking;
+        bookingId: string;
     };
 };
 
@@ -62,10 +57,6 @@ export default function AppNavigator() {
                     <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
                     <Stack.Screen name="Register" component={RegisterScreen} />
                     <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
-                    <Stack.Screen name="Requirements" component={RequirementsScreen} />
-                    <Stack.Screen name="SlotBooking" component={SlotBookingScreen} />
-                    <Stack.Screen name="Charges" component={ChargesScreen} />
-                    <Stack.Screen name="Complimentary" component={ComplimentaryScreen} />
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
                     <Stack.Screen name="LabPartner" component={LabPartnerScreen} />
                     <Stack.Screen name="StaffPanel" component={StaffPanelScreen} />
