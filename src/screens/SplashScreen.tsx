@@ -1,5 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, StatusBar, Animated, Dimensions, Easing } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    StatusBar,
+    Animated,
+    Dimensions,
+    Easing,
+    Image,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../theme/colors';
 import { useAuthStore } from '../store/useAuthStore';
@@ -64,7 +73,7 @@ const Particle: React.FC<{
 };
 
 const SplashScreen: React.FC<Props> = ({ navigation }) => {
-    const { loadAuth  } = useAuthStore();
+    const { loadAuth } = useAuthStore();
     // Core animation refs
     const ring1Scale = useRef(new Animated.Value(0.6)).current;
     const ring1Opacity = useRef(new Animated.Value(0)).current;
@@ -107,7 +116,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         } else {
             navigation.replace('Login');
         }
-    }; 
+    };
 
     useEffect(() => {
         // Entrance sequence
@@ -280,25 +289,11 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                     ]}
                 >
                     {/* Geometric medical cross */}
-                    <Animated.View
-                        style={{
-                            transform: [{ scale: crossScale }],
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        {/* Horizontal bar */}
-                        <View style={styles.crossH} />
-                        {/* Vertical bar */}
-                        <View style={styles.crossV} />
-                        {/* Small dots at cross ends for detail */}
-                        <View style={[styles.crossDot, { top: 14, left: '50%', marginLeft: -4 }]} />
-                        <View
-                            style={[styles.crossDot, { bottom: 14, left: '50%', marginLeft: -4 }]}
-                        />
-                        <View style={[styles.crossDot, { left: 14, top: '50%', marginTop: -4 }]} />
-                        <View style={[styles.crossDot, { right: 14, top: '50%', marginTop: -4 }]} />
-                    </Animated.View>
+                    <Image
+                        source={require('../assets/injection.png')}
+                        style={{width: '100%', height: '100%'}}
+                        resizeMode="contain"
+                    />
                 </Animated.View>
 
                 {/* App name */}
