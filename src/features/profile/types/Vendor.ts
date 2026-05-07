@@ -1,70 +1,49 @@
-export type BusinessType =
-    | 'Individual'
-    | 'Clinic'
-    | 'Hospital'
-    | 'Laboratory'
-    | 'Pharmacy'
-    | 'Other';
-
-export type ServiceOffered =
-    | 'Home Injections'
-    | 'IV Drip Services'
-    | 'Wound Dressing'
-    | 'Day Care at Home'
-    | 'Patient Monitoring'
-    | 'Old Age Patient Care'
-    | '24 HR Patient Care'
-    | 'Field Survey Service'
-    | 'Data Collection Service'
-    | 'Field Sample Collection'
-    | 'Community Survey'
-    | 'Awareness Activities'
-    | 'Lab-based Training'
-    | 'BSC/MSC Training'
-    | 'DMLT Training'
-    | 'Nursing Training'
-    | 'Dissertation Program'
-    | 'Placement Services';
-
-export type WeekDay =
-    | 'Monday'
-    | 'Tuesday'
-    | 'Wednesday'
-    | 'Thursday'
-    | 'Friday'
-    | 'Saturday'
-    | 'Sunday';
-
-export type VerificationStatus = 'pending' | 'verified' | 'rejected';
-
 export interface Vendor {
-    // Basic
+    // Basic Information
     name: string;
     email: string;
     password: string;
     phone: string;
     alternatePhone?: string;
 
-    // Business
+    // Business Information
     businessName: string;
-    businessType: BusinessType;
+    businessType: 'Individual' | 'Clinic' | 'Hospital' | 'Laboratory' | 'Pharmacy' | 'Other';
     registrationNumber?: string;
     gstNumber?: string;
 
-    // Services
-    servicesOffered?: ServiceOffered[];
+    // Services Offered
+    servicesOffered?: (
+        | 'Home Injections'
+        | 'IV Drip Services'
+        | 'Wound Dressing'
+        | 'Day Care at Home'
+        | 'Patient Monitoring'
+        | 'Old Age Patient Care'
+        | '24 HR Patient Care'
+        | 'Field Survey Service'
+        | 'Data Collection Service'
+        | 'Field Sample Collection'
+        | 'Community Survey'
+        | 'Awareness Activities'
+        | 'Lab-based Training'
+        | 'BSC/MSC Training'
+        | 'DMLT Training'
+        | 'Nursing Training'
+        | 'Dissertation Program'
+        | 'Placement Services'
+    )[];
 
-    // Professional
+    // Professional Details
     qualifications?: {
         degree?: string;
         institution?: string;
         year?: number;
     }[];
-
     experience?: number;
     specialization?: string;
 
-    // Location
+    // Location Details
     address: string;
     city: string;
     state: string;
@@ -93,12 +72,20 @@ export interface Vendor {
 
     // Availability
     availability?: {
-        days?: WeekDay[];
+        days?: (
+            | 'Monday'
+            | 'Tuesday'
+            | 'Wednesday'
+            | 'Thursday'
+            | 'Friday'
+            | 'Saturday'
+            | 'Sunday'
+        )[];
         timeSlots?: {
             from?: string;
             to?: string;
         }[];
-        emergencyAvailable: boolean;
+        emergencyAvailable?: boolean;
     };
 
     // Pricing
@@ -108,21 +95,21 @@ export interface Vendor {
         emergencyFee?: number;
     };
 
-    // Status
-    isVerified: boolean;
-    isActive: boolean;
-    verificationStatus: VerificationStatus;
-    verificationDate?: string;
+    // Status and Verification
+    isVerified?: boolean;
+    isActive?: boolean;
+    verificationStatus?: 'pending' | 'verified' | 'rejected';
+    verificationDate?: Date;
 
-    // Ratings
-    rating: number;
-    totalReviews: number;
+    // Ratings and Reviews
+    rating?: number;
+    totalReviews?: number;
 
     // Profile
-    profileImage: string | null;
+    profileImage?: string | null;
     bio?: string;
 
-    // Bank
+    // Bank Details
     bankDetails?: {
         accountHolderName?: string;
         accountNumber?: string;
@@ -131,6 +118,6 @@ export interface Vendor {
         branch?: string;
     };
 
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

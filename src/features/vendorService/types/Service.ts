@@ -1,4 +1,8 @@
-export type ServiceCategory =
+export interface Service {
+    // Service Information
+    serviceName: string;
+    description: string;
+    category:
     | 'Home Injections'
     | 'IV Drip Services'
     | 'Wound Dressing'
@@ -24,22 +28,25 @@ export type ServiceCategory =
     | 'Physiotherapy Session'
     | 'Other';
 
-export type ServiceType = 'At Home' | 'At Clinic' | 'Both';
-
-export interface Service {
-    _id?: string;
-    serviceName: string;
-    description: string;
-    category: ServiceCategory;
+    // Pricing
     basePrice: number;
-    duration: number;
-    serviceType: ServiceType;
+
+    // Service Details
+    duration?: number;
+    serviceType?: 'At Home' | 'At Clinic' | 'Both';
+
+    // Vendor Reference
     vendorId: string;
-    isActive: boolean;
-    icon: string | null;
-    image: string | null;
+
+    // Service Status
+    isActive?: boolean;
+
+    // Additional Info
+    icon?: string | null;
+    image?: string | null;
     tags?: string[];
     requirements?: string;
-    createdAt: string;
-    updatedAt: string;
+
+    createdAt?: Date;
+    updatedAt?: Date;
 }

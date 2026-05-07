@@ -9,11 +9,14 @@ module.exports = {
           '@': './src',
           '@/components': './src/components',
           '@/context': './src/context',
+          '@/navigation': './src/navigation', 
           '@/screens': './src/screens',
           '@/service': './src/service',
           '@/store': './src/store',
-          '@/theme': './src/themme',
-          '@/types': './src/types'
+          '@/theme': './src/theme', 
+          '@/types': './src/types',
+          '@/assets': './src/assets',
+          '@/features': './src/features'
         }
       }
     ]

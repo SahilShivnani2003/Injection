@@ -28,11 +28,17 @@
       "@/store/*": [
         "src/store/*"
       ],
-      "@theme/*": [
+      "@/theme/*": [
         "src/theme/*"
       ],
-      "@types/*": [
+      "@/types/*": [
         "src/types/*"
+      ],
+      "@/assets/*": [
+        "src/assets/*"
+      ],
+      "@/features/*": [
+        "src/features/*"
       ]
     }
   },

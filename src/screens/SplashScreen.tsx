@@ -12,12 +12,10 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../theme/colors';
 import { useAuthStore } from '../store/useAuthStore';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/types/RootStackParamList';
 
 const { width, height } = Dimensions.get('window');
-
-interface Props {
-    navigation: any;
-}
 
 // Floating background particle
 const Particle: React.FC<{
@@ -29,8 +27,10 @@ const Particle: React.FC<{
 }> = ({ x, y, size, delay, opacity }) => {
     const anim = useRef(new Animated.Value(0)).current;
 
+    // FIX 1: Added `delay` to the dependency array — the loop config depends on
+    //         it, so omitting it caused stale values after re-renders.
     useEffect(() => {
-        Animated.loop(
+        const animation = Animated.loop(
             Animated.sequence([
                 Animated.delay(delay),
                 Animated.timing(anim, {
@@ -46,8 +46,12 @@ const Particle: React.FC<{
                     useNativeDriver: true,
                 }),
             ]),
-        ).start();
-    }, []);
+        );
+        animation.start();
+
+        // FIX 2: Stop particle loop on unmount to prevent memory leaks.
+        return () => animation.stop();
+    }, [delay]);
 
     const translateY = anim.interpolate({
         inputRange: [0, 1],
@@ -72,8 +76,11 @@ const Particle: React.FC<{
     );
 };
 
-const SplashScreen: React.FC<Props> = ({ navigation }) => {
+type SplashScreenProps = NativeStackScreenProps<RootStackParamList, 'Splash'>;
+
+const SplashScreen = ({ navigation }: SplashScreenProps) => {
     const { loadAuth } = useAuthStore();
+
     // Core animation refs
     const ring1Scale = useRef(new Animated.Value(0.6)).current;
     const ring1Opacity = useRef(new Animated.Value(0)).current;
@@ -82,6 +89,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
     const logoScale = useRef(new Animated.Value(0)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current;
     const crossScale = useRef(new Animated.Value(0)).current;
+
     const titleOpacity = useRef(new Animated.Value(0)).current;
     const titleTranslateY = useRef(new Animated.Value(24)).current;
     const taglineOpacity = useRef(new Animated.Value(0)).current;
@@ -89,6 +97,10 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
     const dividerWidth = useRef(new Animated.Value(0)).current;
     const bottomOpacity = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    // FIX 4: Animated progress bar — was hardcoded at 40%, now fills from 0
+    //         to 100% over the full 4 200 ms splash duration.
+    const progressAnim = useRef(new Animated.Value(0)).current;
 
     // Particles data
     const particles = [
@@ -104,24 +116,32 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         { x: 0.62 * width, y: 0.18 * height, size: 3, delay: 900, opacity: 0.18 },
     ];
 
-    const handleNavigation = async () => {
-        await loadAuth();
-
-        const { isAuthenticated, user } = useAuthStore.getState();
-
-        if (isAuthenticated) {
-            navigation.replace('MainTab', {
-                screen: 'Dashboard',
-            });
-        } else {
-            navigation.replace('Login');
-        }
-    };
-
     useEffect(() => {
+        const handleNavigation = async () => {
+            await loadAuth();
+            const { isAuthenticated } = useAuthStore.getState();
+
+            if (isAuthenticated) {
+                navigation.replace('UserTab', {
+                    screen: 'Dashboard',
+                });
+            } else {
+                navigation.replace('Login');
+            }
+        };
+
+        // Kick off the progress bar fill in parallel with everything else.
+        // useNativeDriver: false because we're animating a layout property (width %).
+        Animated.timing(progressAnim, {
+            toValue: 1,
+            duration: 4000,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: false,
+        }).start();
+
         // Entrance sequence
-        Animated.sequence([
-            // 1) Rings expand in
+        const entranceAnimation = Animated.sequence([
+            // 1) Outer ring expands in
             Animated.parallel([
                 Animated.timing(ring1Scale, {
                     toValue: 1,
@@ -135,7 +155,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                     useNativeDriver: true,
                 }),
             ]),
-            // 2) Inner ring
+            // 2) Inner ring + logo disk appear
             Animated.parallel([
                 Animated.timing(ring2Scale, {
                     toValue: 1,
@@ -160,7 +180,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                     useNativeDriver: true,
                 }),
             ]),
-            // 3) Cross appears
+            // 3) FIX 3 continued: icon image inside disk pops in (was a no-op before)
             Animated.spring(crossScale, {
                 toValue: 1,
                 tension: 80,
@@ -184,10 +204,10 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                     toValue: 60,
                     duration: 500,
                     easing: Easing.out(Easing.cubic),
-                    useNativeDriver: false, // width can't use native driver
+                    useNativeDriver: false, // width cannot use native driver
                 }),
             ]),
-            // 5) Tagline + bottom
+            // 5) Tagline + bottom section fade in
             Animated.parallel([
                 Animated.timing(taglineOpacity, {
                     toValue: 1,
@@ -206,9 +226,14 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                     useNativeDriver: true,
                 }),
             ]),
-        ]).start(() => {
-            // Start idle pulse after entrance
-            Animated.loop(
+        ]);
+
+        // FIX 6: Store pulse animation ref so it can be stopped on unmount.
+        let pulseAnimation: Animated.CompositeAnimation | null = null;
+
+        entranceAnimation.start(() => {
+            // Start idle pulse after entrance completes
+            pulseAnimation = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {
                         toValue: 1.08,
@@ -223,15 +248,29 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                         useNativeDriver: true,
                     }),
                 ]),
-            ).start();
+            );
+            pulseAnimation.start();
         });
 
         const timer = setTimeout(() => {
             handleNavigation();
         }, 4200);
 
-        return () => clearTimeout(timer);
-    }, []);
+        // FIX 6 continued: Clean up timer AND all running animations on unmount
+        //                   to prevent setState-on-unmounted-component warnings.
+        return () => {
+            clearTimeout(timer);
+            entranceAnimation.stop();
+            progressAnim.stopAnimation();
+            pulseAnimation?.stop();
+        };
+    }, [navigation]);
+
+    // FIX 4 continued: interpolate the 0–1 progress value to a "0%"–"100%" string
+    const progressWidth = progressAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '100%'],
+    });
 
     return (
         <LinearGradient
@@ -288,12 +327,19 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
                         },
                     ]}
                 >
-                    {/* Geometric medical cross */}
-                    <Image
-                        source={require('../assets/injection.png')}
-                        style={{width: '100%', height: '100%'}}
-                        resizeMode="contain"
-                    />
+                    <Animated.View
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            transform: [{ scale: crossScale }],
+                        }}
+                    >
+                        <Image
+                            source={require('@/assets/injection.png')}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="contain"
+                        />
+                    </Animated.View>
                 </Animated.View>
 
                 {/* App name */}
@@ -328,9 +374,9 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* ── Bottom section ── */}
             <Animated.View style={[styles.bottomSection, { opacity: bottomOpacity }]}>
-                {/* Progress bar strip */}
+                {/* FIX 4 continued: Progress bar now animates from 0 → 100% */}
                 <View style={styles.progressTrack}>
-                    <Animated.View style={styles.progressFill} />
+                    <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
                 </View>
 
                 <Text style={styles.bottomLabel}>Connecting your care</Text>
@@ -419,31 +465,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.35,
         shadowRadius: 24,
         elevation: 16,
-        // Inner glass shimmer via background approach
         overflow: 'hidden',
-    },
-
-    // Geometric cross
-    crossH: {
-        position: 'absolute',
-        width: 46,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: Colors.white,
-    },
-    crossV: {
-        position: 'absolute',
-        width: 12,
-        height: 46,
-        borderRadius: 6,
-        backgroundColor: Colors.white,
-    },
-    crossDot: {
-        position: 'absolute',
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.5)',
     },
 
     // Typography
@@ -492,7 +514,6 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     progressFill: {
-        width: '40%',
         height: '100%',
         backgroundColor: 'rgba(255,255,255,0.8)',
         borderRadius: 1,

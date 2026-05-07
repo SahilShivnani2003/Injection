@@ -13,15 +13,17 @@ import {
     Easing,
     Dimensions,
     ScrollView,
+    Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Colors } from '@/theme/colors';
+import { RootStackParamList } from '@/types/RootStackParamList';
 
 const { width, height } = Dimensions.get('window');
 
-type loginPros = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type LoginProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 // ── Individual OTP Cell ──────────────────────────────────────────────────────
 const OtpCell: React.FC<{
@@ -32,15 +34,18 @@ const OtpCell: React.FC<{
     const borderAnim = useRef(new Animated.Value(0)).current;
     const cursorAnim = useRef(new Animated.Value(1)).current;
 
+    // FIX 1: Added animation cleanup to prevent leaks when OTP section unmounts.
     useEffect(() => {
-        Animated.timing(borderAnim, {
+        const anim = Animated.timing(borderAnim, {
             toValue: active ? 1 : 0,
             duration: 180,
             useNativeDriver: false,
-        }).start();
+        });
+        anim.start();
+        return () => anim.stop();
     }, [active]);
 
-    // Blinking cursor animation
+    // FIX 2: Cursor blink already had a cleanup — kept and unchanged.
     useEffect(() => {
         if (active && !char) {
             const blink = Animated.loop(
@@ -88,7 +93,7 @@ const OtpCell: React.FC<{
 };
 
 // ── Screen ───────────────────────────────────────────────────────────────────
-const LoginScreen = ({ navigation }: loginPros) => {
+const LoginScreen = ({ navigation }: LoginProps) => {
     const [userType, setUserType] = useState<'patient' | 'labpartner' | 'staff'>('patient');
     const [mobile, setMobile] = useState('');
     const [otp, setOtp] = useState('');
@@ -113,7 +118,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
 
     // ── Entrance animation ────────────────────────────────────────────────────
     useEffect(() => {
-        Animated.parallel([
+        const entrance = Animated.parallel([
             Animated.timing(logoY, {
                 toValue: 0,
                 duration: 560,
@@ -134,22 +139,28 @@ const LoginScreen = ({ navigation }: loginPros) => {
                 delay: 160,
                 useNativeDriver: true,
             }),
-        ]).start();
+        ]);
+        entrance.start();
+        return () => entrance.stop();
     }, []);
 
     // ── Mobile border focus ───────────────────────────────────────────────────
     useEffect(() => {
-        Animated.timing(mobileBorder, {
+        const anim = Animated.timing(mobileBorder, {
             toValue: mobileActive ? 1 : 0,
             duration: 180,
             useNativeDriver: false,
-        }).start();
+        });
+        anim.start();
+        return () => anim.stop();
     }, [mobileActive]);
 
     // ── OTP section slide-in ──────────────────────────────────────────────────
     useEffect(() => {
+        let focusTimer: ReturnType<typeof setTimeout> | null = null;
+
         if (otpSent) {
-            Animated.parallel([
+            const anim = Animated.parallel([
                 Animated.timing(otpSlide, {
                     toValue: 1,
                     duration: 400,
@@ -157,15 +168,22 @@ const LoginScreen = ({ navigation }: loginPros) => {
                     useNativeDriver: true,
                 }),
                 Animated.timing(otpOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-            ]).start(() => {
-                // Small delay so animation completes before focusing
-                setTimeout(() => otpRef.current?.focus(), 50);
+            ]);
+            anim.start(() => {
+                focusTimer = setTimeout(() => otpRef.current?.focus(), 50);
             });
+
+            return () => {
+                anim.stop();
+                if (focusTimer) clearTimeout(focusTimer);
+            };
         } else {
-            Animated.parallel([
+            const anim = Animated.parallel([
                 Animated.timing(otpSlide, { toValue: 0, duration: 260, useNativeDriver: true }),
                 Animated.timing(otpOp, { toValue: 0, duration: 200, useNativeDriver: true }),
-            ]).start();
+            ]);
+            anim.start();
+            return () => anim.stop();
         }
     }, [otpSent]);
 
@@ -183,8 +201,9 @@ const LoginScreen = ({ navigation }: loginPros) => {
             Alert.alert('Terms Required', 'Please accept the terms and conditions.');
             return;
         }
-        if (otp.length < 4) {
-            Alert.alert('Invalid OTP', 'Please enter the correct OTP.');
+        // FIX 5: Was `>= 4` but the OTP field is exactly 6 digits; corrected to `=== 6`.
+        if (otp.length < 6) {
+            Alert.alert('Invalid OTP', 'Please enter the complete 6-digit OTP.');
             return;
         }
 
@@ -197,13 +216,15 @@ const LoginScreen = ({ navigation }: loginPros) => {
                 break;
             case 'patient':
             default:
-                navigation.navigate('MainTab', { screen: 'Dashboard' });
+                navigation.navigate('UserTab', { screen: 'Dashboard' });
                 break;
         }
     };
 
     const otpTranslateY = otpSlide.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
-    const canLogin = agreed && otp.length >= 4 && otpSent;
+
+    // FIX 5 continued: gate also updated to require all 6 digits.
+    const canLogin = agreed && otp.length === 6 && otpSent;
 
     // Active index: where the cursor sits (next character position)
     const activeIndex = otpFocused ? Math.min(otp.length, 5) : -1;
@@ -213,6 +234,17 @@ const LoginScreen = ({ navigation }: loginPros) => {
         filled: !!otp[i],
         active: activeIndex === i,
     }));
+
+    // FIX 6: Replaced emoji icons with MaterialIcons vector icons throughout.
+    const userTypes: {
+        key: 'patient' | 'labpartner' | 'staff';
+        label: string;
+        icon: string; // MaterialIcons name
+    }[] = [
+        { key: 'patient', label: 'Patient', icon: 'person' },
+        { key: 'labpartner', label: 'Lab Partner', icon: 'local-hospital' },
+        { key: 'staff', label: 'Staff', icon: 'medical-services' },
+    ];
 
     return (
         <View style={styles.root}>
@@ -237,8 +269,11 @@ const LoginScreen = ({ navigation }: loginPros) => {
                 >
                     <View style={styles.logoRing}>
                         <View style={styles.logoDisk}>
-                            <View style={styles.crossH} />
-                            <View style={styles.crossV} />
+                            <Image
+                                source={require('@/assets/injection.png')}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="contain"
+                            />
                         </View>
                     </View>
                     <Text style={styles.brandName}>INJECTION</Text>
@@ -272,23 +307,27 @@ const LoginScreen = ({ navigation }: loginPros) => {
                         {/* ── User Type Selection ─────────────────────────── */}
                         <Text style={styles.fieldLabel}>Login as</Text>
                         <View style={styles.userTypeRow}>
-                            {[
-                                { key: 'patient', label: 'Patient', icon: '👤' },
-                                { key: 'labpartner', label: 'Lab Partner', icon: '🏥' },
-                                { key: 'staff', label: 'Staff', icon: '👨‍⚕️' },
-                            ].map((type, index) => (
+                            {userTypes.map(type => (
                                 <TouchableOpacity
                                     key={type.key}
                                     style={[
                                         styles.userTypeBtn,
                                         userType === type.key && styles.userTypeBtnActive,
-                                        index === 0 && styles.userTypeBtnFirst,
-                                        index === 2 && styles.userTypeBtnLast,
                                     ]}
-                                    onPress={() => setUserType(type.key as any)}
+                                    onPress={() => setUserType(type.key)}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.userTypeIcon}>{type.icon}</Text>
+                                    {/* FIX 6: Vector icon replaces emoji */}
+                                    <Icon
+                                        name={type.icon}
+                                        size={24}
+                                        color={
+                                            userType === type.key
+                                                ? Colors.gradientStart
+                                                : Colors.textMuted
+                                        }
+                                        style={styles.userTypeIcon}
+                                    />
                                     <Text
                                         style={[
                                             styles.userTypeText,
@@ -307,6 +346,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             style={[styles.mobileRow, { borderColor: mobileBorderColor }]}
                         >
                             <View style={styles.prefixBox}>
+                                {/* Flag stays as emoji — no vector icon equivalent */}
                                 <Text style={styles.flag}>🇮🇳</Text>
                                 <Text style={styles.code}>+91</Text>
                             </View>
@@ -325,7 +365,8 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             />
                             {mobile.length === 10 && (
                                 <View style={styles.validBadge}>
-                                    <Text style={styles.validTick}>✓</Text>
+                                    {/* FIX 6: Vector icon replaces ✓ text */}
+                                    <Icon name="check" size={14} color={Colors.white} />
                                 </View>
                             )}
                         </Animated.View>
@@ -350,7 +391,14 @@ const LoginScreen = ({ navigation }: loginPros) => {
                         ) : (
                             <View style={styles.sentRow}>
                                 <View style={styles.sentBadge}>
-                                    <Text style={styles.sentText}>✓ OTP sent to +91 {mobile}</Text>
+                                    {/* FIX 6: Vector icon replaces ✓ text */}
+                                    <Icon
+                                        name="check-circle"
+                                        size={14}
+                                        color="#0F7A58"
+                                        style={styles.sentIcon}
+                                    />
+                                    <Text style={styles.sentText}>OTP sent to +91 {mobile}</Text>
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => {
@@ -377,7 +425,7 @@ const LoginScreen = ({ navigation }: loginPros) => {
                                     One-Time Password
                                 </Text>
 
-                                {/* Hidden real input — off-screen, NOT zIndex:-1 */}
+                                {/* Hidden real input — off-screen */}
                                 <TextInput
                                     ref={otpRef}
                                     style={styles.hiddenInput}
@@ -417,7 +465,8 @@ const LoginScreen = ({ navigation }: loginPros) => {
                             activeOpacity={0.7}
                         >
                             <View style={[styles.checkbox, agreed && styles.checkboxOn]}>
-                                {agreed && <Text style={styles.tick}>✓</Text>}
+                                {/* FIX 6: Vector icon replaces ✓ text */}
+                                {agreed && <Icon name="check" size={13} color={Colors.white} />}
                             </View>
                             <Text style={styles.termsText}>
                                 I agree to the{' '}
@@ -470,7 +519,14 @@ const LoginScreen = ({ navigation }: loginPros) => {
                                 onPress={() => navigation.replace('EmailLogin')}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.emailLoginText}>📧 Email & Password</Text>
+                                {/* FIX 6: Vector icon replaces 📧 emoji */}
+                                <Icon
+                                    name="email"
+                                    size={18}
+                                    color={Colors.textMedium}
+                                    style={styles.emailIcon}
+                                />
+                                <Text style={styles.emailLoginText}>Email & Password</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -539,20 +595,6 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.55)',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    crossH: {
-        position: 'absolute',
-        width: 32,
-        height: 9,
-        borderRadius: 4.5,
-        backgroundColor: Colors.white,
-    },
-    crossV: {
-        position: 'absolute',
-        width: 9,
-        height: 32,
-        borderRadius: 4.5,
-        backgroundColor: Colors.white,
     },
     brandName: {
         fontSize: 30,
@@ -629,14 +671,13 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#E8F0F4',
     },
-    userTypeBtnFirst: { marginLeft: 0 },
-    userTypeBtnLast: { marginRight: 0 },
+    // FIX 7: Removed dead userTypeBtnFirst / userTypeBtnLast styles (were
+    //         just margin: 0 on flex children that already default to 0).
     userTypeBtnActive: {
         borderColor: Colors.gradientStart,
         backgroundColor: '#E6FAF5',
     },
     userTypeIcon: {
-        fontSize: 22,
         marginBottom: 6,
     },
     userTypeText: {
@@ -677,7 +718,7 @@ const styles = StyleSheet.create({
         color: Colors.textDark,
         fontWeight: '600',
         paddingHorizontal: 14,
-        paddingVertical: 0, // prevents Android vertical clipping
+        paddingVertical: 0,
         height: 54,
     },
     validBadge: {
@@ -689,7 +730,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginRight: 14,
     },
-    validTick: { color: Colors.white, fontSize: 13, fontWeight: '800' },
 
     // ── Send OTP Button ────────────────────────────────────────────────────
     sendBtn: {
@@ -720,12 +760,18 @@ const styles = StyleSheet.create({
     },
     sentBadge: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#EAF9F4',
         paddingHorizontal: 12,
         paddingVertical: 10,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: '#B0E8D4',
+        gap: 6,
+    },
+    sentIcon: {
+        // spacing handled by gap in sentBadge
     },
     sentText: { fontSize: 12, color: '#0F7A58', fontWeight: '600' },
     resendText: {
@@ -736,9 +782,7 @@ const styles = StyleSheet.create({
     },
 
     // ── OTP ────────────────────────────────────────────────────────────────
-    otpSection: {
-        // Wrapper keeps the section from intercepting touches when hidden
-    },
+    otpSection: {},
     hiddenInput: {
         position: 'absolute',
         top: -9999,
@@ -775,7 +819,6 @@ const styles = StyleSheet.create({
         color: Colors.textDark,
         lineHeight: 28,
     },
-    // Blinking cursor bar shown inside the active empty cell
     cursor: {
         width: 2,
         height: 24,
@@ -804,7 +847,6 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     checkboxOn: { backgroundColor: Colors.accent, borderColor: Colors.accentDark },
-    tick: { color: Colors.white, fontSize: 13, fontWeight: '900' },
     termsText: { flex: 1, fontSize: 13, color: Colors.textMuted, lineHeight: 20 },
     termsLink: {
         color: Colors.gradientStart,
@@ -858,12 +900,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     emailLoginBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#F4F9FB',
         paddingHorizontal: 24,
         paddingVertical: 13,
         borderRadius: 12,
         borderWidth: 1.5,
         borderColor: '#E0EDF2',
+        gap: 8,
+    },
+    emailIcon: {
+        // spacing handled by gap in emailLoginBtn
     },
     emailLoginText: {
         fontSize: 14,

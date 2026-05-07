@@ -6,12 +6,7 @@ import CustomTabBar from '../components/CustomTabBar';
 import BookingsScreen from '../screens/user/tabs/BookingsScreen';
 import { ITabItem } from '../types/TabItem';
 import { View } from 'react-native';
-
-export type TabParamList = {
-    Dashboard: undefined;
-    Bookings: undefined;
-    Profile: undefined;
-};
+import { UserTabParamList } from '@/types/UserTabParamList';
 
 const TabItems: ITabItem[] = [
     {
@@ -33,7 +28,7 @@ const TabItems: ITabItem[] = [
         iconOff: 'person-outline',
     },
 ];
-const Tab = createBottomTabNavigator<TabParamList>();
+const Tab = createBottomTabNavigator<UserTabParamList>();
 
 export default function TabNavigator() {
     return (
