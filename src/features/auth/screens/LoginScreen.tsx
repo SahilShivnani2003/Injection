@@ -94,7 +94,7 @@ const OtpCell: React.FC<{
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 const LoginScreen = ({ navigation }: LoginProps) => {
-    const [userType, setUserType] = useState<'patient' | 'labpartner' | 'staff'>('patient');
+    const [userType, setUserType] = useState<'patient' | 'labpartner' | 'Vendor'>('patient');
     const [mobile, setMobile] = useState('');
     const [otp, setOtp] = useState('');
     const [agreed, setAgreed] = useState(false);
@@ -211,7 +211,7 @@ const LoginScreen = ({ navigation }: LoginProps) => {
             case 'labpartner':
                 navigation.navigate('LabPartner');
                 break;
-            case 'staff':
+            case 'Vendor':
                 navigation.navigate('StaffPanel');
                 break;
             case 'patient':
@@ -237,19 +237,16 @@ const LoginScreen = ({ navigation }: LoginProps) => {
 
     // FIX 6: Replaced emoji icons with MaterialIcons vector icons throughout.
     const userTypes: {
-        key: 'patient' | 'labpartner' | 'staff';
+        key: 'patient' | 'labpartner' | 'Vendor';
         label: string;
         icon: string; // MaterialIcons name
     }[] = [
         { key: 'patient', label: 'Patient', icon: 'person' },
-        { key: 'labpartner', label: 'Lab Partner', icon: 'local-hospital' },
-        { key: 'staff', label: 'Staff', icon: 'medical-services' },
+        { key: 'Vendor', label: 'Vendor', icon: 'medical-services' },
     ];
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
             {/* ── Gradient Header ─────────────────────────────────────────── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}

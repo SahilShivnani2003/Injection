@@ -3,35 +3,23 @@ import {
     View,
     Text,
     StyleSheet,
-    StatusBar,
     TouchableOpacity,
     Image,
     ScrollView,
     Switch,
-    Alert,
     Modal,
-    Animated,
+    StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../../theme/colors';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
-import { TabParamList } from '../../../navigation/TabNavigator';
 import { useAuthStore } from '@/store/useAuthStore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '@/navigation/AppNavigator';
+import { Colors } from '@/theme/colors';
+import { RootStackParamList } from '@/types/RootStackParamList';
+import { UserTabParamList } from '@/types/UserTabParamList';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-type ProfileProps = NativeBottomTabScreenProps<TabParamList, 'Profile'>;
-
-// ── Minimal icon set using Unicode / text glyphs (no extra lib needed) ──
-const Icon = ({
-    glyph,
-    size = 18,
-    color = Colors.gradientStart,
-}: {
-    glyph: string;
-    size?: number;
-    color?: string;
-}) => <Text style={{ fontSize: size, color, lineHeight: size + 4 }}>{glyph}</Text>;
+type ProfileProps = NativeBottomTabScreenProps<UserTabParamList, 'Profile'>;
 
 interface MenuRowProps {
     icon: string;
@@ -45,13 +33,14 @@ interface MenuRowProps {
 const MenuRow = ({ icon, label, sublabel, onPress, rightElement, danger }: MenuRowProps) => (
     <TouchableOpacity style={styles.menuRow} onPress={onPress} activeOpacity={0.7}>
         <View style={[styles.menuIconWrap, danger && styles.menuIconWrapDanger]}>
-            <Icon glyph={icon} size={16} color={danger ? '#E53935' : Colors.gradientStart} />
+            {/* Fixed: use `name` prop (not `glyph`) for MaterialIcons */}
+            <Icon name={icon} size={18} color={danger ? '#E53935' : Colors.gradientStart} />
         </View>
         <View style={styles.menuText}>
             <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]}>{label}</Text>
             {sublabel ? <Text style={styles.menuSublabel}>{sublabel}</Text> : null}
         </View>
-        {rightElement ?? <Text style={styles.chevron}>›</Text>}
+        {rightElement ?? <Icon name="chevron-right" size={20} color="#BCCDD6" />}
     </TouchableOpacity>
 );
 
@@ -67,41 +56,35 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
     const handleLogout = async () => {
         setLogoutModalVisible(false);
         await removeAuth();
-
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>().reset({
             index: 0,
             routes: [{ name: 'Login' }],
         });
     };
 
-    // Helper to get role display text
-    const getRoleDisplay = () => {
-        if (!user) return '👤 User';
-        if (user.role === 'admin') return '👨‍💼 Admin';
-        if (user.isStaff) return '👨‍⚕️ Staff';
-        return '🏥 Patient';
+    // Returns a MaterialIcons icon name and label for the user's role
+    const getRoleDisplay = (): { icon: string; label: string } => {
+        if (!user) return { icon: 'person', label: 'User' };
+        if (user.role === 'admin') return { icon: 'admin-panel-settings', label: 'Admin' };
+        if (user.isStaff) return { icon: 'badge', label: 'Staff' };
+        return { icon: 'person', label: 'Patient' };
     };
 
-    // Helper to format date of birth from age
     const getDateOfBirth = () => {
         if (!user?.age) return 'Not provided';
-        const currentYear = new Date().getFullYear();
-        const birthYear = currentYear - user.age;
-        return `Age: ${user.age} years`;
+        return `${user.age} years old`;
     };
 
-    // Helper to get location
     const getLocation = () => {
         if (user?.currentLocation) return user.currentLocation;
         if (user?.address) return user.address;
         return 'Not provided';
     };
 
-    // Calculate stats (these would come from actual data in production)
     const stats = {
-        visits: 0, // Could be fetched from booking history
-        reports: 0, // Could be fetched from medical records
-        upcoming: 0, // Could be fetched from upcoming appointments
+        visits: 0,
+        reports: 0,
+        upcoming: 0,
     };
 
     if (!user) {
@@ -112,10 +95,10 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
         );
     }
 
+    const role = getRoleDisplay();
+
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
             {/* ── Header ── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -123,19 +106,20 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 end={{ x: 0.9, y: 1 }}
                 style={styles.header}
             >
+                {/* Left — back button */}
                 <TouchableOpacity
-                    style={styles.backBtn}
+                    style={styles.headerIconBtn}
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                 >
-                    <Text style={styles.backText}>←</Text>
+                    <Icon name="arrow-back" size={22} color={Colors.textLight} />
                 </TouchableOpacity>
+
+                {/* Center — title */}
                 <Text style={styles.headerTitle}>My Profile</Text>
 
-                {/* Settings shortcut */}
-                <TouchableOpacity style={styles.settingsBtn} activeOpacity={0.7}>
-                    <Icon glyph="⚙" size={18} color={Colors.white} />
-                </TouchableOpacity>
+                {/* Right — spacer keeps title perfectly centered */}
+                <View style={styles.headerIconBtn} />
             </LinearGradient>
 
             <ScrollView
@@ -147,10 +131,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 <View style={styles.avatarCard}>
                     <View style={styles.avatarRing}>
                         {user.profileImage ? (
-                            <Image
-                                source={{ uri: user.profileImage }}
-                                style={styles.avatar}
-                            />
+                            <Image source={{ uri: user.profileImage }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                 <Text style={styles.avatarText}>
@@ -160,8 +141,16 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                         )}
                     </View>
                     <Text style={styles.name}>{user.name}</Text>
+
+                    {/* Role pill with vector icon */}
                     <View style={styles.rolePill}>
-                        <Text style={styles.roleText}>{getRoleDisplay()}</Text>
+                        <Icon
+                            name={role.icon}
+                            size={13}
+                            color={Colors.gradientStart}
+                            style={{ marginRight: 5 }}
+                        />
+                        <Text style={styles.roleText}>{role.label}</Text>
                     </View>
 
                     <View style={styles.statsRow}>
@@ -182,41 +171,51 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                     </View>
                 </View>
 
-                {/* ── Personal Info ── */}
+                {/* ── Personal Information ── */}
                 <SectionHeader title="PERSONAL INFORMATION" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="✉" label="Email" sublabel={user.email} />
+                    <MenuRow icon="email" label="Email" sublabel={user.email} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📞" label="Phone" sublabel={user.phone} />
+                    <MenuRow icon="phone" label="Phone" sublabel={user.phone} />
                     {user.alternateMobile && (
                         <>
                             <View style={styles.rowDivider} />
-                            <MenuRow icon="📱" label="Alternate Phone" sublabel={user.alternateMobile} />
+                            <MenuRow
+                                icon="phone-android"
+                                label="Alternate Phone"
+                                sublabel={user.alternateMobile}
+                            />
                         </>
                     )}
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📍" label="Location" sublabel={getLocation()} />
+                    <MenuRow icon="location-on" label="Location" sublabel={getLocation()} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="🎂" label="Age" sublabel={getDateOfBirth()} />
+                    <MenuRow icon="cake" label="Age" sublabel={getDateOfBirth()} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="⚧" label="Gender" sublabel={user.gender} />
+                    <MenuRow icon="wc" label="Gender" sublabel={user.gender} />
                     {user.bloodGroup && user.bloodGroup !== 'Unknown' && (
                         <>
                             <View style={styles.rowDivider} />
-                            <MenuRow icon="🩸" label="Blood Group" sublabel={user.bloodGroup} />
+                            <MenuRow
+                                icon="water-drop"
+                                label="Blood Group"
+                                sublabel={user.bloodGroup}
+                            />
                         </>
                     )}
                 </View>
 
                 {/* ── Medical Information ── */}
-                {(user.allergies?.length || user.chronicDiseases?.length || user.currentMedications?.length) && (
+                {user.allergies?.length ||
+                user.chronicDiseases?.length ||
+                user.currentMedications?.length ? (
                     <>
                         <SectionHeader title="MEDICAL INFORMATION" />
                         <View style={styles.menuCard}>
                             {user.allergies && user.allergies.length > 0 && (
                                 <>
                                     <MenuRow
-                                        icon="⚠️"
+                                        icon="warning"
                                         label="Allergies"
                                         sublabel={user.allergies.join(', ')}
                                     />
@@ -226,7 +225,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                             {user.chronicDiseases && user.chronicDiseases.length > 0 && (
                                 <>
                                     <MenuRow
-                                        icon="🏥"
+                                        icon="local-hospital"
                                         label="Chronic Diseases"
                                         sublabel={user.chronicDiseases.join(', ')}
                                     />
@@ -235,14 +234,14 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                             )}
                             {user.currentMedications && user.currentMedications.length > 0 && (
                                 <MenuRow
-                                    icon="💊"
+                                    icon="medication"
                                     label="Current Medications"
                                     sublabel={user.currentMedications.join(', ')}
                                 />
                             )}
                         </View>
                     </>
-                )}
+                ) : null}
 
                 {/* ── Insurance Information ── */}
                 {user.hasInsurance && (
@@ -250,7 +249,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                         <SectionHeader title="INSURANCE" />
                         <View style={styles.menuCard}>
                             <MenuRow
-                                icon="🛡"
+                                icon="verified-user"
                                 label="Insurance Type"
                                 sublabel={user.insuranceType}
                             />
@@ -258,7 +257,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                 <>
                                     <View style={styles.rowDivider} />
                                     <MenuRow
-                                        icon="🏢"
+                                        icon="business"
                                         label="Provider"
                                         sublabel={user.insuranceProvider}
                                     />
@@ -268,7 +267,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                 <>
                                     <View style={styles.rowDivider} />
                                     <MenuRow
-                                        icon="🔢"
+                                        icon="confirmation-number"
                                         label="Policy Number"
                                         sublabel={user.insurancePolicyNumber}
                                     />
@@ -278,9 +277,15 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                 <>
                                     <View style={styles.rowDivider} />
                                     <MenuRow
-                                        icon="📅"
+                                        icon="event"
                                         label="Expiry Date"
-                                        sublabel={user.insuranceExpiryDate}
+                                        sublabel={
+                                            user.insuranceExpiryDate instanceof Date
+                                                ? user.insuranceExpiryDate.toLocaleDateString(
+                                                      'en-IN',
+                                                  )
+                                                : String(user.insuranceExpiryDate)
+                                        }
                                     />
                                 </>
                             )}
@@ -294,7 +299,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                         <SectionHeader title="EMERGENCY CONTACT" />
                         <View style={styles.menuCard}>
                             <MenuRow
-                                icon="👤"
+                                icon="person"
                                 label="Contact Name"
                                 sublabel={user.emergencyContactName}
                             />
@@ -302,7 +307,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                 <>
                                     <View style={styles.rowDivider} />
                                     <MenuRow
-                                        icon="📞"
+                                        icon="phone"
                                         label="Contact Phone"
                                         sublabel={user.emergencyContactPhone}
                                     />
@@ -312,7 +317,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                 <>
                                     <View style={styles.rowDivider} />
                                     <MenuRow
-                                        icon="❤️"
+                                        icon="favorite"
                                         label="Relationship"
                                         sublabel={user.emergencyContactRelation}
                                     />
@@ -325,26 +330,26 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Account ── */}
                 <SectionHeader title="ACCOUNT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="✏" label="Edit Profile" onPress={() => {}} />
+                    <MenuRow icon="edit" label="Edit Profile" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="🔒" label="Change Password" onPress={() => {}} />
+                    <MenuRow icon="lock" label="Change Password" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="🩺" label="Medical Records" onPress={() => {}} />
+                    <MenuRow icon="folder-shared" label="Medical Records" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="💳" label="Insurance & Billing" onPress={() => {}} />
+                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => {}} />
                 </View>
 
                 {/* ── Preferences ── */}
-                <SectionHeader title="PREFERENCES" />
+                {/* <SectionHeader title="PREFERENCES" />
                 <View style={styles.menuCard}>
                     <MenuRow
-                        icon="🌐"
+                        icon="language"
                         label="Preferred Language"
-                        sublabel={user.preferredLanguage}
+                        sublabel={user.preferredLanguage ?? 'Not set'}
                     />
                     <View style={styles.rowDivider} />
                     <MenuRow
-                        icon="🔔"
+                        icon="notifications"
                         label="Push Notifications"
                         rightElement={
                             <Switch
@@ -355,36 +360,32 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                             />
                         }
                     />
-                </View>
+                </View> */}
 
                 {/* ── Support ── */}
                 <SectionHeader title="SUPPORT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="❓" label="Help & FAQ" onPress={() => {}} />
+                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📣" label="Send Feedback" onPress={() => {}} />
+                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="🛡" label="Privacy Policy" onPress={() => {}} />
+                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="📄" label="Terms of Service" onPress={() => {}} />
+                    <MenuRow icon="description" label="Terms of Service" onPress={() => {}} />
+                        <MenuRow icon="info" label="About" onPress={() => {}} />
                 </View>
 
                 {/* ── Danger Zone ── */}
                 <SectionHeader title="ACCOUNT ACTIONS" />
                 <View style={styles.menuCard}>
                     <MenuRow
-                        icon="🚪"
+                        icon="logout"
                         label="Log Out"
                         danger
                         onPress={() => setLogoutModalVisible(true)}
                     />
                 </View>
-
-                {/* App version */}
-                <Text style={styles.version}>
-                    HealthApp v2.4.1 • Build 2025.06
-                    {user.lastLoginAt && `\nLast login: ${new Date(user.lastLoginAt).toLocaleDateString()}`}
-                </Text>
+                <View style={{height:40, marginBottom: 28}}></View>
             </ScrollView>
 
             {/* ── Logout Confirmation Modal ── */}
@@ -397,7 +398,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalIconWrap}>
-                            <Text style={{ fontSize: 32 }}>👋</Text>
+                            <Icon name="logout" size={32} color="#E53935" />
                         </View>
                         <Text style={styles.modalTitle}>Log Out?</Text>
                         <Text style={styles.modalBody}>
@@ -430,54 +431,38 @@ const styles = StyleSheet.create({
 
     // ── Header ──
     header: {
-        paddingTop: 56,
-        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 32,
+        paddingHorizontal: 16,
         paddingBottom: 24,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
-    backBtn: {
-        position: 'absolute',
-        left: 18,
-        top: 58,
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+    headerIconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    backText: { color: Colors.white, fontSize: 20, fontWeight: '700', marginTop: -2 },
     headerTitle: {
         color: Colors.white,
         fontSize: 20,
         fontWeight: '700',
         textAlign: 'center',
-        marginTop: 8,
-    },
-    settingsBtn: {
-        position: 'absolute',
-        right: 18,
-        top: 58,
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        flex: 1,
     },
 
     // ── Scroll ──
     scroll: { flex: 1 },
-    scrollContent: { paddingBottom: 40 },
+    scrollContent: { paddingBottom: 40, marginBottom: 40 },
 
     // ── Avatar Card ──
     avatarCard: {
         marginHorizontal: 16,
-        marginTop: -2,
+        marginTop: 20,
         backgroundColor: Colors.white,
         borderRadius: 20,
         paddingTop: 28,
@@ -511,11 +496,13 @@ const styles = StyleSheet.create({
     },
     name: { fontSize: 22, fontWeight: '800', color: Colors.textDark, letterSpacing: 0.3 },
     rolePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginTop: 6,
         backgroundColor: '#E6FBF5',
         borderRadius: 20,
         paddingHorizontal: 14,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderWidth: 1,
         borderColor: '#B2EFE0',
     },
@@ -578,7 +565,6 @@ const styles = StyleSheet.create({
     menuLabel: { fontSize: 15, fontWeight: '600', color: Colors.textDark },
     menuLabelDanger: { color: '#E53935' },
     menuSublabel: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-    chevron: { fontSize: 22, color: '#BCCDD6', fontWeight: '300' },
     rowDivider: { height: 1, backgroundColor: '#F0F5F8', marginLeft: 66 },
 
     // ── Version ──
@@ -586,7 +572,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 11,
         color: Colors.textMuted,
-        marginTop: 28,
+        marginTop: 18,
         letterSpacing: 0.4,
         lineHeight: 16,
     },
@@ -615,7 +601,7 @@ const styles = StyleSheet.create({
         width: 68,
         height: 68,
         borderRadius: 34,
-        backgroundColor: '#FFF3E0',
+        backgroundColor: '#FDECEA',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,

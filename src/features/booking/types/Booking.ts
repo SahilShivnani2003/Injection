@@ -1,4 +1,5 @@
 export interface Booking {
+    _id?: string;
     // Patient Information
     patientName: string;
     age: number;

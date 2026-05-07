@@ -12,15 +12,17 @@ import {
     Easing,
     Dimensions,
     ScrollView,
+    Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Colors } from '../../../theme/colors';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
-import { useAlert } from '../../context/AlertContext';
-import Loader from '../../components/Loader';
-import { userApi } from '../../service/apis/userService';
-import { useAuthStore } from '../../store/useAuthStore';
+import { RootStackParamList } from '@/types/RootStackParamList';
+import Loader from '@/components/Loader';
+import { useAlert } from '@/context/AlertContext';
+import { userApi } from '@/service/apis/userService';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,14 +34,16 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-
+    const [userType, setUserType] = useState<'patient' | 'labpartner' | 'Vendor'>('patient');
     const alert = useAlert();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
+    // FIX 1: Store the animation reference and stop it on unmount to prevent
+    //         setState-on-unmounted-component warnings.
     useEffect(() => {
-        Animated.parallel([
+        const entrance = Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 800,
@@ -52,11 +56,16 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
-        ]).start();
+        ]);
+        entrance.start();
+        return () => entrance.stop();
     }, []);
 
     const handleLogin = async () => {
-        if (!email.trim()) {
+        // Trim once so all subsequent checks and calls use a clean value.
+        const trimmedEmail = email.trim();
+
+        if (!trimmedEmail) {
             alert.error('Validation Error', 'Please enter your email address');
             return;
         }
@@ -66,18 +75,22 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+
+        // FIX 2: Was `emailRegex.test(email)` — a value like " user@email.com "
+        //         passes the non-empty check but fails the regex. Now tests the
+        //         already-trimmed value so validation is consistent.
+        if (!emailRegex.test(trimmedEmail)) {
             alert.warning('Invalid Email', 'Please enter a valid email address');
             return;
         }
 
         try {
-            setIsLoading(true); // ← start loader before API call
-            const response = await userApi.login({ email, password });
+            setIsLoading(true);
+            const response = await userApi.login({ email: trimmedEmail, password });
             if (response.data?.success) {
                 alert.success('Login Successful', 'Welcome back!');
                 setAuth(response.data.data.user, response.data.data.token);
-                navigation.replace('MainTab', { screen: 'Dashboard' });
+                navigation.replace('UserTab', { screen: 'Dashboard' });
             } else {
                 alert.error('Login Failed', 'Invalid email or password. Please try again.');
             }
@@ -88,10 +101,17 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
         }
     };
 
+    const userTypes: {
+        key: 'patient' | 'labpartner' | 'Vendor';
+        label: string;
+        icon: string; // MaterialIcons name
+    }[] = [
+        { key: 'patient', label: 'Patient', icon: 'person' },
+        { key: 'Vendor', label: 'Vendor', icon: 'medical-services' },
+    ];
     return (
         <View style={styles.root}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-
+            {/* ── Gradient Header ────────────────────────────────────────── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
@@ -101,12 +121,17 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                 <View style={styles.glowRingOuter} />
                 <View style={styles.glowRingInner} />
                 <View style={styles.logoRing}>
-                    <Text style={styles.logoText}>💉</Text>
+                    <Image
+                        source={require('@/assets/injection.png')}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="contain"
+                    />
                 </View>
                 <Text style={styles.title}>Welcome Back</Text>
                 <Text style={styles.subtitle}>Sign in to your account</Text>
             </LinearGradient>
 
+            {/* ── Form Sheet ─────────────────────────────────────────────── */}
             <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -122,7 +147,43 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Email Input */}
+                        {/* ── User Type Selection ─────────────────────────── */}
+                        <Text style={styles.inputLabel}>Login as</Text>
+                        <View style={styles.userTypeRow}>
+                            {userTypes.map(type => (
+                                <TouchableOpacity
+                                    key={type.key}
+                                    style={[
+                                        styles.userTypeBtn,
+                                        userType === type.key && styles.userTypeBtnActive,
+                                    ]}
+                                    onPress={() => setUserType(type.key)}
+                                    activeOpacity={0.7}
+                                >
+                                    {/* FIX 6: Vector icon replaces emoji */}
+                                    <Icon
+                                        name={type.icon}
+                                        size={24}
+                                        color={
+                                            userType === type.key
+                                                ? Colors.gradientStart
+                                                : Colors.textMuted
+                                        }
+                                        style={styles.userTypeIcon}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.userTypeText,
+                                            userType === type.key && styles.userTypeTextActive,
+                                        ]}
+                                    >
+                                        {type.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* ── Email Input ─────────────────────────────────── */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>Email Address</Text>
                             <View style={styles.inputContainer}>
@@ -137,13 +198,14 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                                     autoCorrect={false}
                                     editable={!isLoading}
                                 />
+                                {/* FIX 3: Vector icon replaces 📧 emoji */}
                                 <View style={styles.inputIcon}>
-                                    <Text style={styles.iconText}>📧</Text>
+                                    <Icon name="email" size={20} color="#A8BEC8" />
                                 </View>
                             </View>
                         </View>
 
-                        {/* Password Input */}
+                        {/* ── Password Input ──────────────────────────────── */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>Password</Text>
                             <View style={styles.inputContainer}>
@@ -158,20 +220,23 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                                     autoCorrect={false}
                                     editable={!isLoading}
                                 />
+                                {/* FIX 3 continued: Vector icons replace 👁️ / 🙈 emojis */}
                                 <TouchableOpacity
                                     style={styles.inputIcon}
                                     onPress={() => setShowPassword(p => !p)}
                                     activeOpacity={0.7}
                                     disabled={isLoading}
                                 >
-                                    <Text style={styles.iconText}>
-                                        {showPassword ? '👁️' : '🙈'}
-                                    </Text>
+                                    <Icon
+                                        name={showPassword ? 'visibility' : 'visibility-off'}
+                                        size={20}
+                                        color="#A8BEC8"
+                                    />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        {/* Forgot Password */}
+                        {/* ── Forgot Password ─────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.forgotPassword}
                             activeOpacity={0.7}
@@ -180,7 +245,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>
 
-                        {/* Login Button */}
+                        {/* ── Login Button ────────────────────────────────── */}
                         <TouchableOpacity
                             style={[styles.loginBtn, isLoading && styles.btnDimmed]}
                             onPress={handleLogin}
@@ -205,20 +270,23 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             </LinearGradient>
                         </TouchableOpacity>
 
-                        {/* Alternative Login */}
+                        {/* ── Alternative Login ───────────────────────────── */}
                         <View style={styles.alternativeContainer}>
                             <Text style={styles.alternativeText}>Or sign in with</Text>
+                            {/* FIX 4: Row layout added so the vector icon sits beside the label */}
                             <TouchableOpacity
                                 style={styles.mobileLoginBtn}
                                 onPress={() => navigation.replace('Login')}
                                 activeOpacity={0.7}
                                 disabled={isLoading}
                             >
-                                <Text style={styles.mobileLoginText}>📱 Mobile Number</Text>
+                                {/* FIX 3 continued: Vector icon replaces 📱 emoji */}
+                                <Icon name="smartphone" size={18} color={Colors.textMedium} />
+                                <Text style={styles.mobileLoginText}>Mobile Number</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Register Link */}
+                        {/* ── Register Link ───────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.registerLink}
                             onPress={() => navigation.navigate('Register')}
@@ -240,6 +308,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F0F7FA' },
 
+    // ── Header ─────────────────────────────────────────────────────────────
     header: {
         height: height * 0.38,
         alignItems: 'center',
@@ -272,7 +341,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginBottom: 18,
     },
-    logoText: { fontSize: 32 },
+    // FIX 5: Removed dead `logoText` style — it was defined but never used.
     title: {
         fontSize: 28,
         fontWeight: '800',
@@ -282,6 +351,7 @@ const styles = StyleSheet.create({
     },
     subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center' },
 
+    // ── Form Sheet ─────────────────────────────────────────────────────────
     container: { flex: 1 },
     formContainer: {
         flex: 1,
@@ -294,6 +364,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: { paddingBottom: 40 },
 
+    // ── Inputs ─────────────────────────────────────────────────────────────
     inputGroup: { marginBottom: 24 },
     inputLabel: {
         fontSize: 14,
@@ -313,12 +384,53 @@ const styles = StyleSheet.create({
         height: 56,
     },
     input: { flex: 1, fontSize: 16, color: Colors.textDark, fontWeight: '500' },
-    inputIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-    iconText: { fontSize: 18 },
+    inputIcon: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    //User type
+    userTypeRow: {
+        flexDirection: 'row',
+        marginBottom: 24,
+        gap: 10,
+    },
+    userTypeBtn: {
+        flex: 1,
+        backgroundColor: '#F8FBFC',
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#E8F0F4',
+    },
+    // FIX 7: Removed dead userTypeBtnFirst / userTypeBtnLast styles (were
+    //         just margin: 0 on flex children that already default to 0).
+    userTypeBtnActive: {
+        borderColor: Colors.gradientStart,
+        backgroundColor: '#E6FAF5',
+    },
+    userTypeIcon: {
+        marginBottom: 6,
+    },
+    userTypeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.textMuted,
+        textAlign: 'center',
+    },
+    userTypeTextActive: {
+        color: Colors.gradientStart,
+        fontWeight: '700',
+    },
 
+    // ── Forgot Password ────────────────────────────────────────────────────
     forgotPassword: { alignSelf: 'flex-end', marginBottom: 32 },
     forgotPasswordText: { fontSize: 14, color: Colors.gradientStart, fontWeight: '600' },
 
+    // ── Login Button ───────────────────────────────────────────────────────
     loginBtn: {
         borderRadius: 16,
         overflow: 'hidden',
@@ -333,9 +445,14 @@ const styles = StyleSheet.create({
     loginBtnText: { color: Colors.white, fontSize: 16, fontWeight: '800', letterSpacing: 0.8 },
     btnDimmed: { opacity: 0.45, shadowOpacity: 0, elevation: 0 },
 
+    // ── Alternative Login ──────────────────────────────────────────────────
     alternativeContainer: { alignItems: 'center', marginBottom: 24 },
     alternativeText: { fontSize: 14, color: Colors.textMuted, marginBottom: 12 },
     mobileLoginBtn: {
+        // FIX 4: Row layout so the vector icon aligns beside the text label.
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
         backgroundColor: '#F0F7FA',
         paddingHorizontal: 20,
         paddingVertical: 12,
@@ -345,6 +462,7 @@ const styles = StyleSheet.create({
     },
     mobileLoginText: { fontSize: 14, color: Colors.textMedium, fontWeight: '600' },
 
+    // ── Register Link ──────────────────────────────────────────────────────
     registerLink: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
     registerText: { fontSize: 14, color: Colors.textMedium },
     registerLinkText: {

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,50 +12,31 @@ import {
     RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Colors } from '../../../theme/colors';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../navigation/AppNavigator';
-import { TabParamList } from '../../../navigation/TabNavigator';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { dashboardService } from '@/service/apis/dashboardService';
 import { useAuthStore } from '@/store/useAuthStore';
+import { UserTabParamList } from '@/types/UserTabParamList';
+import { Colors } from '@/theme/colors';
+import { RootStackParamList } from '@/types/RootStackParamList';
+import { Booking } from '@/features/booking/types/Booking';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
-type DashboardProps = NativeBottomTabScreenProps<TabParamList, 'Dashboard'>;
+type DashboardProps = NativeBottomTabScreenProps<UserTabParamList, 'Dashboard'>;
 
-// ── Types matching API response ──────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface SelectedService {
-    serviceId: string;
-    serviceName: string;
-    price: number;
-    quantity: number;
-    _id: string;
-}
-
-interface VendorInfo {
-    _id: string;
-    name: string;
-    phone: string;
-    businessName: string;
-}
-
-interface Booking {
-    _id: string;
-    patientName: string;
-    selectedServices: SelectedService[];
-    grandTotal: number;
-    preferredTimeSlot: string;
-    vendorId: VendorInfo;
-    bookingStatus: string;
-    createdAt: string;
-}
-
-interface BookingByStatus {
-    _id: string;
-    count: number;
+interface Summary {
+    totalBookings: number;
+    completedBookings: number;
+    cancelledBookings: number;
+    upcomingBookingsCount: number;
+    totalSpent: number;
 }
 
 interface MostUsedService {
@@ -65,17 +46,14 @@ interface MostUsedService {
 }
 
 interface MonthlyBooking {
-    _id: { year: number; month: number };
+    month: string;
     count: number;
     spent: number;
 }
 
-interface Summary {
-    totalBookings: number;
-    completedBookings: number;
-    cancelledBookings: number;
-    upcomingBookingsCount: number;
-    totalSpent: number;
+interface BookingByStatus {
+    _id: string;
+    count: number;
 }
 
 interface DashboardData {
@@ -87,15 +65,27 @@ interface DashboardData {
     monthlyBookings: MonthlyBooking[];
 }
 
+interface MetricCardConfig {
+    label: string;
+    value: string;
+    bg: string;
+    accent: string;
+    iconName: string;
+    iconLib: 'MaterialCommunityIcons' | 'Ionicons' | 'FontAwesome5';
+}
+
+interface ActivityItem {
+    iconName: string;
+    iconLib: 'MaterialCommunityIcons' | 'Ionicons' | 'FontAwesome5';
+    text: string;
+    time: string;
+    color: string;
+    dot: string;
+}
+
 // ── Animated metric card ─────────────────────────────────────────────────────
 
-const MetricCard = ({
-    card,
-    delay,
-}: {
-    card: { label: string; value: string; bg: string; accent: string; icon: string };
-    delay: number;
-}) => {
+const MetricCard = ({ card, delay }: { card: MetricCardConfig; delay: number }) => {
     const anim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -107,6 +97,13 @@ const MetricCard = ({
             friction: 8,
         }).start();
     }, []);
+
+    const IconComponent =
+        card.iconLib === 'MaterialCommunityIcons'
+            ? MaterialCommunityIcons
+            : card.iconLib === 'FontAwesome5'
+            ? FontAwesome5
+            : Ionicons;
 
     return (
         <Animated.View
@@ -127,7 +124,7 @@ const MetricCard = ({
             ]}
         >
             <View style={[styles.metricIconBubble, { backgroundColor: card.accent + '22' }]}>
-                <Text style={styles.metricIcon}>{card.icon}</Text>
+                <IconComponent name={card.iconName} size={24} color={card.accent} />
             </View>
             <Text style={[styles.metricValue, { color: card.accent }]}>{card.value}</Text>
             <Text style={styles.metricLabel}>{card.label}</Text>
@@ -147,13 +144,14 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
 
+    const rootNav = useCallback(
+        () => navigation.getParent<NativeStackNavigationProp<RootStackParamList>>(),
+        [navigation],
+    );
+
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(headerAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
+            Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
             Animated.timing(contentAnim, {
                 toValue: 1,
                 duration: 600,
@@ -163,15 +161,11 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         ]).start();
     }, []);
 
-    const fetchDashboardData = async (isRefreshing = false) => {
+    const fetchDashboardData = useCallback(async (isRefreshing = false) => {
         try {
             if (!isRefreshing) setLoading(true);
-
             const response = await dashboardService.dashboardStats();
-
-            // API returns { success, data: { summary, recentBookings, ... } }
-            if (response.data?.success) {
-                console.log('dashboad response : ',response.data.data);
+            if (response?.data?.success) {
                 setDashboardData(response.data.data as DashboardData);
             }
         } catch (error) {
@@ -180,34 +174,33 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             setLoading(false);
             if (isRefreshing) setRefreshing(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchDashboardData();
-    }, []);
+    }, [fetchDashboardData]);
 
-    const onRefresh = () => {
+    const onRefresh = useCallback(() => {
         setRefreshing(true);
         fetchDashboardData(true);
-    };
+    }, [fetchDashboardData]);
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    const getGreeting = () => {
+    const getGreeting = (): string => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good morning';
         if (hour < 17) return 'Good afternoon';
         return 'Good evening';
     };
 
-    const getUserInitials = () => {
+    const getUserInitials = (): string => {
         if (!user?.name) return 'U';
-        const names = user.name.split(' ');
-        if (names.length >= 2) return `${names[0][0]}${names[1][0]}`.toUpperCase();
+        const parts = user.name.trim().split(' ');
+        if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
         return user.name.substring(0, 2).toUpperCase();
     };
 
-    /** Primary service name from a booking's selectedServices array */
     const getPrimaryServiceName = (booking: Booking): string => {
         if (!booking.selectedServices?.length) return 'Service';
         const first = booking.selectedServices[0].serviceName;
@@ -215,149 +208,189 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         return extra > 0 ? `${first} +${extra} more` : first;
     };
 
-    const getTimeAgo = (date: Date) => {
+    const getTimeAgo = (date: Date): string => {
         const diffMs = Date.now() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
+        if (diffMs < 0) return 'just now';
+        const diffMins = Math.floor(diffMs / 60_000);
+        if (diffMins < 1) return 'just now';
         if (diffMins < 60) return `${diffMins}m ago`;
+        const diffHours = Math.floor(diffMs / 3_600_000);
         if (diffHours < 24) return `${diffHours}h ago`;
+        const diffDays = Math.floor(diffMs / 86_400_000);
         if (diffDays === 1) return 'Yesterday';
         return `${diffDays}d ago`;
     };
 
-    const formatDate = (dateString: string) =>
-        new Date(dateString).toLocaleDateString('en-US', {
+    // Booking.createdAt is Date | undefined per the interface
+    const formatDate = (date?: Date): string => {
+        if (!date) return '—';
+        return new Date(date).toLocaleDateString('en-IN', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
         });
+    };
+
+    const formatCurrency = (amount: number): string => `₹${amount.toLocaleString('en-IN')}`;
+
+    // ── Derived flags ─────────────────────────────────────────────────────────
+
+    const isAdminOrStaff = Boolean(user?.isStaff || user?.role === 'admin');
+
+    // ── Status meta ───────────────────────────────────────────────────────────
+
+    const statusMeta: Record<
+        string,
+        {
+            iconName: string;
+            iconLib: 'MaterialCommunityIcons' | 'Ionicons';
+            bg: string;
+            dot: string;
+        }
+    > = {
+        completed: {
+            iconName: 'checkmark-circle',
+            iconLib: 'Ionicons',
+            bg: '#E6FFF5',
+            dot: '#00D4A0',
+        },
+        accepted: {
+            iconName: 'clipboard-text',
+            iconLib: 'MaterialCommunityIcons',
+            bg: '#E8F9FF',
+            dot: '#00B4E8',
+        },
+        'in-progress': { iconName: 'sync', iconLib: 'Ionicons', bg: '#F0EEFF', dot: '#7C4DFF' },
+        cancelled: { iconName: 'close-circle', iconLib: 'Ionicons', bg: '#FFE8E8', dot: '#E53935' },
+        pending: { iconName: 'time', iconLib: 'Ionicons', bg: '#FFF8E6', dot: '#F5A623' },
+    };
+
+    // bookingStatus is optional on Booking, so always provide a fallback
+    const getStatusMeta = (status?: Booking['bookingStatus']) =>
+        statusMeta[status ?? 'pending'] ?? statusMeta.pending;
 
     // ── Metric cards ─────────────────────────────────────────────────────────
 
-    const getMetricCards = () => {
+    const getMetricCards = (): MetricCardConfig[] => {
         if (!dashboardData) return [];
         const { summary } = dashboardData;
 
-        if (!user?.isStaff && user?.role !== 'admin') {
-            // Patient view
+        if (!isAdminOrStaff) {
             return [
                 {
                     label: 'Upcoming',
-                    value: summary.upcomingBookingsCount.toString(),
+                    value: String(summary.upcomingBookingsCount),
                     bg: '#E8F9FF',
                     accent: '#00B4E8',
-                    icon: '📅',
+                    iconName: 'calendar-outline',
+                    iconLib: 'Ionicons',
                 },
                 {
                     label: 'Total Bookings',
-                    value: summary.totalBookings.toString(),
+                    value: String(summary.totalBookings),
                     bg: '#E6FFF5',
                     accent: '#00D4A0',
-                    icon: '📋',
+                    iconName: 'clipboard-text-outline',
+                    iconLib: 'MaterialCommunityIcons',
                 },
                 {
                     label: 'Completed',
-                    value: summary.completedBookings.toString(),
+                    value: String(summary.completedBookings),
                     bg: '#FFF8E6',
                     accent: '#F5A623',
-                    icon: '✅',
+                    iconName: 'checkmark-done-circle-outline',
+                    iconLib: 'Ionicons',
                 },
                 {
                     label: 'Cancelled',
-                    value: summary.cancelledBookings.toString(),
+                    value: String(summary.cancelledBookings),
                     bg: '#FFE8F5',
                     accent: '#E91E63',
-                    icon: '❌',
+                    iconName: 'close-circle-outline',
+                    iconLib: 'Ionicons',
                 },
             ];
         }
 
-        // Admin / staff view
         return [
             {
                 label: 'Total Bookings',
-                value: summary.totalBookings.toString(),
+                value: String(summary.totalBookings),
                 bg: '#E8F9FF',
                 accent: '#00B4E8',
-                icon: '📅',
+                iconName: 'calendar-outline',
+                iconLib: 'Ionicons',
             },
             {
                 label: 'Upcoming',
-                value: summary.upcomingBookingsCount.toString(),
+                value: String(summary.upcomingBookingsCount),
                 bg: '#E6FFF5',
                 accent: '#00D4A0',
-                icon: '🗓️',
+                iconName: 'calendar-month-outline',
+                iconLib: 'MaterialCommunityIcons',
             },
             {
                 label: 'Completed',
-                value: summary.completedBookings.toString(),
+                value: String(summary.completedBookings),
                 bg: '#FFF8E6',
                 accent: '#F5A623',
-                icon: '✅',
+                iconName: 'checkmark-done-outline',
+                iconLib: 'Ionicons',
             },
             {
                 label: 'Cancelled',
-                value: summary.cancelledBookings.toString(),
+                value: String(summary.cancelledBookings),
                 bg: '#FFE8F5',
                 accent: '#E91E63',
-                icon: '❌',
+                iconName: 'close-circle-outline',
+                iconLib: 'Ionicons',
             },
         ];
     };
 
     // ── Activity feed ─────────────────────────────────────────────────────────
 
-    const getActivityFeed = () => {
+    const getActivityFeed = (): ActivityItem[] => {
         if (!dashboardData?.recentBookings?.length) return [];
 
-        const statusMeta: Record<string, { icon: string; bg: string; dot: string }> = {
-            completed: { icon: '✅', bg: '#E6FFF5', dot: '#00D4A0' },
-            confirmed: { icon: '📋', bg: '#E8F9FF', dot: '#00B4E8' },
-            cancelled: { icon: '❌', bg: '#FFE8E8', dot: '#E53935' },
-            pending:   { icon: '⏳', bg: '#FFF8E6', dot: '#F5A623' },
-        };
-
-        return dashboardData.recentBookings.slice(0, 3).map((booking) => {
-            const meta = statusMeta[booking.bookingStatus] ?? statusMeta.pending;
+        return dashboardData.recentBookings.slice(0, 3).map(booking => {
+            const meta = getStatusMeta(booking.bookingStatus);
             return {
-                icon: meta.icon,
-                text: `${getPrimaryServiceName(booking)} — ${booking.bookingStatus}`,
-                time: getTimeAgo(new Date(booking.createdAt)),
+                iconName: meta.iconName,
+                iconLib: meta.iconLib,
+                text: `${getPrimaryServiceName(booking)} — ${booking.bookingStatus ?? 'pending'}`,
+                // createdAt is Date | undefined on Booking
+                time: booking.createdAt ? getTimeAgo(new Date(booking.createdAt)) : '—',
                 color: meta.bg,
                 dot: meta.dot,
-                patientName: booking.patientName,
             };
         });
     };
 
-    // ── Next appointment — taken from upcomingBookings ────────────────────────
+    // ── Next appointment ──────────────────────────────────────────────────────
 
-    const getNextAppointment = (): Booking | null => {
-        if (!dashboardData?.upcomingBookings?.length) return null;
-        return dashboardData.upcomingBookings[0];
-    };
+    const getNextAppointment = (): Booking | null => dashboardData?.upcomingBookings?.[0] ?? null;
 
+    // Booking has no _id in the public interface; the backend always returns one.
+    // We cast to access it rather than adding an extra interface.
     const handleViewBooking = (booking: Booking) => {
-        navigation
-            .getParent<NativeStackNavigationProp<RootStackParamList>>()
-            .navigate('BookingDetail', { bookingId: booking._id });
+        rootNav().navigate('BookingDetail', {
+            bookingId: (booking as Booking & { _id: string })._id,
+        });
     };
 
-    // ── Revenue totals for admin banner ──────────────────────────────────────
+    // ── Revenue total for admin banner ────────────────────────────────────────
 
-    const getTotalRevenue = () => {
-        if (!dashboardData) return 0;
-        return dashboardData.monthlyBookings.reduce((sum, m) => sum + m.spent, 0);
-    };
+    const getTotalRevenue = (): number =>
+        dashboardData?.monthlyBookings?.reduce((sum, m) => sum + (m.spent ?? 0), 0) ?? 0;
 
     // ── Render ────────────────────────────────────────────────────────────────
 
     if (loading && !dashboardData) {
         return (
-            <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[styles.root, styles.centered]}>
                 <ActivityIndicator size="large" color={Colors.gradientStart} />
-                <Text style={[styles.menuLabel, { marginTop: 12 }]}>Loading dashboard...</Text>
+                <Text style={[styles.menuLabel, { marginTop: 12 }]}>Loading dashboard…</Text>
             </View>
         );
     }
@@ -369,8 +402,6 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
             {/* ── Header ── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -399,8 +430,15 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                 >
                     <View style={styles.headerRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.greeting}>{getGreeting()} 👋</Text>
-                            <Text style={styles.name}>{user?.name || 'User'}</Text>
+                            <View style={styles.greetingRow}>
+                                <Text style={styles.greeting}>{getGreeting()} </Text>
+                                <Ionicons
+                                    name="hand-right"
+                                    size={16}
+                                    color="rgba(255,255,255,0.85)"
+                                />
+                            </View>
+                            <Text style={styles.name}>{user?.name ?? 'User'}</Text>
                             <View style={styles.statusPill}>
                                 <View style={styles.statusDot} />
                                 <Text style={styles.statusText}>
@@ -417,12 +455,10 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                     </View>
 
                     {/* Patient summary banner */}
-                    {!user?.isStaff && user?.role !== 'admin' && summary && (
+                    {!isAdminOrStaff && summary && (
                         <View style={styles.healthBanner}>
                             <View style={styles.healthScoreBlock}>
-                                <Text style={styles.healthScoreNum}>
-                                    {summary.totalBookings}
-                                </Text>
+                                <Text style={styles.healthScoreNum}>{summary.totalBookings}</Text>
                                 <Text style={styles.healthScoreLabel}>Total{'\n'}Bookings</Text>
                             </View>
                             <View style={styles.healthDivider} />
@@ -441,7 +477,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                 </View>
                                 <View style={styles.healthStat}>
                                     <Text style={styles.healthStatVal}>
-                                        ₹{summary.totalSpent.toLocaleString()}
+                                        {formatCurrency(summary.totalSpent)}
                                     </Text>
                                     <Text style={styles.healthStatKey}>Spent</Text>
                                 </View>
@@ -450,7 +486,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                     )}
 
                     {/* Admin / staff revenue banner */}
-                    {(user?.isStaff || user?.role === 'admin') && summary && (
+                    {isAdminOrStaff && summary && (
                         <View style={styles.healthBanner}>
                             <View style={styles.healthScoreBlock}>
                                 <Text style={styles.healthScoreNum}>
@@ -487,7 +523,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             {/* ── Scrollable Content ── */}
             <Animated.View
                 style={[
-                    { flex: 1 },
+                    styles.contentWrapper,
                     {
                         opacity: contentAnim,
                         transform: [
@@ -527,25 +563,25 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         <TouchableOpacity
                             style={[styles.quickActionBtn, { flex: 1.6 }]}
                             activeOpacity={0.8}
-                            onPress={() =>
-                                navigation
-                                    .getParent<NativeStackNavigationProp<RootStackParamList>>()
-                                    .navigate('Booking')
-                            }
+                            onPress={() => rootNav().navigate('Booking')}
                         >
                             <LinearGradient
-                                colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+                                colors={[
+                                    Colors.gradientStart,
+                                    Colors.gradientMid,
+                                    Colors.gradientEnd,
+                                ]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.quickActionGradient}
                             >
-                                <Text style={styles.quickActionIcon}>📅</Text>
+                                <Ionicons name="calendar" size={28} color="#fff" />
                                 <Text style={styles.quickActionText}>Book Service</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
 
-                    {/* Next Appointment — from upcomingBookings[0] */}
+                    {/* Next Appointment */}
                     {nextAppointment && (
                         <>
                             <Text style={styles.sectionLabel}>Next Appointment</Text>
@@ -558,64 +594,92 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                 />
                                 <View style={styles.appointmentHeader}>
                                     <View style={styles.apptIconWrap}>
-                                        <Text style={styles.apptIconEmoji}>🏥</Text>
+                                        <MaterialCommunityIcons
+                                            name="hospital-building"
+                                            size={26}
+                                            color="#00B4E8"
+                                        />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.apptType}>
+                                        <Text style={styles.apptType} numberOfLines={2}>
                                             {getPrimaryServiceName(nextAppointment)}
                                         </Text>
                                         <Text style={styles.apptSub}>
                                             Patient: {nextAppointment.patientName}
                                         </Text>
                                     </View>
-                                    <View style={styles.apptBadge}>
+                                    <View
+                                        style={[
+                                            styles.apptBadge,
+                                            {
+                                                backgroundColor: getStatusMeta(
+                                                    nextAppointment.bookingStatus,
+                                                ).bg,
+                                            },
+                                        ]}
+                                    >
                                         <Text style={styles.apptBadgeText}>
-                                            {nextAppointment.bookingStatus.charAt(0).toUpperCase() +
-                                                nextAppointment.bookingStatus.slice(1)}
+                                            {(nextAppointment.bookingStatus ?? 'pending')
+                                                .charAt(0)
+                                                .toUpperCase() +
+                                                (nextAppointment.bookingStatus ?? 'pending').slice(
+                                                    1,
+                                                )}
                                         </Text>
                                     </View>
                                 </View>
 
                                 <View style={styles.apptTimeRow}>
                                     <View style={styles.apptTimeChip}>
-                                        <Text style={styles.apptTimeIcon}>📅</Text>
+                                        <Ionicons
+                                            name="calendar-outline"
+                                            size={14}
+                                            color={Colors.textDark}
+                                        />
                                         <Text style={styles.apptTimeText}>
                                             {formatDate(nextAppointment.createdAt)}
                                         </Text>
                                     </View>
                                     <View style={styles.apptTimeChip}>
-                                        <Text style={styles.apptTimeIcon}>⏰</Text>
-                                        <Text style={styles.apptTimeText}>
+                                        <Ionicons
+                                            name="time-outline"
+                                            size={14}
+                                            color={Colors.textDark}
+                                        />
+                                        <Text style={styles.apptTimeText} numberOfLines={1}>
                                             {nextAppointment.preferredTimeSlot}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {/* Grand total chip */}
+                                {/* Amount row */}
                                 <View style={styles.apptTotalRow}>
                                     <Text style={styles.apptTotalLabel}>Total Amount</Text>
                                     <Text style={styles.apptTotalValue}>
-                                        ₹{nextAppointment.grandTotal.toLocaleString()}
+                                        {formatCurrency(nextAppointment.grandTotal)}
                                     </Text>
                                 </View>
 
-                                {nextAppointment.vendorId && (
-                                    <View style={styles.apptNurseRow}>
-                                        <View style={styles.nurseAvatar}>
-                                            <Text style={styles.nurseAvatarText}>
-                                                {nextAppointment.vendorId.name
-                                                    .substring(0, 2)
-                                                    .toUpperCase()}
+                                {/* Coupon discount row */}
+                                {!!nextAppointment.appliedCoupon?.discountAmount && (
+                                    <View style={styles.discountRow}>
+                                        <View style={styles.discountLabelRow}>
+                                            <MaterialCommunityIcons
+                                                name="tag"
+                                                size={14}
+                                                color="#00A070"
+                                            />
+                                            <Text style={styles.discountLabel}>
+                                                Coupon (
+                                                {nextAppointment.appliedCoupon.couponCode ?? '—'})
                                             </Text>
                                         </View>
-                                        <View>
-                                            <Text style={styles.nurseName}>
-                                                {nextAppointment.vendorId.name}
-                                            </Text>
-                                            <Text style={styles.nurseRating}>
-                                                {nextAppointment.vendorId.businessName}
-                                            </Text>
-                                        </View>
+                                        <Text style={styles.discountValue}>
+                                            -
+                                            {formatCurrency(
+                                                nextAppointment.appliedCoupon.discountAmount,
+                                            )}
+                                        </Text>
                                     </View>
                                 )}
 
@@ -630,8 +694,10 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                         end={{ x: 1, y: 0 }}
                                         style={styles.viewDetailsBtnInner}
                                     >
-                                        <Text style={styles.viewDetailsBtnText}>View Full Details</Text>
-                                        <Text style={styles.viewDetailsBtnArrow}>→</Text>
+                                        <Text style={styles.viewDetailsBtnText}>
+                                            View Full Details
+                                        </Text>
+                                        <Ionicons name="arrow-forward" size={16} color="#fff" />
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
@@ -639,33 +705,48 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                     )}
 
                     {/* Most Used Services */}
-                    {(dashboardData?.mostUsedServices as MostUsedService[])?.length > 0 && (
+                    {(dashboardData?.mostUsedServices?.length ?? 0) > 0 && (
                         <>
                             <Text style={styles.sectionLabel}>Top Services</Text>
                             <View style={styles.activityFeed}>
-                                {dashboardData?.mostUsedServices.slice(0, 3).map((svc, idx, arr) => (
-                                    <View
-                                        key={svc._id}
-                                        style={[
-                                            styles.activityItem,
-                                            idx < arr.length - 1 && styles.activityItemBorder,
-                                        ]}
-                                    >
+                                {dashboardData!.mostUsedServices
+                                    .slice(0, 3)
+                                    .map((svc, idx, arr) => (
                                         <View
-                                            style={[styles.activityIconWrap, { backgroundColor: '#E8F9FF' }]}
+                                            key={svc._id}
+                                            style={[
+                                                styles.activityItem,
+                                                idx < arr.length - 1 && styles.activityItemBorder,
+                                            ]}
                                         >
-                                            <Text style={styles.activityEmoji}>🏥</Text>
+                                            <View
+                                                style={[
+                                                    styles.activityIconWrap,
+                                                    { backgroundColor: '#E8F9FF' },
+                                                ]}
+                                            >
+                                                <MaterialCommunityIcons
+                                                    name="hospital-building"
+                                                    size={20}
+                                                    color="#00B4E8"
+                                                />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.activityText}>{svc._id}</Text>
+                                                <Text style={styles.activityTime}>
+                                                    {svc.count} booking
+                                                    {svc.count !== 1 ? 's' : ''} ·{' '}
+                                                    {formatCurrency(svc.totalSpent)}
+                                                </Text>
+                                            </View>
+                                            <View
+                                                style={[
+                                                    styles.activityDot,
+                                                    { backgroundColor: '#00B4E8' },
+                                                ]}
+                                            />
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.activityText}>{svc._id}</Text>
-                                            <Text style={styles.activityTime}>
-                                                {svc.count} booking{svc.count !== 1 ? 's' : ''} · ₹
-                                                {svc.totalSpent.toLocaleString()}
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.activityDot, { backgroundColor: '#00B4E8' }]} />
-                                    </View>
-                                ))}
+                                    ))}
                             </View>
                         </>
                     )}
@@ -675,67 +756,74 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         <>
                             <Text style={styles.sectionLabel}>Recent Activity</Text>
                             <View style={styles.activityFeed}>
-                                {activityFeed.map((item, idx) => (
-                                    <View
-                                        key={idx}
-                                        style={[
-                                            styles.activityItem,
-                                            idx < activityFeed.length - 1 && styles.activityItemBorder,
-                                        ]}
-                                    >
+                                {activityFeed.map((item, idx) => {
+                                    const IconComponent =
+                                        item.iconLib === 'MaterialCommunityIcons'
+                                            ? MaterialCommunityIcons
+                                            : item.iconLib === 'FontAwesome5'
+                                            ? FontAwesome5
+                                            : Ionicons;
+
+                                    return (
                                         <View
+                                            key={idx}
                                             style={[
-                                                styles.activityIconWrap,
-                                                { backgroundColor: item.color },
+                                                styles.activityItem,
+                                                idx < activityFeed.length - 1 &&
+                                                    styles.activityItemBorder,
                                             ]}
                                         >
-                                            <Text style={styles.activityEmoji}>{item.icon}</Text>
+                                            <View
+                                                style={[
+                                                    styles.activityIconWrap,
+                                                    { backgroundColor: item.color },
+                                                ]}
+                                            >
+                                                <IconComponent
+                                                    name={item.iconName}
+                                                    size={20}
+                                                    color={item.dot}
+                                                />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.activityText}>{item.text}</Text>
+                                                <Text style={styles.activityTime}>{item.time}</Text>
+                                            </View>
+                                            <View
+                                                style={[
+                                                    styles.activityDot,
+                                                    { backgroundColor: item.dot },
+                                                ]}
+                                            />
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.activityText}>{item.text}</Text>
-                                            <Text style={styles.activityTime}>{item.time}</Text>
-                                        </View>
-                                        <View
-                                            style={[styles.activityDot, { backgroundColor: item.dot }]}
-                                        />
-                                    </View>
-                                ))}
+                                    );
+                                })}
                             </View>
                         </>
-                    )}
-
-                    {/* Patient tip */}
-                    {!user?.isStaff && user?.role !== 'admin' && (
-                        <View style={styles.tipCard}>
-                            <Text style={styles.tipIcon}>🏆</Text>
-                            <Text style={styles.tipText}>
-                                Welcome to your health dashboard! Book appointments and track your
-                                health journey.
-                            </Text>
-                        </View>
                     )}
 
                     {/* Empty state */}
                     {summary?.totalBookings === 0 && (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyIcon}>📋</Text>
+                            <MaterialCommunityIcons
+                                name="clipboard-text-outline"
+                                size={64}
+                                color={Colors.textMuted}
+                            />
                             <Text style={styles.emptyTitle}>No bookings yet</Text>
                             <Text style={styles.emptyText}>
                                 Start your health journey by booking your first service
                             </Text>
                             <TouchableOpacity
                                 style={styles.emptyButton}
-                                onPress={() =>
-                                    navigation
-                                        .getParent<NativeStackNavigationProp<RootStackParamList>>()
-                                        .navigate('Booking')
-                                }
+                                onPress={() => rootNav().navigate('Booking')}
                             >
                                 <Text style={styles.emptyButtonText}>Book Now</Text>
                             </TouchableOpacity>
                         </View>
                     )}
                 </ScrollView>
+                <View style={{ marginBottom: 48 }}></View>
             </Animated.View>
         </View>
     );
@@ -745,10 +833,12 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F2F7FA' },
+    centered: { justifyContent: 'center', alignItems: 'center' },
+    contentWrapper: { flex: 1 },
 
     // Header
     header: {
-        paddingTop: 56,
+        paddingTop: 28,
         paddingHorizontal: 20,
         paddingBottom: 24,
         borderBottomLeftRadius: 28,
@@ -775,6 +865,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.07)',
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    greetingRow: { flexDirection: 'row', alignItems: 'center' },
     greeting: { color: 'rgba(255,255,255,0.85)', fontSize: 15 },
     name: {
         color: '#FFFFFF',
@@ -842,7 +933,7 @@ const styles = StyleSheet.create({
     healthStatKey: { color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 },
 
     // Content
-    content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 0 },
+    content: { paddingHorizontal: 16, paddingBottom: 40, gap: 0 },
     sectionLabel: {
         fontSize: 13,
         fontWeight: '700',
@@ -917,7 +1008,6 @@ const styles = StyleSheet.create({
     apptType: { fontSize: 16, fontWeight: '700', color: Colors.textDark },
     apptSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
     apptBadge: {
-        backgroundColor: '#FFF8E6',
         borderRadius: 10,
         paddingHorizontal: 10,
         paddingVertical: 5,
@@ -950,25 +1040,21 @@ const styles = StyleSheet.create({
     },
     apptTotalLabel: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
     apptTotalValue: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
-    apptNurseRow: {
+
+    // Discount row
+    discountRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        backgroundColor: '#F8FCFF',
+        justifyContent: 'space-between',
+        backgroundColor: '#E6FFF5',
         borderRadius: 12,
-        padding: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
     },
-    nurseAvatar: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: Colors.gradientMid + '30',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    nurseAvatarText: { fontSize: 13, fontWeight: '700', color: Colors.gradientMid },
-    nurseName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
-    nurseRating: { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
+    discountLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    discountLabel: { fontSize: 12, color: '#00A070', fontWeight: '600' },
+    discountValue: { fontSize: 13, fontWeight: '700', color: '#00A070' },
+
     viewDetailsBtn: { borderRadius: 14, overflow: 'hidden' },
     viewDetailsBtnInner: {
         flexDirection: 'row',
