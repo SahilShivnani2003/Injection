@@ -2,10 +2,36 @@ import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { FieldInput } from '../../../components/FieldInput';
+import { BookingFormData } from '../screens/BookingScreen';
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
 
-// ── Sex selector pill group ──────────────────────────────────────────────────
+/* ─────────────────────── Types ─────────────────────── */
+
+/** Subset of BookingFormData that lives in Step 1 */
+export interface BasicDetails {
+    patientName: string;
+    age: string;
+    sex: string;
+    address: string;
+    pincode: string;
+    currentLocation: string;
+    phoneNumber: string;
+    email: string;
+}
+
+interface BasicDetailsScreenProps {
+    basicDetails: BasicDetails;
+    /**
+     * FIX: Accepts a (field, value) pair instead of a functional updater.
+     * This prevents the field-clearing bug caused by passing a function into
+     * BookingScreen's setFormData spread.
+     */
+    onChange: (field: keyof BookingFormData, value: string) => void;
+}
+
+/* ─────────────────────── Sex selector ─────────────────────── */
+
 const SexSelector: React.FC<{ value: string; onChange: (v: string) => void }> = ({
     value,
     onChange,
@@ -34,7 +60,8 @@ const SexSelector: React.FC<{ value: string; onChange: (v: string) => void }> = 
     </View>
 );
 
-// ── Section divider ──────────────────────────────────────────────────────────
+/* ─────────────────────── Section divider ─────────────────────── */
+
 const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
     <View style={styles.sectionRow}>
         <View style={styles.sectionLine} />
@@ -43,53 +70,39 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
     </View>
 );
 
-// ── Main Screen ──────────────────────────────────────────────────────────────
-const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
-    const handlePatientName = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, patientName: v })),
-        [setBasicDetails], // ✅ dependency add karo
-    );
+/* ─────────────────────── Main Screen ─────────────────────── */
 
+const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, onChange }) => {
+    /**
+     * Each handler calls onChange(fieldName, value) — a direct field update.
+     * This avoids the previous pattern of calling setBasicDetails(prev => ...)
+     * which passed a function into BookingScreen's setState spread and caused
+     * every field to clear on each keystroke.
+     */
+    const handlePatientName = useCallback((v: string) => onChange('patientName', v), [onChange]);
     const handleAge = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, age: v.replace(/[^0-9]/g, '') })),
-        [setBasicDetails],
+        (v: string) => onChange('age', v.replace(/[^0-9]/g, '')),
+        [onChange],
     );
-
-    const handleSex = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, sex: v })),
-        [setBasicDetails],
-    );
-
-    const handleAddress = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, address: v })),
-        [setBasicDetails],
-    );
-
+    const handleSex = useCallback((v: string) => onChange('sex', v), [onChange]);
+    const handleAddress = useCallback((v: string) => onChange('address', v), [onChange]);
     const handlePincode = useCallback(
-        (v: string) =>
-            setBasicDetails((prev: any) => ({ ...prev, pincode: v.replace(/[^0-9]/g, '') })),
-        [setBasicDetails],
+        (v: string) => onChange('pincode', v.replace(/[^0-9]/g, '')),
+        [onChange],
     );
-
     const handleCurrentLocation = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, currentLocation: v })),
-        [setBasicDetails],
+        (v: string) => onChange('currentLocation', v),
+        [onChange],
     );
-
     const handlePhone = useCallback(
-        (v: string) =>
-            setBasicDetails((prev: any) => ({ ...prev, phoneNumber: v.replace(/[^0-9]/g, '') })),
-        [setBasicDetails],
+        (v: string) => onChange('phoneNumber', v.replace(/[^0-9]/g, '')),
+        [onChange],
     );
-
-    const handleEmail = useCallback(
-        (v: string) => setBasicDetails((prev: any) => ({ ...prev, email: v })),
-        [setBasicDetails],
-    );
+    const handleEmail = useCallback((v: string) => onChange('email', v), [onChange]);
 
     return (
         <View style={styles.root}>
-            {/* ── Personal info ──────────────────────────────────────── */}
+            {/* ── Personal Info ── */}
             <SectionLabel title="Personal Info" />
 
             <FieldInput
@@ -97,6 +110,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 required
                 value={basicDetails.patientName}
                 onChangeText={handlePatientName}
+                placeholder="Full name of patient"
             />
 
             <View style={styles.rowTwo}>
@@ -104,10 +118,11 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                     <FieldInput
                         label="Age"
                         required
-                        value={String(basicDetails.age)}
+                        value={basicDetails.age}
                         onChangeText={handleAge}
                         keyboardType="number-pad"
                         maxLength={3}
+                        placeholder="Years"
                     />
                 </View>
                 <View style={styles.rowHalf}>
@@ -115,7 +130,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 </View>
             </View>
 
-            {/* ── Location ───────────────────────────────────────────── */}
+            {/* ── Location ── */}
             <SectionLabel title="Location" />
 
             <FieldInput
@@ -124,6 +139,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                 value={basicDetails.address}
                 onChangeText={handleAddress}
                 multiline
+                placeholder="House no., street, locality"
             />
 
             <View style={styles.rowTwo}>
@@ -135,6 +151,7 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                         onChangeText={handlePincode}
                         keyboardType="number-pad"
                         maxLength={6}
+                        placeholder="6-digit"
                     />
                 </View>
                 <View style={styles.rowHalf}>
@@ -143,31 +160,38 @@ const BasicDetailsScreen = ({ basicDetails, setBasicDetails }: any) => {
                         required
                         value={basicDetails.currentLocation}
                         onChangeText={handleCurrentLocation}
+                        placeholder="Landmark / area"
                         rightIcon={<Text style={styles.pinIcon}>📍</Text>}
                     />
                 </View>
             </View>
 
-            {/* ── Contact (optional) ─────────────────────────────────── */}
-            <SectionLabel title="Contact (Optional)" />
+            {/* ── Contact ── */}
+            <SectionLabel title="Contact" />
 
             <FieldInput
                 label="Phone Number"
+                required
                 value={basicDetails.phoneNumber}
                 onChangeText={handlePhone}
                 keyboardType="phone-pad"
                 maxLength={10}
+                placeholder="10-digit mobile number"
             />
 
             <FieldInput
                 label="Email Address"
+                required
                 value={basicDetails.email}
                 onChangeText={handleEmail}
                 keyboardType="email-address"
+                placeholder="you@example.com"
             />
         </View>
     );
 };
+
+/* ─────────────────────── Styles ─────────────────────── */
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: Colors.white },
@@ -183,7 +207,6 @@ const styles = StyleSheet.create({
     },
     required: { color: Colors.gradientStart },
 
-    // Section divider
     sectionRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -201,19 +224,10 @@ const styles = StyleSheet.create({
     },
     pinIcon: { fontSize: 18 },
 
-    // Two-column layout
-    rowTwo: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 0,
-    },
+    rowTwo: { flexDirection: 'row', gap: 12, marginBottom: 0 },
     rowHalf: { flex: 1 },
 
-    // Sex pills
-    pillRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
+    pillRow: { flexDirection: 'row', gap: 8 },
     pill: {
         flex: 1,
         height: 52,
@@ -228,15 +242,8 @@ const styles = StyleSheet.create({
         borderColor: Colors.gradientStart,
         backgroundColor: '#E6FAF5',
     },
-    pillText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: Colors.textMuted,
-    },
-    pillTextActive: {
-        color: Colors.gradientStart,
-        fontWeight: '800',
-    },
+    pillText: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+    pillTextActive: { color: Colors.gradientStart, fontWeight: '800' },
 });
 
 export default BasicDetailsScreen;

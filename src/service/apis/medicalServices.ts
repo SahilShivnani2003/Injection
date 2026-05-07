@@ -1,7 +1,7 @@
 import { privateClient, publicClient } from "../apiClient";
 
 export const serviceAPI = {
-    createService: (data:any) => publicClient.post('/services/create', data),
+    createService: (data:any) => privateClient.post('/services/create', data),
     getAllServices: () => publicClient.get('/services'),
     vendorServices: () => privateClient.get(`/services/vendor/me`),
     getServiceByVendorID: (vendorId:string) => publicClient.get(`/services/vendor/${vendorId}`),
@@ -9,5 +9,5 @@ export const serviceAPI = {
     getServiceById: (serviceId:string) => publicClient.get(`/services/${serviceId}`),
     updateService: (serviceId:string, data:any) => privateClient.put(`/services/${serviceId}`, data),
     deleteService: (serviceId:string) => privateClient.delete(`/services/${serviceId}`),
-    toggleServiceStatus: (serviceId:string, status:boolean) => privateClient.patch(`/services/${serviceId}/toggle-status`, { status }),
+    toggleServiceStatus: (serviceId:string) => privateClient.put(`/services/${serviceId}/toggle-status`),
 }

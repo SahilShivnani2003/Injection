@@ -11,15 +11,12 @@ import {
     Dimensions,
     Modal,
     Platform,
-    ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import { Colors } from '../../../theme/colors';
-import { SelectedService } from '@/types/booking';
 import { UploadedFile } from '../screens/BookingScreen';
-import { serviceAPI } from '@/service/apis/medicalServices';
 import { Service } from '@/features/vendorService/types/Service';
 
 const { width } = Dimensions.get('window');

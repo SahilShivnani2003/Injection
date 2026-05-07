@@ -61,7 +61,7 @@ const SummaryRow: React.FC<{
 /* ─────────────────────── Main Screen ─────────────────────── */
 
 const ChargesScreen: React.FC<ChargesScreenProps> = ({ selectedServices }) => {
-    const subtotal = selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0);
+    const subtotal = selectedServices.reduce((sum, s) => sum + s.price * (s.quantity ?? 1), 0);
     const gstAmount = Math.round(subtotal * 0.18);
     const grandTotal = subtotal + gstAmount;
 

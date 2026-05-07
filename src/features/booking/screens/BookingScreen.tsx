@@ -11,6 +11,7 @@ import {
     Easing,
     StatusBar,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { Colors, Fonts, Spacing } from '../../../theme/colors';
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,6 +29,7 @@ import { bookingAPI } from '@/service/apis/bookingService';
 import { ComplimentaryService, Gender, SelectedService, StaffPreference } from '@/types/booking';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { Booking } from '../types/Booking';
+import { useAlert } from '@/context/AlertContext';
 
 const RADIUS = 32;
 const { width, height } = Dimensions.get('window');
@@ -40,7 +42,6 @@ export interface UploadedFile {
     type: 'image' | 'document';
 }
 
-/** All form data collected across all 6 steps */
 export interface BookingFormData {
     // Step 1 — Basic Details
     patientName: string;
@@ -51,26 +52,18 @@ export interface BookingFormData {
     currentLocation: string;
     phoneNumber: string;
     email: string;
-
     // Step 2 — Service Selection
     selectedServices: SelectedService[];
+    // Step 3 — Requirements
     additionalRequirements: string;
     uploadedFile: UploadedFile | null;
     hasInsurance: boolean;
     insurancePolicyNumber: string;
-
-    // Step 3 — Requirements
-    // (additionalRequirements, uploadedFile, hasInsurance, insurancePolicyNumber are handled in Step 2 above)
-
     // Step 4 — Slot Booking
     selectedDate: string | null;
     selectedTime: string | null;
     staffPreference: StaffPreference;
-
-    // Step 5 — Review & Charges
-    // (No additional data collected, just review of previous steps)
-
-    // Step 6 — Complimentary Service Selection
+    // Step 6 — Complimentary
     freeComplimentaryService: ComplimentaryService;
 }
 
@@ -86,12 +79,7 @@ const steps: IStepType[] = [
         subtitle: 'Choose your tests',
         icon: 'checkmark-circle-outline',
     },
-    {
-        id: 3,
-        title: 'Requirements',
-        subtitle: 'Additional details',
-        icon: 'document-text-outline',
-    },
+    { id: 3, title: 'Requirements', subtitle: 'Additional details', icon: 'document-text-outline' },
     { id: 4, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
     {
         id: 5,
@@ -107,44 +95,54 @@ const steps: IStepType[] = [
     },
 ];
 
+const FORM_DEFAULTS = (user: any): BookingFormData => ({
+    patientName: user?.name ?? '',
+    age: user?.age ? String(user.age) : '',
+    sex: user?.gender ?? '',
+    address: user?.address ?? '',
+    pincode: user?.pincode ?? '',
+    currentLocation: '',
+    phoneNumber: user?.phone ?? '',
+    email: user?.email ?? '',
+    selectedServices: [],
+    additionalRequirements: '',
+    uploadedFile: null,
+    hasInsurance: false,
+    insurancePolicyNumber: '',
+    selectedDate: null,
+    selectedTime: null,
+    staffPreference: 'Any Available',
+    freeComplimentaryService: 'None',
+});
+
 /* ─────────────────────── Component ─────────────────────── */
 
 type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const BookingScreen = ({ navigation }: BookingScreenProps) => {
+    const alert = useAlert();
     const { user } = useAuthStore();
-    const [current, setCurrent] = useState<IStepType>(steps[0]);
+    const [currentStep, setCurrentStep] = useState<IStepType>(steps[0]);
     const [submitting, setSubmitting] = useState(false);
     const total = steps.length;
 
-    /* ── Consolidated form state ── */
-    const [formData, setFormData] = useState<BookingFormData>({
-        // Step 1
-        patientName: user?.name ?? '',
-        age: user?.age ? String(user?.age) : '',
-        sex: user?.gender ?? '',
-        address: user?.address ?? '',
-        pincode: user?.pincode ?? '',
-        currentLocation: '',
-        phoneNumber: user?.phone ?? '',
-        email: user?.email ?? '',
-        // Step 2
-        selectedServices: [],
-        additionalRequirements: '',
-        uploadedFile: null,
-        hasInsurance: false,
-        insurancePolicyNumber: '',
-        // Step 3 — Slot
-        selectedDate: null,
-        selectedTime: null,
-        staffPreference: 'Any Available',
-        // Step 6 — Complimentary
-        freeComplimentaryService: 'None',
-    });
+    // ── Single consolidated form state ──────────────────────────────────────
+    const [formData, setFormData] = useState<BookingFormData>(() => FORM_DEFAULTS(user));
 
-    /** Partial updater — merges any subset of BookingFormData */
-    const update = (patch: Partial<BookingFormData>) =>
+    /**
+     * Type-safe partial updater for any BookingFormData fields.
+     * Usage: update({ patientName: 'John' })
+     */
+    const update = <K extends keyof BookingFormData>(patch: Pick<BookingFormData, K>) =>
         setFormData(prev => ({ ...prev, ...patch }));
+
+    /**
+     * Single-field updater — used by BasicDetailsScreen to avoid
+     * the "field clears on keystroke" bug caused by passing a functional
+     * updater into a spread.
+     */
+    const updateField = (field: keyof BookingFormData, value: any) =>
+        setFormData(prev => ({ ...prev, [field]: value }));
 
     /* ── Animation refs ── */
     const sheetY = useRef(new Animated.Value(60)).current;
@@ -152,6 +150,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     const headerOpacity = useRef(new Animated.Value(0)).current;
     const progressWidth = useRef(new Animated.Value(0)).current;
 
+    // Entry animation — runs once
     useEffect(() => {
         Animated.parallel([
             Animated.timing(headerOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
@@ -171,30 +170,38 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
         ]).start();
     }, []);
 
+    // Progress bar animation — runs on step change
     useEffect(() => {
         Animated.timing(progressWidth, {
-            toValue: (current.id / total) * 100,
+            toValue: (currentStep.id / total) * 100,
             duration: 400,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
         }).start();
-    }, [current.id]);
+    }, [currentStep.id, total]);
 
     /* ── Step validation ── */
+    const warn = (msg: string): false => {
+        Alert.alert('Required', msg);
+        return false;
+    };
+
     const validateStep = (): boolean => {
-        switch (current.id) {
+        switch (currentStep.id) {
             case 1:
                 if (!formData.patientName.trim()) return warn('Please enter patient name.');
                 if (!formData.age || isNaN(Number(formData.age)))
                     return warn('Please enter a valid age.');
                 if (Number(formData.age) <= 0 || Number(formData.age) > 150)
-                    return warn('Please enter a valid age between 1 and 150.');
+                    return warn('Age must be between 1 and 150.');
                 if (!formData.sex) return warn('Please select sex.');
                 if (!formData.address.trim()) return warn('Please enter address.');
                 if (formData.pincode.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
                 if (!formData.currentLocation.trim()) return warn('Please enter current location.');
                 if (!formData.phoneNumber.trim()) return warn('Please enter phone number.');
+                if (formData.phoneNumber.length < 10)
+                    return warn('Please enter a valid 10-digit phone number.');
                 if (!formData.email.trim()) return warn('Please enter email address.');
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
                     return warn('Please enter a valid email address.');
@@ -220,30 +227,24 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
         }
     };
 
-    const warn = (msg: string): false => {
-        Alert.alert('Required', msg);
-        return false;
-    };
-
     /* ── Navigation ── */
     const handleNext = () => {
         if (!validateStep()) return;
-        if (current.id === total) {
+        if (currentStep.id === total) {
             handleConfirm();
         } else {
-            setCurrent(steps[current.id]); // steps is 0-indexed; current.id == next index
+            setCurrentStep(steps[currentStep.id]); // steps is 0-indexed; currentStep.id == next index
         }
     };
 
     const handlePrevious = () => {
-        if (current.id > 1) setCurrent(steps[current.id - 2]);
+        if (currentStep.id > 1) setCurrentStep(steps[currentStep.id - 2]);
     };
 
     /* ── Submit ── */
     const handleConfirm = async () => {
+        setSubmitting(true);
         try {
-            setSubmitting(true);
-
             const subtotal = formData.selectedServices.reduce(
                 (sum, s) => sum + s.price * (s.quantity ?? 1),
                 0,
@@ -251,15 +252,16 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
             const gstAmount = Math.round(subtotal * 0.18);
             const grandTotal = subtotal + gstAmount;
 
-            // Validate sex is a valid Gender type
             const validGenders: Gender[] = ['Male', 'Female', 'Other'];
-            const gender = validGenders.includes(formData.sex as Gender) 
-                ? (formData.sex as Gender) 
+            const gender = validGenders.includes(formData.sex as Gender)
+                ? (formData.sex as Gender)
                 : 'Other';
 
-            const preferredTimeSlot = `${formData.selectedDate || ''} ${formData.selectedTime || ''}`.trim();
+            const preferredTimeSlot = `${formData.selectedDate ?? ''} ${
+                formData.selectedTime ?? ''
+            }`.trim();
             if (!preferredTimeSlot) {
-                Alert.alert('Error', 'Invalid time slot selected. Please go back and select date and time.');
+                Alert.alert('Error', 'Invalid time slot. Please go back and select date and time.');
                 return;
             }
 
@@ -272,28 +274,21 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 currentLocation: formData.currentLocation.trim() || formData.address.trim(),
                 alternateMobile: formData.phoneNumber.trim() || undefined,
                 email: formData.email.trim(),
-
                 selectedServices: formData.selectedServices,
                 additionalRequirements: formData.additionalRequirements.trim() || undefined,
-
-                // Prescriptions will be uploaded separately if file exists
                 prescriptions: [],
-
                 hasInsurance: formData.hasInsurance,
                 insurancePolicyNumber: formData.hasInsurance
                     ? formData.insurancePolicyNumber
                     : undefined,
-
                 subtotal,
                 gstAmount,
                 grandTotal,
-
                 freeComplimentaryService: formData.freeComplimentaryService,
                 preferredTimeSlot,
                 staffPreference: formData.staffPreference,
                 serviceLocation: formData.address.trim(),
                 estimatedDuration: 45,
-
                 userId: user?._id ?? '',
                 vendorId: null,
                 bookingStatus: 'pending',
@@ -302,36 +297,33 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
 
             const response = await bookingAPI.createBooking(payload);
 
-            // Handle file upload if exists (would need prescription upload API)
-            // if (formData.uploadedFile) {
-            //     await prescriptionAPI.upload(response.data.bookingId, formData.uploadedFile);
-            // }
-
-            Alert.alert(
-                'Booking Confirmed! 🎉',
-                `Your appointment on ${preferredTimeSlot} has been booked successfully.`,
-                [{ text: 'Done', onPress: () => navigation.goBack() }],
-            );
+            if (response?.data?.success || response?.data?._id || response?.status === 201) {
+                
+                alert.success('Booking Confirmed! 🎉',
+                    `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
+                navigation.goBack();
+            } else {
+                alert.error('Failed',
+                    response?.data?.message || 'Unable to create booking. Please try again.')
+            }
         } catch (error: any) {
             console.error('Booking error:', error);
-            const errorMessage = error?.response?.data?.message || 
-                                 error?.message || 
-                                 'Failed to create booking. Please try again.';
-            Alert.alert('Error', errorMessage);
+            alert.error('Error',
+                error?.response?.data?.message ?? error?.message ?? 'Failed to create booking.')
         } finally {
             setSubmitting(false);
         }
     };
 
-    /* ── Progress bar ── */
+    /* ── Progress bar interpolation ── */
     const progressWidthInterpolated = progressWidth.interpolate({
         inputRange: [0, 100],
         outputRange: ['0%', '100%'],
     });
 
-    /* ── Screen renderer ── */
+    /* ── Step renderer ── */
     const renderStep = () => {
-        switch (current.id) {
+        switch (currentStep.id) {
             case 1:
                 return (
                     <BasicDetailsScreen
@@ -345,9 +337,12 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                             phoneNumber: formData.phoneNumber,
                             email: formData.email,
                         }}
-                        setBasicDetails={(patch: any) =>
-                            setFormData(prev => ({ ...prev, ...patch }))
-                        }
+                        /**
+                         * FIX: pass updateField (not a functional-updater setter) so
+                         * BasicDetailsScreen can call onChange('patientName', value)
+                         * without triggering the field-clearing bug.
+                         */
+                        onChange={updateField}
                     />
                 );
             case 2:
@@ -403,8 +398,6 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-
             {/* ── Header ── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -417,31 +410,53 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         <TouchableOpacity
                             style={styles.iconBtn}
                             onPress={() =>
-                                current.id > 1 ? handlePrevious() : navigation.goBack()
+                                currentStep.id > 1 ? handlePrevious() : navigation.goBack()
                             }
                             activeOpacity={0.8}
                         >
                             <Ionicons name="arrow-back" size={22} color={Colors.white} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Book Appointment</Text>
-                        <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
-                            <Ionicons name="help-circle-outline" size={22} color={Colors.white} />
-                        </TouchableOpacity>
+                        <View style={styles.iconBtn}>
+                            {/* Step counter badge */}
+                            <Text style={styles.stepCounter}>
+                                {currentStep.id}/{total}
+                            </Text>
+                        </View>
                     </View>
 
                     <View style={styles.stepInfoContainer}>
                         <View style={styles.stepIconWrapper}>
-                            <Ionicons name={current.icon as any} size={28} color={Colors.white} />
+                            <Ionicons
+                                name={currentStep.icon as any}
+                                size={28}
+                                color={Colors.white}
+                            />
                         </View>
                         <View style={styles.stepTextContainer}>
                             <Text style={styles.stepLabel}>
-                                Step {current.id} of {total}
+                                Step {currentStep.id} of {total}
                             </Text>
-                            <Text style={styles.stepTitle}>{current.title}</Text>
-                            <Text style={styles.stepSubtitle}>{current.subtitle}</Text>
+                            <Text style={styles.stepTitle}>{currentStep.title}</Text>
+                            <Text style={styles.stepSubtitle}>{currentStep.subtitle}</Text>
                         </View>
                     </View>
 
+                    {/* ── Dot indicators ── */}
+                    <View style={styles.dotsRow}>
+                        {steps.map(s => (
+                            <View
+                                key={s.id}
+                                style={[
+                                    styles.dot,
+                                    s.id === currentStep.id && styles.dotActive,
+                                    s.id < currentStep.id && styles.dotDone,
+                                ]}
+                            />
+                        ))}
+                    </View>
+
+                    {/* ── Progress bar ── */}
                     <View style={styles.progressContainer}>
                         <View style={styles.progressTrack}>
                             <Animated.View
@@ -476,7 +491,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                     {/* ── Bottom navigation ── */}
                     <View style={styles.bottomNav}>
                         <View style={styles.bottomNavContent}>
-                            {current.id > 1 ? (
+                            {currentStep.id > 1 ? (
                                 <TouchableOpacity
                                     style={styles.btnSecondary}
                                     onPress={handlePrevious}
@@ -508,22 +523,24 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                                     end={{ x: 1, y: 0 }}
                                     style={styles.btnPrimary}
                                 >
-                                    <Text style={styles.btnPrimaryText}>
-                                        {submitting
-                                            ? 'Booking...'
-                                            : current.id === total
-                                            ? 'Confirm'
-                                            : 'Next'}
-                                    </Text>
-                                    <Ionicons
-                                        name={
-                                            current.id === total
-                                                ? 'checkmark-circle'
-                                                : 'arrow-forward'
-                                        }
-                                        size={20}
-                                        color={Colors.white}
-                                    />
+                                    {submitting ? (
+                                        <ActivityIndicator color={Colors.white} size="small" />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.btnPrimaryText}>
+                                                {currentStep.id === total ? 'Confirm' : 'Next'}
+                                            </Text>
+                                            <Ionicons
+                                                name={
+                                                    currentStep.id === total
+                                                        ? 'checkmark-circle'
+                                                        : 'arrow-forward'
+                                                }
+                                                size={20}
+                                                color={Colors.white}
+                                            />
+                                        </>
+                                    )}
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
@@ -540,16 +557,15 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F0F8F8' },
 
     header: {
-        height: height * 0.28,
+        height: height * 0.3,
         paddingTop: Spacing.xxl,
         overflow: 'hidden',
     },
     headerContent: {
         flex: 1,
         paddingHorizontal: Spacing.lg,
-        paddingBottom: Spacing.lg,
+        paddingBottom: Spacing.md,
         justifyContent: 'space-between',
-        marginBottom: Spacing.xxxl,
     },
     headerTop: {
         flexDirection: 'row',
@@ -572,16 +588,21 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: -0.5,
     },
+    stepCounter: {
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: '800',
+    },
 
     stepInfoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: Spacing.lg,
+        marginBottom: 10,
         gap: 14,
     },
     stepIconWrapper: {
-        width: 56,
-        height: 56,
+        width: 52,
+        height: 52,
         borderRadius: 16,
         backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
@@ -591,7 +612,7 @@ const styles = StyleSheet.create({
     },
     stepTextContainer: { flex: 1 },
     stepLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: 'rgba(255,255,255,0.8)',
         fontWeight: '600',
         letterSpacing: 1,
@@ -599,17 +620,38 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     stepTitle: {
-        fontSize: 22,
+        fontSize: 20,
         color: Colors.white,
         fontWeight: '800',
         letterSpacing: -0.3,
         marginBottom: 2,
     },
-    stepSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
+    stepSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
 
-    progressContainer: { gap: 12 },
+    // Step dots
+    dotsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        marginRight: 6,
+    },
+    dotActive: {
+        width: 18,
+        backgroundColor: Colors.white,
+    },
+    dotDone: {
+        backgroundColor: 'rgba(255,255,255,0.7)',
+    },
+
+    progressContainer: {},
     progressTrack: {
-        height: 5,
+        height: 4,
         backgroundColor: 'rgba(255,255,255,0.25)',
         borderRadius: 3,
         overflow: 'hidden',
@@ -653,10 +695,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         paddingHorizontal: 24,
         paddingTop: 16,
-        gap: 12,
         alignItems: 'center',
+        // gap replaced with margin on children for RN compatibility
     },
-
     btnSecondary: {
         flex: 1,
         flexDirection: 'row',
@@ -667,13 +708,14 @@ const styles = StyleSheet.create({
         backgroundColor: `${Colors.gradientMid}15`,
         borderWidth: 1.5,
         borderColor: `${Colors.gradientMid}30`,
-        gap: 8,
+        marginRight: 12,
     },
     btnSecondaryText: {
         fontSize: 16,
         fontWeight: '700',
         color: Colors.gradientMid,
         letterSpacing: 0.2,
+        marginLeft: 6,
     },
     btnPrimaryContainer: { flex: 2 },
     btnDisabled: { opacity: 0.6 },
@@ -683,7 +725,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 16,
         borderRadius: 14,
-        gap: 8,
         shadowColor: Colors.gradientStart,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
@@ -696,6 +737,7 @@ const styles = StyleSheet.create({
         color: Colors.white,
         letterSpacing: 0.3,
         textTransform: 'uppercase',
+        marginRight: 8,
     },
 });
 

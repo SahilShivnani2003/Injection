@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -7,7 +7,12 @@ import {
     StyleSheet,
     StatusBar,
     ActivityIndicator,
-    Alert,
+    Modal,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -16,261 +21,997 @@ import { serviceAPI } from '@/service/apis/medicalServices';
 import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { Colors } from '@/theme/colors';
 import { Service } from '@/features/vendorService/types/Service';
+import { useAlert } from '@/context/AlertContext';
 
-const VendorServicesScreen = ({ navigation }: NativeBottomTabScreenProps<VendorTabParamList, 'Services'>) => {
-    const [services, setServices] = useState<Service[]>([]);
+// Service type needs _id from the API response
+type ServiceWithId = Service & { _id: string };
+
+const { width } = Dimensions.get('window');
+
+// ── Category list ─────────────────────────────────────────────────────────────
+
+const CATEGORIES: Service['category'][] = [
+    'Home Injections',
+    'IV Drip Services',
+    'Wound Dressing',
+    'Day Care at Home',
+    'Patient Monitoring',
+    'Old Age Patient Care',
+    '24 HR Patient Care',
+    'Field Survey Service',
+    'Data Collection Service',
+    'Field Sample Collection',
+    'Community Survey',
+    'Awareness Activities',
+    'Lab-based Training',
+    'BSC/MSC Training',
+    'DMLT Training',
+    'Nursing Training',
+    'Dissertation Program',
+    'Placement Services',
+    'Blood Collection',
+    'BP/Sugar Monitoring',
+    'ECG at Home',
+    'Catheter Care',
+    'Physiotherapy Session',
+    'Other',
+];
+
+const SERVICE_TYPES: NonNullable<Service['serviceType']>[] = ['At Home', 'At Clinic', 'Both'];
+
+// ── Category icon map ─────────────────────────────────────────────────────────
+
+const CATEGORY_ICON: Record<string, string> = {
+    'Home Injections': '💉',
+    'IV Drip Services': '🩸',
+    'Wound Dressing': '🩹',
+    'Day Care at Home': '🏠',
+    'Patient Monitoring': '📊',
+    'Old Age Patient Care': '👴',
+    '24 HR Patient Care': '🌙',
+    'Field Survey Service': '📋',
+    'Data Collection Service': '📂',
+    'Field Sample Collection': '🧪',
+    'Community Survey': '👥',
+    'Awareness Activities': '📢',
+    'Lab-based Training': '🔬',
+    'BSC/MSC Training': '🎓',
+    'DMLT Training': '🧫',
+    'Nursing Training': '👩‍⚕️',
+    'Dissertation Program': '📖',
+    'Placement Services': '💼',
+    'Blood Collection': '🩸',
+    'BP/Sugar Monitoring': '❤️',
+    'ECG at Home': '💓',
+    'Catheter Care': '🏥',
+    'Physiotherapy Session': '🤸',
+    Other: '⚕️',
+};
+
+// ── New Service Form ──────────────────────────────────────────────────────────
+
+interface ServiceForm {
+    serviceName: string;
+    description: string;
+    category: Service['category'] | '';
+    basePrice: string;
+    duration: string;
+    serviceType: Service['serviceType'] | '';
+    requirements: string;
+}
+
+const FORM_DEFAULT: ServiceForm = {
+    serviceName: '',
+    description: '',
+    category: '',
+    basePrice: '',
+    duration: '',
+    serviceType: '',
+    requirements: '',
+};
+
+const validateServiceForm = (form: ServiceForm): string | null => {
+    if (!form.serviceName.trim()) return 'Service name is required.';
+    if (!form.category) return 'Please select a category.';
+    if (!form.description.trim()) return 'Description is required.';
+    if (!form.basePrice.trim()) return 'Base price is required.';
+    const price = parseFloat(form.basePrice);
+    if (isNaN(price) || price <= 0) return 'Enter a valid base price.';
+    if (form.duration && isNaN(parseInt(form.duration, 10))) return 'Duration must be a number.';
+    return null;
+};
+
+// ── Add Service Modal ─────────────────────────────────────────────────────────
+
+interface AddServiceModalProps {
+    visible: boolean;
+    submitting: boolean;
+    form: ServiceForm;
+    onChange: (field: keyof ServiceForm, value: string) => void;
+    onSubmit: () => void;
+    onClose: () => void;
+}
+
+const AddServiceModal = ({
+    visible,
+    submitting,
+    form,
+    onChange,
+    onSubmit,
+    onClose,
+}: AddServiceModalProps) => {
+    const [categoryOpen, setCategoryOpen] = useState(false);
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            onRequestClose={onClose}
+            statusBarTranslucent
+        >
+            <KeyboardAvoidingView
+                style={modal.overlay}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <TouchableOpacity style={modal.backdrop} activeOpacity={1} onPress={onClose} />
+
+                <View style={modal.sheet}>
+                    <View style={modal.handle} />
+
+                    {/* Title */}
+                    <View style={modal.titleRow}>
+                        <LinearGradient
+                            colors={[Colors.gradientStart, Colors.gradientMid]}
+                            style={modal.titleIconWrap}
+                        >
+                            <Text style={{ fontSize: 20 }}>⚕️</Text>
+                        </LinearGradient>
+                        <View>
+                            <Text style={modal.title}>Add New Service</Text>
+                            <Text style={modal.subtitle}>Fill in the service details below</Text>
+                        </View>
+                    </View>
+
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        {/* Service Name */}
+                        <Field label="Service Name" required>
+                            <ModalInput
+                                value={form.serviceName}
+                                onChangeText={v => onChange('serviceName', v)}
+                                placeholder="e.g. Home Blood Collection"
+                                editable={!submitting}
+                            />
+                        </Field>
+
+                        {/* Category picker */}
+                        <Field label="Category" required>
+                            <TouchableOpacity
+                                style={[modal.input, modal.pickerBtn]}
+                                onPress={() => setCategoryOpen(o => !o)}
+                                disabled={submitting}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={
+                                        form.category ? modal.pickerValue : modal.pickerPlaceholder
+                                    }
+                                >
+                                    {form.category || 'Select a category'}
+                                </Text>
+                                <Text style={modal.pickerChevron}>{categoryOpen ? '▲' : '▼'}</Text>
+                            </TouchableOpacity>
+                            {categoryOpen && (
+                                <View style={modal.categoryList}>
+                                    <ScrollView
+                                        style={{ maxHeight: 200 }}
+                                        nestedScrollEnabled
+                                        showsVerticalScrollIndicator={false}
+                                    >
+                                        {CATEGORIES.map(cat => (
+                                            <TouchableOpacity
+                                                key={cat}
+                                                style={[
+                                                    modal.categoryItem,
+                                                    form.category === cat &&
+                                                        modal.categoryItemActive,
+                                                ]}
+                                                onPress={() => {
+                                                    onChange('category', cat);
+                                                    setCategoryOpen(false);
+                                                }}
+                                                activeOpacity={0.75}
+                                            >
+                                                <Text style={modal.categoryItemIcon}>
+                                                    {CATEGORY_ICON[cat] ?? '⚕️'}
+                                                </Text>
+                                                <Text
+                                                    style={[
+                                                        modal.categoryItemText,
+                                                        form.category === cat &&
+                                                            modal.categoryItemTextActive,
+                                                    ]}
+                                                >
+                                                    {cat}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </Field>
+
+                        {/* Description */}
+                        <Field label="Description" required>
+                            <ModalInput
+                                value={form.description}
+                                onChangeText={v => onChange('description', v)}
+                                placeholder="Brief description of the service"
+                                multiline
+                                numberOfLines={3}
+                                editable={!submitting}
+                            />
+                        </Field>
+
+                        {/* Price + Duration row */}
+                        <View style={modal.twoCol}>
+                            <View style={{ flex: 1 }}>
+                                <Field label="Base Price (₹)" required>
+                                    <ModalInput
+                                        value={form.basePrice}
+                                        onChangeText={v =>
+                                            onChange('basePrice', v.replace(/[^0-9.]/g, ''))
+                                        }
+                                        placeholder="0.00"
+                                        keyboardType="decimal-pad"
+                                        editable={!submitting}
+                                    />
+                                </Field>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Field label="Duration (min)">
+                                    <ModalInput
+                                        value={form.duration}
+                                        onChangeText={v =>
+                                            onChange('duration', v.replace(/[^0-9]/g, ''))
+                                        }
+                                        placeholder="e.g. 30"
+                                        keyboardType="number-pad"
+                                        editable={!submitting}
+                                    />
+                                </Field>
+                            </View>
+                        </View>
+
+                        {/* Service Type */}
+                        <Field label="Service Type">
+                            <View style={modal.typeRow}>
+                                {SERVICE_TYPES.map(t => (
+                                    <TouchableOpacity
+                                        key={t}
+                                        style={[
+                                            modal.typeChip,
+                                            form.serviceType === t && modal.typeChipActive,
+                                        ]}
+                                        onPress={() =>
+                                            onChange('serviceType', form.serviceType === t ? '' : t)
+                                        }
+                                        disabled={submitting}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text
+                                            style={[
+                                                modal.typeText,
+                                                form.serviceType === t && modal.typeTextActive,
+                                            ]}
+                                        >
+                                            {t}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </Field>
+
+                        {/* Requirements */}
+                        <Field label="Requirements / Notes">
+                            <ModalInput
+                                value={form.requirements}
+                                onChangeText={v => onChange('requirements', v)}
+                                placeholder="Any special requirements for this service"
+                                multiline
+                                numberOfLines={2}
+                                editable={!submitting}
+                            />
+                        </Field>
+
+                        {/* Buttons */}
+                        <View style={modal.btnRow}>
+                            <TouchableOpacity
+                                style={modal.cancelBtn}
+                                onPress={onClose}
+                                disabled={submitting}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={modal.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[modal.submitBtn, submitting && { opacity: 0.7 }]}
+                                onPress={onSubmit}
+                                disabled={submitting}
+                                activeOpacity={0.85}
+                            >
+                                <LinearGradient
+                                    colors={[
+                                        Colors.gradientStart,
+                                        Colors.gradientMid,
+                                        Colors.gradientEnd,
+                                    ]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={modal.submitGradient}
+                                >
+                                    {submitting ? (
+                                        <ActivityIndicator color="#fff" size="small" />
+                                    ) : (
+                                        <Text style={modal.submitText}>Add Service</Text>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ height: Platform.OS === 'ios' ? 20 : 8 }} />
+                    </ScrollView>
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+};
+
+// ── Small helpers for modal ───────────────────────────────────────────────────
+
+const Field = ({
+    label,
+    required,
+    children,
+}: {
+    label: string;
+    required?: boolean;
+    children: React.ReactNode;
+}) => (
+    <View style={modal.field}>
+        <Text style={modal.fieldLabel}>
+            {label}
+            {required && <Text style={{ color: '#EF4444' }}> *</Text>}
+        </Text>
+        {children}
+    </View>
+);
+
+const ModalInput = (props: React.ComponentProps<typeof TextInput>) => (
+    <TextInput
+        style={[modal.input, props.multiline && modal.inputMulti]}
+        placeholderTextColor="#B0BEC5"
+        textAlignVertical={props.multiline ? 'top' : 'center'}
+        {...props}
+    />
+);
+
+const modal = StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+    sheet: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 22,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+        maxHeight: '92%',
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#DDE3EA',
+        alignSelf: 'center',
+        marginBottom: 18,
+    },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
+    titleIconWrap: {
+        width: 50,
+        height: 50,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    title: { fontSize: 17, fontWeight: '800', color: Colors.textDark, letterSpacing: -0.2 },
+    subtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+    field: { marginBottom: 14 },
+    fieldLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.textDark,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    input: {
+        borderWidth: 1.5,
+        borderColor: '#E0E8EF',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 13,
+        fontSize: 14,
+        color: Colors.textDark,
+        fontWeight: '500',
+        backgroundColor: '#F8FCFF',
+    },
+    inputMulti: { minHeight: 70, paddingTop: 12 },
+    pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    pickerValue: { fontSize: 14, color: Colors.textDark, fontWeight: '500', flex: 1 },
+    pickerPlaceholder: { fontSize: 14, color: '#B0BEC5', flex: 1 },
+    pickerChevron: { fontSize: 11, color: Colors.textMuted },
+    categoryList: {
+        borderWidth: 1.5,
+        borderColor: '#E0E8EF',
+        borderRadius: 14,
+        marginTop: 6,
+        backgroundColor: '#fff',
+        overflow: 'hidden',
+    },
+    categoryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F4F8',
+    },
+    categoryItemActive: { backgroundColor: Colors.gradientStart + '15' },
+    categoryItemIcon: { fontSize: 16, width: 22 },
+    categoryItemText: { fontSize: 13, fontWeight: '600', color: Colors.textDark },
+    categoryItemTextActive: { color: Colors.gradientStart },
+    twoCol: { flexDirection: 'row', gap: 12 },
+    typeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    typeChip: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#D8E8EE',
+        backgroundColor: '#F8FCFF',
+    },
+    typeChipActive: { backgroundColor: Colors.gradientStart, borderColor: Colors.gradientStart },
+    typeText: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
+    typeTextActive: { color: '#fff' },
+    btnRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    cancelBtn: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#DDE3EA',
+        borderRadius: 14,
+        paddingVertical: 14,
+        backgroundColor: '#F8FCFF',
+    },
+    cancelText: { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
+    submitBtn: { flex: 2, borderRadius: 14, overflow: 'hidden' },
+    submitGradient: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+    submitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+});
+
+// ── Service Card ──────────────────────────────────────────────────────────────
+
+const ServiceCard = ({
+    service,
+    processing,
+    onToggle,
+}: {
+    service: ServiceWithId;
+    processing: boolean;
+    onToggle: () => void;
+}) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePress = () => {
+        Animated.sequence([
+            Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
+            Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+        ]).start();
+        onToggle();
+    };
+
+    const icon = CATEGORY_ICON[service.category] ?? '⚕️';
+    const active = service.isActive ?? false;
+
+    return (
+        <Animated.View style={[styles.serviceCard, { transform: [{ scale: scaleAnim }] }]}>
+            {/* Header row */}
+            <View style={styles.cardHeader}>
+                <View
+                    style={[
+                        styles.catIconWrap,
+                        { backgroundColor: active ? Colors.gradientStart + '18' : '#F3F7FA' },
+                    ]}
+                >
+                    <Text style={{ fontSize: 20 }}>{icon}</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.serviceTitle} numberOfLines={1}>
+                        {service.serviceName}
+                    </Text>
+                    <Text style={styles.serviceCategory}>{service.category}</Text>
+                </View>
+                <View
+                    style={[styles.statusPill, { backgroundColor: active ? '#E6FFF5' : '#FFF1F0' }]}
+                >
+                    <View
+                        style={[
+                            styles.statusDot,
+                            { backgroundColor: active ? '#00D4A0' : '#FF5A5F' },
+                        ]}
+                    />
+                    <Text style={[styles.statusText, { color: active ? '#00A07A' : '#CC2200' }]}>
+                        {active ? 'Active' : 'Inactive'}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Description */}
+            <Text style={styles.serviceDescription} numberOfLines={2}>
+                {service.description ?? 'No description available.'}
+            </Text>
+
+            {/* Meta chips */}
+            <View style={styles.metaRow}>
+                <View style={styles.metaChip}>
+                    <Text style={styles.metaIcon}>💰</Text>
+                    <Text style={styles.metaText}>
+                        ₹{service.basePrice?.toLocaleString('en-IN')}
+                    </Text>
+                </View>
+                {!!service.duration && (
+                    <View style={styles.metaChip}>
+                        <Text style={styles.metaIcon}>⏱</Text>
+                        <Text style={styles.metaText}>{service.duration} min</Text>
+                    </View>
+                )}
+                {!!service.serviceType && (
+                    <View style={styles.metaChip}>
+                        <Text style={styles.metaIcon}>📍</Text>
+                        <Text style={styles.metaText}>{service.serviceType}</Text>
+                    </View>
+                )}
+            </View>
+
+            {/* Tags */}
+            {(service.tags?.length ?? 0) > 0 && (
+                <View style={styles.tagsRow}>
+                    {service.tags!.map(tag => (
+                        <View key={tag} style={styles.tagChip}>
+                            <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Requirements */}
+            {!!service.requirements && (
+                <View style={styles.reqRow}>
+                    <Text style={styles.reqIcon}>⚠️</Text>
+                    <Text style={styles.reqText} numberOfLines={2}>
+                        {service.requirements}
+                    </Text>
+                </View>
+            )}
+
+            {/* Footer */}
+            <View style={styles.cardFooter}>
+                <TouchableOpacity
+                    style={[
+                        styles.toggleBtn,
+                        active ? styles.deactivateBtn : styles.activateBtn,
+                        processing && styles.toggleBtnDisabled,
+                    ]}
+                    onPress={handlePress}
+                    disabled={processing}
+                    activeOpacity={0.85}
+                >
+                    {processing ? (
+                        <ActivityIndicator size="small" color={active ? '#CC2200' : '#00A07A'} />
+                    ) : (
+                        <>
+                            <Text style={styles.toggleIcon}>{active ? '⏸' : '▶️'}</Text>
+                            <Text
+                                style={[
+                                    styles.toggleText,
+                                    { color: active ? '#CC2200' : '#00A07A' },
+                                ]}
+                            >
+                                {active ? 'Deactivate' : 'Activate'}
+                            </Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
+        </Animated.View>
+    );
+};
+
+// ── Main Screen ───────────────────────────────────────────────────────────────
+
+const VendorServicesScreen = ({
+    navigation,
+}: NativeBottomTabScreenProps<VendorTabParamList, 'Services'>) => {
+    const alert = useAlert();
+    const [services, setServices] = useState<ServiceWithId[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchServices();
-    }, []);
+    // Add service modal
+    const [modalVisible, setModalVisible] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [form, setForm] = useState<ServiceForm>(FORM_DEFAULT);
 
-    const fetchServices = async () => {
-        setLoading(true);
+    // ── Fetch ─────────────────────────────────────────────────────────────────
+
+    const fetchServices = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const response = await serviceAPI.vendorServices();
-            setServices(response.data?.data ?? response.data?.services ?? response.data ?? []);
+            setServices((response.data?.data ?? []) as ServiceWithId[]);
         } catch (error) {
             console.warn('Unable to load vendor services', error);
+            alert.error('Error', 'Unable to load services. Pull down to retry.');
         } finally {
             setLoading(false);
         }
     };
 
+    useEffect(() => {
+        fetchServices();
+    }, []);
+
+    // ── Toggle ────────────────────────────────────────────────────────────────
+
     const handleToggle = async (serviceId: string, currentStatus?: boolean) => {
         setProcessingId(serviceId);
         try {
-            await serviceAPI.toggleServiceStatus(serviceId, !currentStatus);
-            await fetchServices();
-        } catch (error) {
-            Alert.alert('Action failed', 'Unable to update service status.');
+            await serviceAPI.toggleServiceStatus(serviceId);
+            // Optimistic update
+            setServices(prev =>
+                prev.map(s => (s._id === serviceId ? { ...s, isActive: !currentStatus } : s)),
+            );
+        } catch (error: any) {
+            console.error('Error while updating status : ', error);
+            alert.error('Action Failed', 'Unable to update service status.');
         } finally {
             setProcessingId(null);
         }
     };
 
+    // ── Add Service ───────────────────────────────────────────────────────────
+
+    const handleFormChange = (field: keyof ServiceForm, value: string) => {
+        setForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleAddService = async () => {
+        const error = validateServiceForm(form);
+        if (error) {
+            alert.error('Validation', error);
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const payload: Partial<Service> = {
+                serviceName: form.serviceName.trim(),
+                category: form.category as Service['category'],
+                description: form.description.trim(),
+                basePrice: parseFloat(form.basePrice),
+                duration: form.duration ? parseInt(form.duration, 10) : undefined,
+                serviceType: (form.serviceType as Service['serviceType']) || undefined,
+                requirements: form.requirements.trim() || undefined,
+                isActive: true,
+            };
+
+            const response = await serviceAPI.createService(payload);
+
+            if (response?.data?.success) {
+                setModalVisible(false);
+                setForm(FORM_DEFAULT);
+                alert.success(
+                    'Service Added',
+                    `"${payload.serviceName}" has been added successfully.`,
+                );
+                await fetchServices(true);
+            } else {
+                alert.error('Failed', response?.data?.message || 'Unable to add service.');
+            }
+        } catch (error: any) {
+            console.error('Error adding service:', error);
+            alert.error(
+                'Failed',
+                error?.response?.data?.message || error?.message || 'Unable to add service.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const openModal = () => {
+        setForm(FORM_DEFAULT);
+        setModalVisible(true);
+    };
+
+    // ── Active / Inactive counts ──────────────────────────────────────────────
+
+    const activeCount = services.filter(s => s.isActive).length;
+    const inactiveCount = services.length - activeCount;
+
+    // ── Loading ───────────────────────────────────────────────────────────────
+
     if (loading) {
         return (
             <View style={[styles.root, styles.centered]}>
                 <ActivityIndicator size="large" color={Colors.gradientStart} />
+                <Text style={styles.loadingText}>Loading services...</Text>
             </View>
         );
     }
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+            {/* ── Add Service Modal ── */}
+            <AddServiceModal
+                visible={modalVisible}
+                submitting={submitting}
+                form={form}
+                onChange={handleFormChange}
+                onSubmit={handleAddService}
+                onClose={() => !submitting && setModalVisible(false)}
+            />
+
+            {/* ── Header ── */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-                start={{ x: 0.1, y: 0 }}
-                end={{ x: 0.9, y: 1 }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.header}
             >
-                <Text style={styles.headerTitle}>Services</Text>
+                <View style={styles.blobTR} />
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.headerTitle}>My Services</Text>
+                        <Text style={styles.headerSub}>
+                            {services.length} total · {activeCount} active · {inactiveCount}{' '}
+                            inactive
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.addBtn}
+                        onPress={openModal}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.addBtnIcon}>＋</Text>
+                        <Text style={styles.addBtnText}>Add</Text>
+                    </TouchableOpacity>
+                </View>
             </LinearGradient>
 
+            {/* ── Content ── */}
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {services.length === 0 ? (
                     <View style={styles.emptyCard}>
-                        <Text style={styles.emptyText}>No services found. Add services from the portal.</Text>
+                        <Text style={{ fontSize: 48, marginBottom: 14 }}>🩺</Text>
+                        <Text style={styles.emptyTitle}>No Services Yet</Text>
+                        <Text style={styles.emptyText}>
+                            Tap the <Text style={{ fontWeight: '800' }}>+ Add</Text> button above to
+                            create your first service.
+                        </Text>
                     </View>
                 ) : (
-                    services.map(service => {
-                        const serviceId = String(
-                            (service as any)._id ||
-                                (service as any).id ||
-                                service.vendorId ||
-                                service.serviceName,
-                        );
-                        return (
-                            <View key={serviceId} style={styles.serviceCard}>
-                                <View style={styles.serviceHeader}>
-                                    <Text style={styles.serviceTitle}>{service.serviceName}</Text>
-                                    <View
-                                        style={[
-                                            styles.statusBadge,
-                                            { backgroundColor: service.isActive ? '#E6FFF5' : '#FFF1F0' },
-                                        ]}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.statusText,
-                                                { color: service.isActive ? '#00D4A0' : '#FF5A5F' },
-                                            ]}
-                                        >
-                                            {service.isActive ? 'Active' : 'Inactive'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <Text style={styles.serviceCategory}>{service.category}</Text>
-                                <Text style={styles.serviceDescription}>
-                                    {service.description ?? 'No description available.'}
-                                </Text>
-                                <View style={styles.serviceFooter}>
-                                    <View>
-                                        <Text style={styles.servicePrice}>
-                                            ₹{service.basePrice?.toLocaleString('en-IN')}
-                                        </Text>
-                                        <Text style={styles.serviceSubText}>
-                                            {service.duration ? `${service.duration} min` : 'Duration not set'}
-                                        </Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.toggleButton,
-                                            service.isActive ? styles.deactivateButton : styles.activateButton,
-                                        ]}
-                                        onPress={() => handleToggle(serviceId, service.isActive)}
-                                        disabled={processingId === serviceId}
-                                    >
-                                        <Text style={styles.toggleButtonText}>
-                                            {service.isActive ? 'Deactivate' : 'Activate'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        );
-                    })
+                    services.map(service => (
+                        <ServiceCard
+                            key={service._id}
+                            service={service}
+                            processing={processingId === service._id}
+                            onToggle={() => handleToggle(service._id, service.isActive)}
+                        />
+                    ))
                 )}
 
-                <TouchableOpacity style={styles.actionButton} onPress={fetchServices} activeOpacity={0.85}>
-                    <Ionicons name="refresh" size={18} color={Colors.gradientStart} />
-                    <Text style={styles.actionButtonText}>Refresh services</Text>
+                {/* Refresh button */}
+                <TouchableOpacity
+                    style={styles.refreshBtn}
+                    onPress={() => fetchServices()}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="refresh" size={16} color={Colors.gradientStart} />
+                    <Text style={styles.refreshText}>Refresh</Text>
                 </TouchableOpacity>
             </ScrollView>
         </View>
     );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: Colors.background },
-    centered: { justifyContent: 'center', alignItems: 'center' },
+    root: { flex: 1, backgroundColor: '#F2F7FA' },
+    centered: { justifyContent: 'center', alignItems: 'center', flex: 1 },
+    loadingText: { marginTop: 12, fontSize: 14, fontWeight: '600', color: Colors.textMuted },
+
+    // Header
     header: {
         paddingTop: 56,
         paddingBottom: 22,
         paddingHorizontal: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderBottomLeftRadius: 26,
+        borderBottomRightRadius: 26,
+        overflow: 'hidden',
     },
-    headerTitle: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: Colors.white,
+    blobTR: {
+        position: 'absolute',
+        top: -40,
+        right: -40,
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255,255,255,0.09)',
     },
-    content: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 100,
+    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    headerTitle: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
+    headerSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 4, fontWeight: '500' },
+    addBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
+    addBtnIcon: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
+    addBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+
+    // Content
+    content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 100 },
+
+    // Service Card
     serviceCard: {
-        backgroundColor: Colors.white,
-        borderRadius: 18,
-        padding: 18,
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 16,
         marginBottom: 14,
-        shadowColor: Colors.shadowColor,
-        shadowOffset: { width: 0, height: 8 },
+        shadowColor: '#004466',
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
-        shadowRadius: 16,
+        shadowRadius: 14,
         elevation: 4,
     },
-    serviceHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    catIconWrap: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
         alignItems: 'center',
-        marginBottom: 10,
+        justifyContent: 'center',
     },
-    serviceTitle: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: Colors.textDark,
-        flex: 1,
-        marginRight: 8,
+    serviceTitle: { fontSize: 15, fontWeight: '800', color: Colors.textDark, marginBottom: 2 },
+    serviceCategory: { fontSize: 12, fontWeight: '600', color: Colors.gradientMid },
+    statusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
     },
-    serviceCategory: {
-        fontSize: 13,
-        color: Colors.gradientMid,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
+    statusDot: { width: 7, height: 7, borderRadius: 4 },
+    statusText: { fontSize: 11, fontWeight: '800' },
     serviceDescription: {
         fontSize: 13,
         color: Colors.textMedium,
-        marginBottom: 14,
         lineHeight: 20,
+        marginBottom: 12,
     },
-    statusBadge: {
-        borderRadius: 999,
-        paddingHorizontal: 12,
+
+    // Meta chips
+    metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    metaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#F2F7FA',
+        borderRadius: 10,
+        paddingHorizontal: 10,
         paddingVertical: 6,
     },
-    statusText: {
-        fontSize: 11,
-        fontWeight: '800',
+    metaIcon: { fontSize: 12 },
+    metaText: { fontSize: 12, fontWeight: '700', color: Colors.textDark },
+
+    // Tags
+    tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+    tagChip: {
+        backgroundColor: Colors.gradientStart + '15',
+        borderRadius: 8,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
     },
-    serviceFooter: {
+    tagText: { fontSize: 11, fontWeight: '600', color: Colors.gradientStart },
+
+    // Requirements
+    reqRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: '#FFF8E6',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#F5A62330',
+    },
+    reqIcon: { fontSize: 13, marginTop: 1 },
+    reqText: { flex: 1, fontSize: 12, color: '#7A5000', fontWeight: '500', lineHeight: 18 },
+
+    // Toggle
+    cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
+    toggleBtn: {
+        flexDirection: 'row',
         alignItems: 'center',
-    },
-    servicePrice: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: Colors.textDark,
-    },
-    serviceSubText: {
-        fontSize: 12,
-        color: Colors.textMuted,
-    },
-    toggleButton: {
+        gap: 7,
         borderRadius: 14,
-        paddingVertical: 12,
+        paddingVertical: 11,
         paddingHorizontal: 18,
+        minWidth: 120,
+        justifyContent: 'center',
     },
-    activateButton: {
-        backgroundColor: '#E6FFF5',
-    },
-    deactivateButton: {
-        backgroundColor: '#FFF1F0',
-    },
-    toggleButtonText: {
-        color: Colors.textDark,
-        fontSize: 13,
-        fontWeight: '800',
-    },
+    activateBtn: { backgroundColor: '#E6FFF5', borderWidth: 1.5, borderColor: '#00D4A033' },
+    deactivateBtn: { backgroundColor: '#FFF1F0', borderWidth: 1.5, borderColor: '#FF5A5F33' },
+    toggleBtnDisabled: { opacity: 0.6 },
+    toggleIcon: { fontSize: 14 },
+    toggleText: { fontSize: 13, fontWeight: '800' },
+
+    // Empty state
     emptyCard: {
-        backgroundColor: Colors.white,
-        borderRadius: 18,
-        padding: 24,
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 32,
         alignItems: 'center',
+        marginBottom: 16,
     },
-    emptyText: {
-        color: Colors.textMuted,
-        fontSize: 14,
-        textAlign: 'center',
-    },
-    actionButton: {
-        marginTop: 10,
+    emptyTitle: { fontSize: 17, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
+    emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
+
+    // Refresh
+    refreshBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
-        backgroundColor: Colors.white,
+        gap: 8,
+        backgroundColor: '#fff',
         borderRadius: 16,
-        paddingVertical: 14,
+        paddingVertical: 13,
         borderWidth: 1,
         borderColor: '#D8E8EE',
-        shadowColor: Colors.shadowColor,
-        shadowOffset: { width: 0, height: 6 },
+        shadowColor: '#004466',
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 3,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    actionButtonText: {
-        color: Colors.gradientStart,
-        fontWeight: '800',
-        fontSize: 13,
-    },
+    refreshText: { color: Colors.gradientStart, fontWeight: '800', fontSize: 13 },
 });
 
 export default VendorServicesScreen;

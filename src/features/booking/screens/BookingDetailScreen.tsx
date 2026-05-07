@@ -632,8 +632,6 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
             {/* ── Reschedule Modal ── */}
             <RescheduleModal
                 visible={rescheduleVisible}
