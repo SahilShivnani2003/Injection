@@ -7,6 +7,8 @@ import RegisterScreen from '../features/auth/screens/RegisterScreen';
 import BasicDetailsScreen from '../screens/user/booking/BasicDetailsScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import LabPartnerScreen from '../screens/vendor/LabPartnerScreen';
+import VendorRegisterScreen from '../features/auth/screens/VendorRegistrationScreen';
+import VendorTabNavigation from './VendorTabNavigation';
 import StaffPanelScreen from '../screens/staff/StaffPanelScreen';
 import TabNavigator from './TabNavigator';
 import { useColorScheme } from 'react-native';
@@ -38,6 +40,8 @@ export default function AppNavigator() {
                     <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
                     <Stack.Screen name="LabPartner" component={LabPartnerScreen} />
+                    <Stack.Screen name="VendorRegister" component={VendorRegisterScreen} />
+                    <Stack.Screen name="VendorTab" component={VendorTabNavigation} />
                     <Stack.Screen name="StaffPanel" component={StaffPanelScreen} />
                     <Stack.Screen name="UserTab" component={TabNavigator} />
                     <Stack.Screen name="Booking" component={BookingScreen} />

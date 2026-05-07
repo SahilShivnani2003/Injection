@@ -1,4 +1,5 @@
 export interface Vendor {
+    _id?:string;
     // Basic Information
     name: string;
     email: string;

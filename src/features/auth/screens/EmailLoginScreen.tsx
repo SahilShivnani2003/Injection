@@ -90,7 +90,11 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             if (response.data?.success) {
                 alert.success('Login Successful', 'Welcome back!');
                 setAuth(response.data.data.user, response.data.data.token);
-                navigation.replace('UserTab', { screen: 'Dashboard' });
+                if (userType === 'Vendor') {
+                    navigation.replace('VendorTab', { screen: 'Dashboard' });
+                } else {
+                    navigation.replace('UserTab', { screen: 'Dashboard' });
+                }
             } else {
                 alert.error('Login Failed', 'Invalid email or password. Please try again.');
             }
@@ -289,7 +293,13 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                         {/* ── Register Link ───────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.registerLink}
-                            onPress={() => navigation.navigate('Register')}
+                            onPress={() =>{
+                                if(userType === 'Vendor'){
+                                    navigation.navigate('VendorRegister')
+                                }else{
+                                    navigation.navigate('Register')
+                                }
+                            }}
                             activeOpacity={0.7}
                             disabled={isLoading}
                         >

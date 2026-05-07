@@ -1,12 +1,13 @@
-import { User } from "@/types/user";
+import { User } from "@/features/profile/types/User";
+import { Vendor } from "@/features/profile/types/Vendor";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 
 type AuthState = {
     isAuthenticated: boolean;
     token: string | null;
-    user: User | null;
-    setAuth: (user: User, token: string) => void;
+    user: User | Vendor |  null;
+    setAuth: (user: User|Vendor, token: string) => void;
     removeAuth: () => void;
     loadAuth: () => void;
 };
@@ -17,7 +18,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
     token: null,
     user: null,
-    setAuth: async (user: User, token: string) => {
+    setAuth: async (user: User | Vendor, token: string) => {
 
         try {
             if (!user || !token) {

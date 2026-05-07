@@ -212,7 +212,7 @@ const LoginScreen = ({ navigation }: LoginProps) => {
                 navigation.navigate('LabPartner');
                 break;
             case 'Vendor':
-                navigation.navigate('StaffPanel');
+                navigation.navigate('VendorTab', { screen: 'Dashboard' });
                 break;
             case 'patient':
             default:

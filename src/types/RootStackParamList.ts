@@ -1,5 +1,6 @@
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { UserTabParamList } from "./UserTabParamList";
+import { VendorTabParamList } from "./VendorTabParamList";
 
 export type RootStackParamList = {
     Splash: undefined;
@@ -16,6 +17,8 @@ export type RootStackParamList = {
     OrderTracking: undefined;
     LabPartner: undefined;
     StaffPanel: undefined;
+    VendorRegister: undefined;
+    VendorTab: NavigatorScreenParams<VendorTabParamList>;
     UserTab: NavigatorScreenParams<UserTabParamList>;
     Booking: undefined;
     BookingDetail: {

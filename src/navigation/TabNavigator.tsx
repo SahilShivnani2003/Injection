@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import DashboardScreen from '../features/dashboard/screens/UserDashboardScreen';
-import ProfileScreen from '../features/profile/screens/ProfileScreen';
+import ProfileScreen from '../features/profile/screens/UserProfileScreen';
 import CustomTabBar from '../components/CustomTabBar';
 import BookingsScreen from '../features/booking/screens/UserBookingsScreen';
 import { ITabItem } from '../types/TabItem';
