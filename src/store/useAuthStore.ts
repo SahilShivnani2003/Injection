@@ -6,8 +6,9 @@ import { create } from "zustand";
 type AuthState = {
     isAuthenticated: boolean;
     token: string | null;
-    user: User | Vendor |  null;
-    setAuth: (user: User|Vendor, token: string) => void;
+    loggedInRole: 'patient' | 'Vendor' | null;
+    user: User | Vendor | null;
+    setAuth: (user: User | Vendor, role: 'patient' | 'Vendor', token: string) => void;
     removeAuth: () => void;
     loadAuth: () => void;
 };
@@ -18,7 +19,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
     token: null,
     user: null,
-    setAuth: async (user: User | Vendor, token: string) => {
+    loggedInRole: null,
+    setAuth: async (user: User | Vendor, role: 'patient' | 'Vendor', token: string) => {
 
         try {
             if (!user || !token) {
@@ -26,14 +28,15 @@ export const useAuthStore = create<AuthState>((set) => ({
                 return;
             }
 
-            const data = JSON.stringify({ user, token });
+            const data = JSON.stringify({ user, token, role });
 
             await AsyncStorage.setItem(STORAGE_KEY, data);
 
             set({
                 isAuthenticated: true,
                 user: user,
-                token: token
+                token: token,
+                loggedInRole: role
             })
 
         } catch (error: any) {
@@ -65,7 +68,8 @@ export const useAuthStore = create<AuthState>((set) => ({
                 set({
                     isAuthenticated: true,
                     user: auth?.user,
-                    token: auth?.token
+                    token: auth?.token,
+                    loggedInRole: auth?.role
                 })
             } else {
                 console.warn('NO USER DATA FOUND.')

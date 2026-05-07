@@ -12,26 +12,22 @@ import {
     StatusBar,
     Alert,
 } from 'react-native';
-import { Colors, Fonts, Spacing } from '../../theme/colors';
+import { Colors, Fonts, Spacing } from '../../../theme/colors';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
-import BasicDetailsScreen from './booking/BasicDetailsScreen';
-import ChargesScreen from './booking/ChargesScreen';
-import ComplimentaryScreen from './booking/ComplimentaryScreen';
-import SlotBookingScreen from './booking/SlotBookingScreen';
-import RequirementsScreen from './booking/RequirementsScreen';
+import BasicDetailsScreen from '../components/BasicDetailsScreen';
+import ChargesScreen from '../components/ChargesScreen';
+import ComplimentaryScreen from '../components/ComplimentaryScreen';
+import SlotBookingScreen from '../components/SlotBookingScreen';
+import RequirementsScreen from '../components/RequirementsScreen';
+import ServiceSelectionScreen from '../components/ServiceSelectionScreen';
 import { useAuthStore } from '@/store/useAuthStore';
 import { bookingAPI } from '@/service/apis/bookingService';
-import {
-    Booking,
-    ComplimentaryService,
-    Gender,
-    SelectedService,
-    StaffPreference,
-} from '@/types/booking';
+import { ComplimentaryService, Gender, SelectedService, StaffPreference } from '@/types/booking';
+import { RootStackParamList } from '@/types/RootStackParamList';
+import { Booking } from '../types/Booking';
 
 const RADIUS = 32;
 const { width, height } = Dimensions.get('window');
@@ -44,7 +40,7 @@ export interface UploadedFile {
     type: 'image' | 'document';
 }
 
-/** All form data collected across all 5 steps */
+/** All form data collected across all 6 steps */
 export interface BookingFormData {
     // Step 1 — Basic Details
     patientName: string;
@@ -56,19 +52,25 @@ export interface BookingFormData {
     phoneNumber: string;
     email: string;
 
-    // Step 2 — Requirements
+    // Step 2 — Service Selection
     selectedServices: SelectedService[];
     additionalRequirements: string;
     uploadedFile: UploadedFile | null;
     hasInsurance: boolean;
     insurancePolicyNumber: string;
 
-    // Step 3 — Slot
+    // Step 3 — Requirements
+    // (additionalRequirements, uploadedFile, hasInsurance, insurancePolicyNumber are handled in Step 2 above)
+
+    // Step 4 — Slot Booking
     selectedDate: string | null;
     selectedTime: string | null;
     staffPreference: StaffPreference;
 
-    // Step 5 — Complimentary
+    // Step 5 — Review & Charges
+    // (No additional data collected, just review of previous steps)
+
+    // Step 6 — Complimentary Service Selection
     freeComplimentaryService: ComplimentaryService;
 }
 
@@ -84,18 +86,24 @@ const steps: IStepType[] = [
         subtitle: 'Choose your tests',
         icon: 'checkmark-circle-outline',
     },
-    { id: 3, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
     {
-        id: 4,
+        id: 3,
+        title: 'Requirements',
+        subtitle: 'Additional details',
+        icon: 'document-text-outline',
+    },
+    { id: 4, title: 'Select Slots', subtitle: 'Choose date & time', icon: 'calendar-outline' },
+    {
+        id: 5,
         title: 'Review & Charges',
         subtitle: 'Review & confirm',
         icon: 'checkmark-done-outline',
     },
     {
-        id: 5,
-        title: 'Confirmation',
-        subtitle: 'Your appointment is booked',
-        icon: 'checkmark-circle',
+        id: 6,
+        title: 'Complimentary Service',
+        subtitle: 'Choose free service',
+        icon: 'gift-outline',
     },
 ];
 
@@ -113,7 +121,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     const [formData, setFormData] = useState<BookingFormData>({
         // Step 1
         patientName: user?.name ?? '',
-        age: user?.age ? String(user.age) : '',
+        age: user?.age ? String(user?.age) : '',
         sex: user?.gender ?? '',
         address: user?.address ?? '',
         pincode: user?.pincode ?? '',
@@ -126,11 +134,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
         uploadedFile: null,
         hasInsurance: false,
         insurancePolicyNumber: '',
-        // Step 3
+        // Step 3 — Slot
         selectedDate: null,
         selectedTime: null,
         staffPreference: 'Any Available',
-        // Step 5
+        // Step 6 — Complimentary
         freeComplimentaryService: 'None',
     });
 
@@ -185,20 +193,24 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 if (!formData.address.trim()) return warn('Please enter address.');
                 if (formData.pincode.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
-                // Email validation if provided
-                if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+                if (!formData.currentLocation.trim()) return warn('Please enter current location.');
+                if (!formData.phoneNumber.trim()) return warn('Please enter phone number.');
+                if (!formData.email.trim()) return warn('Please enter email address.');
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
                     return warn('Please enter a valid email address.');
-                }
                 return true;
 
             case 2:
                 if (formData.selectedServices.length === 0)
                     return warn('Please select at least one service.');
+                return true;
+
+            case 3:
                 if (formData.hasInsurance && !formData.insurancePolicyNumber.trim())
                     return warn('Please enter your insurance policy number.');
                 return true;
 
-            case 3:
+            case 4:
                 if (!formData.selectedDate) return warn('Please select a preferred date.');
                 if (!formData.selectedTime) return warn('Please select a preferred time slot.');
                 return true;
@@ -233,7 +245,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
             setSubmitting(true);
 
             const subtotal = formData.selectedServices.reduce(
-                (sum, s) => sum + s.price * s.quantity,
+                (sum, s) => sum + s.price * (s.quantity ?? 1),
                 0,
             );
             const gstAmount = Math.round(subtotal * 0.18);
@@ -245,6 +257,12 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 ? (formData.sex as Gender) 
                 : 'Other';
 
+            const preferredTimeSlot = `${formData.selectedDate || ''} ${formData.selectedTime || ''}`.trim();
+            if (!preferredTimeSlot) {
+                Alert.alert('Error', 'Invalid time slot selected. Please go back and select date and time.');
+                return;
+            }
+
             const payload: Booking = {
                 patientName: formData.patientName.trim(),
                 age: parseInt(formData.age, 10),
@@ -252,7 +270,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 address: formData.address.trim(),
                 pincode: formData.pincode.trim(),
                 currentLocation: formData.currentLocation.trim() || formData.address.trim(),
-                alternateMobile: formData.phoneNumber || undefined,
+                alternateMobile: formData.phoneNumber.trim() || undefined,
                 email: formData.email.trim(),
 
                 selectedServices: formData.selectedServices,
@@ -271,7 +289,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 grandTotal,
 
                 freeComplimentaryService: formData.freeComplimentaryService,
-                preferredTimeSlot: `${formData.selectedDate} ${formData.selectedTime}`,
+                preferredTimeSlot,
                 staffPreference: formData.staffPreference,
                 serviceLocation: formData.address.trim(),
                 estimatedDuration: 45,
@@ -291,7 +309,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
 
             Alert.alert(
                 'Booking Confirmed! 🎉',
-                `Your appointment on ${formData.selectedDate} at ${formData.selectedTime} has been booked successfully.`,
+                `Your appointment on ${preferredTimeSlot} has been booked successfully.`,
                 [{ text: 'Done', onPress: () => navigation.goBack() }],
             );
         } catch (error: any) {
@@ -334,9 +352,14 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 );
             case 2:
                 return (
-                    <RequirementsScreen
+                    <ServiceSelectionScreen
                         selectedServices={formData.selectedServices}
                         setSelectedServices={v => update({ selectedServices: v })}
+                    />
+                );
+            case 3:
+                return (
+                    <RequirementsScreen
                         additionalRequirements={formData.additionalRequirements}
                         setAdditionalRequirements={v => update({ additionalRequirements: v })}
                         uploadedFile={formData.uploadedFile}
@@ -347,7 +370,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         setInsurancePolicyNumber={v => update({ insurancePolicyNumber: v })}
                     />
                 );
-            case 3:
+            case 4:
                 return (
                     <SlotBookingScreen
                         selectedDate={formData.selectedDate}
@@ -358,9 +381,9 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                         setStaffPreference={v => update({ staffPreference: v })}
                     />
                 );
-            case 4:
-                return <ChargesScreen selectedServices={formData.selectedServices} />;
             case 5:
+                return <ChargesScreen selectedServices={formData.selectedServices} />;
+            case 6:
                 return (
                     <ComplimentaryScreen
                         freeComplimentaryService={formData.freeComplimentaryService}

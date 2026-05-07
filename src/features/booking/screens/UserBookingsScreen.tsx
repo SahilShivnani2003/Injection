@@ -136,18 +136,16 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                 </View>
             </View>
 
-            {item.bookingStatus === 'pending' && (
-                <TouchableOpacity
-                    style={styles.cancelBtn}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                        /* handle cancel */
-                    }}
-                >
-                    <Icon name="cancel" size={15} color={Colors.white} />
-                    <Text style={styles.cancelText}>Cancel Booking</Text>
-                </TouchableOpacity>
-            )}
+            <TouchableOpacity
+                style={styles.cancelBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                    handleNavigation(item)
+                }}
+            >
+                <Text style={styles.cancelText}>View Detail</Text>
+                <Icon name="arrow-right" size={25} color={Colors.white} />
+            </TouchableOpacity>
         </TouchableOpacity>
     );
 
@@ -200,6 +198,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                         onRefresh={fetchBookings}
                     />
                 )}
+                <View style={{height: 42, marginBottom: 24}}></View>
             </View>
         </View>
     );
@@ -332,7 +331,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        backgroundColor: '#FF4757',
+        backgroundColor: Colors.gradientMid,
         borderRadius: 8,
         paddingVertical: 10,
     },

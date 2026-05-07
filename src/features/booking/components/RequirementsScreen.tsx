@@ -18,17 +18,15 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import { Colors } from '../../../theme/colors';
 import { SelectedService } from '@/types/booking';
-import { UploadedFile } from '../BookingScreen';
+import { UploadedFile } from '../screens/BookingScreen';
 import { serviceAPI } from '@/service/apis/medicalServices';
-import { Service } from '@/types/Service';
+import { Service } from '@/features/vendorService/types/Service';
 
 const { width } = Dimensions.get('window');
 
 /* ─────────────────────── Props ─────────────────────── */
 
 interface RequirementsScreenProps {
-    selectedServices: SelectedService[];
-    setSelectedServices: (v: SelectedService[]) => void;
     additionalRequirements: string;
     setAdditionalRequirements: (v: string) => void;
     uploadedFile: UploadedFile | null;
@@ -337,8 +335,6 @@ const FileChip: React.FC<{ file: UploadedFile; onRemove: () => void }> = ({ file
 /* ─────────────────────── Main Screen ─────────────────────── */
 
 const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
-    selectedServices,
-    setSelectedServices,
     additionalRequirements,
     setAdditionalRequirements,
     uploadedFile,
@@ -348,8 +344,6 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
     insurancePolicyNumber,
     setInsurancePolicyNumber,
 }) => {
-    const [availableServices, setAvailableServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
     const [otherFocused, setOtherFocused] = useState(false);
     const [showUploadSheet, setShowUploadSheet] = useState(false);
     const [policyFocused, setPolicyFocused] = useState(false);
@@ -358,27 +352,6 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
 
     const insProgress = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
     const insRotateAnim = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
-
-    useEffect(() => {
-        fetchServices();
-    }, []);
-
-    const fetchServices = async () => {
-        try {
-            setLoading(true);
-            const res = await serviceAPI.getAllServices();
-            if (res.data?.success && res.data?.data) {
-                // Filter only active services
-                const activeServices = res.data.data.filter((s: Service) => s.isActive);
-                setAvailableServices(activeServices);
-            }
-        } catch (error) {
-            console.error('Error fetching services:', error);
-            Alert.alert('Error', 'Failed to load services. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     useEffect(() => {
         const toValue = hasInsurance ? 1 : 0;
@@ -402,23 +375,6 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
         }
     }, [hasInsurance]);
 
-    const toggleService = (svc: Service) => {
-        const exists = selectedServices.find(s => s.serviceId === svc._id);
-        if (exists) {
-            setSelectedServices(selectedServices.filter(s => s.serviceId !== svc._id));
-        } else {
-            setSelectedServices([
-                ...selectedServices,
-                {
-                    serviceId: svc._id!,
-                    serviceName: svc.serviceName,
-                    price: svc.basePrice,
-                    quantity: 1,
-                },
-            ]);
-        }
-    };
-
     const handleFetchPolicy = async () => {
         if (!insurancePolicyNumber.trim()) return;
         try {
@@ -440,44 +396,10 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
         outputRange: ['0deg', '90deg'],
     });
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.gradientStart} />
-                <Text style={styles.loadingText}>Loading services...</Text>
-            </View>
-        );
-    }
-
     return (
         <View style={styles.root}>
-            <SectionLabel title="Available Services" />
-            {selectedServices.length > 0 && (
-                <Text style={styles.selectedCount}>
-                    {selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''}{' '}
-                    selected
-                </Text>
-            )}
-
-            {availableServices.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyIcon}>📋</Text>
-                    <Text style={styles.emptyText}>No services available at the moment</Text>
-                </View>
-            ) : (
-                <View style={styles.grid}>
-                    {availableServices.map(s => (
-                        <ServiceCard
-                            key={s._id}
-                            service={s}
-                            selected={selectedServices.some(sel => sel.serviceId === s._id)}
-                            onPress={() => toggleService(s)}
-                        />
-                    ))}
-                </View>
-            )}
-
-            <SectionLabel title="Other Requirement" />
+            {/* ── Additional Requirements ── */}
+            <SectionLabel title="Additional Requirements" />
             <View style={[styles.otherBox, otherFocused && styles.otherBoxFocused]}>
                 <TextInput
                     style={styles.otherInput}
@@ -493,6 +415,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                 />
             </View>
 
+            {/* ── Documents ── */}
             <SectionLabel title="Documents" />
             {uploadedFile ? (
                 <View style={styles.uploadedRow}>
@@ -522,6 +445,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                 </TouchableOpacity>
             )}
 
+            {/* ── Insurance ── */}
             <SectionLabel title="Insurance" />
             <TouchableOpacity
                 style={[styles.insuranceToggle, hasInsurance && styles.insuranceToggleOn]}

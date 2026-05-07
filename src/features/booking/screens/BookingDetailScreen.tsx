@@ -1,7 +1,6 @@
-import { RootStackParamList } from '@/navigation/AppNavigator';
 import { bookingAPI } from '@/service/apis/bookingService';
 import { Colors } from '@/theme/colors';
-import { Booking, BookingStatus } from '@/types/booking';
+import { RootStackParamList } from '@/types/RootStackParamList';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useRef, useEffect, useState } from 'react';
 import {
@@ -13,10 +12,15 @@ import {
     TouchableOpacity,
     Dimensions,
     Animated,
-    Alert,
     ActivityIndicator,
+    TextInput,
+    Modal,
+    Platform,
+    KeyboardAvoidingView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { Booking, BookingStatus } from '../types/Booking';
+import { useAlert } from '@/context/AlertContext';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +49,35 @@ type PopulatedBooking = Omit<Booking, 'userId' | 'vendorId'> & {
     _id: string;
     userId: PopulatedUser;
     vendorId: PopulatedVendor | null;
+};
+
+// ─── Reschedule form state ────────────────────────────────────────────────────
+
+interface RescheduleForm {
+    newDate: string;
+    newTime: string;
+    reason: string;
+}
+
+const RESCHEDULE_FORM_DEFAULT: RescheduleForm = { newDate: '', newTime: '', reason: '' };
+
+// Validation helpers
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/; // HH:MM (24-hr)
+
+const validateRescheduleForm = (form: RescheduleForm): string | null => {
+    if (!form.newDate.trim()) return 'Please enter a new date.';
+    if (!DATE_REGEX.test(form.newDate)) return 'Date must be in YYYY-MM-DD format.';
+    const inputDate = new Date(form.newDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(inputDate.getTime())) return 'Please enter a valid date.';
+    if (inputDate < today) return 'Date cannot be in the past.';
+    if (!form.newTime.trim()) return 'Please enter a new time.';
+    if (!TIME_REGEX.test(form.newTime)) return 'Time must be in HH:MM (24-hr) format.';
+    if (!form.reason.trim()) return 'Please provide a reason for rescheduling.';
+    if (form.reason.trim().length < 5) return 'Reason must be at least 5 characters.';
+    return null;
 };
 
 // ─── Status config ─────────────────────────────────────────────────────────────
@@ -134,16 +167,20 @@ const ServiceRow = ({
     service,
     isLast,
 }: {
-    service: { serviceName: string; price: number; quantity: number };
+    // FIX: quantity is optional in Booking type — handled with fallback below
+    service: { serviceName: string; price: number; quantity?: number };
     isLast: boolean;
-}) => (
-    <View style={[srStyles.row, !isLast && srStyles.border]}>
-        <View style={srStyles.dot} />
-        <Text style={srStyles.name}>{service.serviceName}</Text>
-        <Text style={srStyles.qty}>×{service.quantity}</Text>
-        <Text style={srStyles.price}>₹{(service.price * service.quantity).toLocaleString()}</Text>
-    </View>
-);
+}) => {
+    const qty = service.quantity ?? 1;
+    return (
+        <View style={[srStyles.row, !isLast && srStyles.border]}>
+            <View style={srStyles.dot} />
+            <Text style={srStyles.name}>{service.serviceName}</Text>
+            <Text style={srStyles.qty}>×{qty}</Text>
+            <Text style={srStyles.price}>₹{(service.price * qty).toLocaleString()}</Text>
+        </View>
+    );
+};
 
 const srStyles = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 10 },
@@ -166,14 +203,230 @@ const getInitials = (name: string) =>
         .slice(0, 2)
         .toUpperCase() || '?';
 
+// ─── Reschedule Modal ─────────────────────────────────────────────────────────
+
+interface RescheduleModalProps {
+    visible: boolean;
+    loading: boolean;
+    form: RescheduleForm;
+    onChange: (field: keyof RescheduleForm, value: string) => void;
+    onConfirm: () => void;
+    onClose: () => void;
+}
+
+const RescheduleModal = ({
+    visible,
+    loading,
+    form,
+    onChange,
+    onConfirm,
+    onClose,
+}: RescheduleModalProps) => (
+    <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
+        statusBarTranslucent
+    >
+        <KeyboardAvoidingView
+            style={modalStyles.overlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+            <TouchableOpacity style={modalStyles.backdrop} activeOpacity={1} onPress={onClose} />
+
+            <View style={modalStyles.sheet}>
+                {/* Handle */}
+                <View style={modalStyles.handle} />
+
+                {/* Title */}
+                <View style={modalStyles.titleRow}>
+                    <View style={modalStyles.titleIcon}>
+                        <Text style={{ fontSize: 20 }}>📅</Text>
+                    </View>
+                    <View>
+                        <Text style={modalStyles.title}>Reschedule Booking</Text>
+                        <Text style={modalStyles.subtitle}>
+                            Choose a new date, time &amp; reason
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Date Field */}
+                <View style={modalStyles.fieldGroup}>
+                    <Text style={modalStyles.fieldLabel}>New Date</Text>
+                    <View style={modalStyles.inputWrapper}>
+                        <Text style={modalStyles.inputIcon}>📆</Text>
+                        <TextInput
+                            style={modalStyles.input}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#B0BEC5"
+                            value={form.newDate}
+                            onChangeText={v => onChange('newDate', v)}
+                            keyboardType="numbers-and-punctuation"
+                            maxLength={10}
+                            editable={!loading}
+                        />
+                    </View>
+                </View>
+
+                {/* Time Field */}
+                <View style={modalStyles.fieldGroup}>
+                    <Text style={modalStyles.fieldLabel}>Preferred Time</Text>
+                    <View style={modalStyles.inputWrapper}>
+                        <Text style={modalStyles.inputIcon}>🕐</Text>
+                        <TextInput
+                            style={modalStyles.input}
+                            placeholder="HH:MM  (24-hr format, e.g. 09:30)"
+                            placeholderTextColor="#B0BEC5"
+                            value={form.newTime}
+                            onChangeText={v => onChange('newTime', v)}
+                            keyboardType="numbers-and-punctuation"
+                            maxLength={5}
+                            editable={!loading}
+                        />
+                    </View>
+                </View>
+
+                {/* Reason Field */}
+                <View style={modalStyles.fieldGroup}>
+                    <Text style={modalStyles.fieldLabel}>Reason for Rescheduling</Text>
+                    <View style={[modalStyles.inputWrapper, modalStyles.textAreaWrapper]}>
+                        <TextInput
+                            style={[modalStyles.input, modalStyles.textArea]}
+                            placeholder="e.g. Patient unavailable, need to change time slot..."
+                            placeholderTextColor="#B0BEC5"
+                            value={form.reason}
+                            onChangeText={v => onChange('reason', v)}
+                            multiline
+                            numberOfLines={3}
+                            textAlignVertical="top"
+                            editable={!loading}
+                        />
+                    </View>
+                </View>
+
+                {/* Buttons */}
+                <View style={modalStyles.buttonRow}>
+                    <TouchableOpacity
+                        style={modalStyles.cancelBtn}
+                        onPress={onClose}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[modalStyles.confirmBtn, loading && { opacity: 0.7 }]}
+                        onPress={onConfirm}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={modalStyles.confirmGradient}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <Text style={modalStyles.confirmBtnText}>Confirm Reschedule</Text>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </KeyboardAvoidingView>
+    </Modal>
+);
+
+const modalStyles = StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+    sheet: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+        gap: 16,
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#DDE3EA',
+        alignSelf: 'center',
+        marginBottom: 4,
+    },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    titleIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#E8F9FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    title: { fontSize: 17, fontWeight: '800', color: Colors.textDark, letterSpacing: -0.2 },
+    subtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+
+    fieldGroup: { gap: 6 },
+    fieldLabel: { fontSize: 13, fontWeight: '700', color: Colors.textDark },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#E0E8EF',
+        borderRadius: 14,
+        backgroundColor: '#F8FCFF',
+        paddingHorizontal: 12,
+        gap: 8,
+    },
+    textAreaWrapper: { alignItems: 'flex-start', paddingVertical: 10 },
+    inputIcon: { fontSize: 16 },
+    input: {
+        flex: 1,
+        fontSize: 14,
+        color: Colors.textDark,
+        fontWeight: '500',
+        paddingVertical: 13,
+    },
+    textArea: { paddingVertical: 0, minHeight: 70 },
+
+    buttonRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
+    cancelBtn: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 14,
+        paddingVertical: 14,
+        borderWidth: 1.5,
+        borderColor: '#DDE3EA',
+        backgroundColor: '#F8FCFF',
+    },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
+    confirmBtn: { flex: 2, borderRadius: 14, overflow: 'hidden' },
+    confirmGradient: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+    confirmBtnText: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
+});
+
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
+    const alert = useAlert();
     const bookingId = route.params?.bookingId;
 
     const [booking, setBooking] = useState<PopulatedBooking | null>(null);
     const [loading, setLoading] = useState(true);
     const [expandedPrescription, setExpandedPrescription] = useState<number | null>(null);
+
+    // Reschedule modal state
+    const [rescheduleVisible, setRescheduleVisible] = useState(false);
+    const [rescheduleLoading, setRescheduleLoading] = useState(false);
+    const [rescheduleForm, setRescheduleForm] = useState<RescheduleForm>(RESCHEDULE_FORM_DEFAULT);
 
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
@@ -202,6 +455,103 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         }
     };
 
+    // ── Cancel ─────────────────────────────────────────────────────────────────
+
+    const handleCancelBooking = async () => {
+        try {
+            const response = await bookingAPI.CancelBooking(bookingId);
+            if (response.data?.success) {
+                // Optimistically update local state
+                setBooking(prev =>
+                    prev ? { ...prev, bookingStatus: 'cancelled', cancelledAt: new Date() } : prev,
+                );
+                alert.success('Success', 'Booking cancelled successfully.');
+            } else {
+                alert.error('Error', response.data?.message || 'Could not cancel booking.');
+            }
+        } catch (error: any) {
+            console.error('Error cancelling booking:', error);
+            alert.error(
+                'Error',
+                error?.response?.data?.message || error?.message || 'Something went wrong.',
+            );
+        }
+    };
+
+    // FIX: removed duplicate `Alert.alert`. Fixed onPress — was `() => {handleCancelBooking}` (no-op).
+    const handleCancel = () => {
+        alert.show({
+            title: 'Cancel Booking',
+            message: 'Are you sure you want to cancel this booking?',
+            buttons: [
+                { label: 'No', style: 'secondary', onPress: alert.dismiss },
+                {
+                    label: 'Yes, Cancel',
+                    style: 'danger',
+                    onPress: () => {
+                        alert.dismiss();
+                        handleCancelBooking();
+                    },
+                },
+            ],
+        });
+    };
+
+    // ── Reschedule ─────────────────────────────────────────────────────────────
+
+    const openRescheduleModal = () => {
+        setRescheduleForm(RESCHEDULE_FORM_DEFAULT);
+        setRescheduleVisible(true);
+    };
+
+    const handleRescheduleFormChange = (field: keyof RescheduleForm, value: string) => {
+        setRescheduleForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleRescheduleConfirm = async () => {
+        const error = validateRescheduleForm(rescheduleForm);
+        if (error) {
+            alert.error('Invalid Input', error);
+            return;
+        }
+
+        try {
+            setRescheduleLoading(true);
+
+            const payload = {
+                newDate: rescheduleForm.newDate.trim(),
+                newTime: rescheduleForm.newTime.trim(),
+                reason: rescheduleForm.reason.trim(),
+            };
+
+            const response = await bookingAPI.rescheduleBooking(bookingId, payload);
+
+            if (response.data?.success) {
+                setRescheduleVisible(false);
+                // Optimistically update the preferred time slot shown in the header
+                setBooking(prev =>
+                    prev
+                        ? {
+                              ...prev,
+                              preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
+                          }
+                        : prev,
+                );
+                alert.success('Success', 'Booking rescheduled successfully.');
+            } else {
+                alert.error('Error', response.data?.message || 'Could not reschedule booking.');
+            }
+        } catch (error: any) {
+            console.error('Error rescheduling booking:', error);
+            alert.error(
+                'Error',
+                error?.response?.data?.message || error?.message || 'Something went wrong.',
+            );
+        } finally {
+            setRescheduleLoading(false);
+        }
+    };
+
     // ── Animations (run after data loads) ─────────────────────────────────────
 
     useEffect(() => {
@@ -226,9 +576,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    const formatDate = (iso?: string | null) => {
+    const formatDate = (iso?: string | Date | null) => {
         if (!iso) return '—';
-        return new Date(iso).toLocaleDateString('en-IN', {
+        return new Date(iso as string).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -237,14 +587,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         });
     };
 
-    const handleCancel = () => {
-        Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
-            { text: 'No', style: 'cancel' },
-            { text: 'Yes, Cancel', style: 'destructive', onPress: () => {} },
-        ]);
-    };
-
-    // ── Loading state ──────────────────────────────────────────────────────────
+    // ── Loading ────────────────────────────────────────────────────────────────
 
     if (loading) {
         return (
@@ -255,7 +598,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         );
     }
 
-    // ── Not found state ────────────────────────────────────────────────────────
+    // ── Not Found ──────────────────────────────────────────────────────────────
 
     if (!booking) {
         return (
@@ -277,11 +620,29 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         );
     }
 
-    const status = STATUS_CONFIG[booking.bookingStatus] ?? STATUS_CONFIG.pending;
+    const status = STATUS_CONFIG[booking.bookingStatus ?? 'pending'] ?? STATUS_CONFIG.pending;
+
+    // A booking is still actionable if it's not completed or cancelled
+    const isActionable =
+        booking.bookingStatus !== 'completed' && booking.bookingStatus !== 'cancelled';
+
+    // Reschedule is only available before a provider accepts
+    const canReschedule =
+        booking.bookingStatus === 'pending' || booking.bookingStatus === 'accepted';
 
     return (
         <View style={styles.root}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+            {/* ── Reschedule Modal ── */}
+            <RescheduleModal
+                visible={rescheduleVisible}
+                loading={rescheduleLoading}
+                form={rescheduleForm}
+                onChange={handleRescheduleFormChange}
+                onConfirm={handleRescheduleConfirm}
+                onClose={() => !rescheduleLoading && setRescheduleVisible(false)}
+            />
 
             {/* ── Header ── */}
             <LinearGradient
@@ -418,14 +779,29 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                     ₹{booking.gstAmount.toLocaleString()}
                                 </Text>
                             </View>
-                            {booking.freeComplimentaryService !== 'None' && (
-                                <View style={styles.totalRow}>
-                                    <Text style={[styles.totalLabel, { color: '#00A07A' }]}>
-                                        🎁 Free: {booking.freeComplimentaryService}
-                                    </Text>
-                                    <Text style={[styles.totalVal, { color: '#00A07A' }]}>₹0</Text>
-                                </View>
-                            )}
+                            {booking.appliedCoupon?.discountAmount != null &&
+                                booking.appliedCoupon.discountAmount > 0 && (
+                                    <View style={styles.totalRow}>
+                                        <Text style={[styles.totalLabel, { color: '#00A07A' }]}>
+                                            🏷️ Coupon ({booking.appliedCoupon.couponCode})
+                                        </Text>
+                                        <Text style={[styles.totalVal, { color: '#00A07A' }]}>
+                                            −₹
+                                            {booking.appliedCoupon.discountAmount.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                )}
+                            {booking.freeComplimentaryService &&
+                                booking.freeComplimentaryService !== 'None' && (
+                                    <View style={styles.totalRow}>
+                                        <Text style={[styles.totalLabel, { color: '#00A07A' }]}>
+                                            🎁 Free: {booking.freeComplimentaryService}
+                                        </Text>
+                                        <Text style={[styles.totalVal, { color: '#00A07A' }]}>
+                                            ₹0
+                                        </Text>
+                                    </View>
+                                )}
                             <View style={[styles.totalRow, styles.grandTotalRow]}>
                                 <Text style={styles.grandTotalLabel}>Grand Total</Text>
                                 <LinearGradient
@@ -435,7 +811,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                     style={styles.grandTotalBadge}
                                 >
                                     <Text style={styles.grandTotalVal}>
-                                        ₹{booking.grandTotal.toLocaleString()}
+                                        ₹
+                                        {(
+                                            booking.finalAmount ?? booking.grandTotal
+                                        ).toLocaleString()}
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -490,7 +869,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                     </TouchableOpacity>
                                 </View>
                                 <InfoRow label="Email" value={booking.vendorId.email} />
-                                <InfoRow label="Location" value={booking.serviceLocation} />
+                                <InfoRow label="Location" value={booking.serviceLocation ?? '—'} />
                             </View>
                         </>
                     )}
@@ -566,7 +945,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                             {!!rx.followUpDate && (
                                                 <InfoRow
                                                     label="Follow-up"
-                                                    value={rx.followUpDate}
+                                                    value={String(rx.followUpDate)}
                                                     accent
                                                 />
                                             )}
@@ -649,8 +1028,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     </View>
 
                     {/* ── Action Buttons ── */}
-                    {booking.bookingStatus !== 'completed' &&
-                        booking.bookingStatus !== 'cancelled' && (
+                    {isActionable && (
+                        <View style={styles.actionsCol}>
+                            {/* Row 1: Contact Provider + Reschedule */}
                             <View style={styles.actionsRow}>
                                 {booking.vendorId && (
                                     <TouchableOpacity style={styles.contactBtn} activeOpacity={0.8}>
@@ -658,15 +1038,31 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         <Text style={styles.contactBtnText}>Contact Provider</Text>
                                     </TouchableOpacity>
                                 )}
-                                <TouchableOpacity
-                                    style={[styles.cancelBtn, !booking.vendorId && { flex: 1 }]}
-                                    onPress={handleCancel}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.cancelBtnText}>Cancel Booking</Text>
-                                </TouchableOpacity>
+                                {canReschedule && (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.rescheduleBtn,
+                                            !booking.vendorId && { flex: 1 },
+                                        ]}
+                                        onPress={openRescheduleModal}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={styles.rescheduleBtnIcon}>📅</Text>
+                                        <Text style={styles.rescheduleBtnText}>Reschedule</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                        )}
+
+                            {/* Row 2: Cancel (full width) */}
+                            <TouchableOpacity
+                                style={styles.cancelBtn}
+                                onPress={handleCancel}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.cancelBtnText}>Cancel Booking</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {booking.bookingStatus === 'completed' && !booking.reportUrl && (
                         <View style={styles.reportPending}>
@@ -914,9 +1310,10 @@ const styles = StyleSheet.create({
     timelineTime: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
 
     // Actions
-    actionsRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
+    actionsCol: { marginTop: 24, gap: 10 },
+    actionsRow: { flexDirection: 'row', gap: 10 },
     contactBtn: {
-        flex: 1.5,
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -934,8 +1331,21 @@ const styles = StyleSheet.create({
     },
     contactBtnIcon: { fontSize: 18 },
     contactBtnText: { fontSize: 14, fontWeight: '700', color: Colors.gradientMid },
-    cancelBtn: {
+    rescheduleBtn: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EFF6FF',
+        borderRadius: 16,
+        paddingVertical: 14,
+        gap: 8,
+        borderWidth: 1.5,
+        borderColor: '#93C5FD',
+    },
+    rescheduleBtnIcon: { fontSize: 16 },
+    rescheduleBtnText: { fontSize: 14, fontWeight: '700', color: '#1D4ED8' },
+    cancelBtn: {
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#FFF0F0',

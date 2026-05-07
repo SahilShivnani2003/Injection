@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
     Switch,
     Modal,
     StatusBar,
+    RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -18,6 +19,8 @@ import { Colors } from '@/theme/colors';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { UserTabParamList } from '@/types/UserTabParamList';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { User } from '../types/User';
+import { userApi } from '@/service/apis/userService';
 
 type ProfileProps = NativeBottomTabScreenProps<UserTabParamList, 'Profile'>;
 
@@ -49,10 +52,35 @@ const SectionHeader = ({ title }: { title: string }) => (
 );
 
 const ProfileScreen = ({ navigation }: ProfileProps) => {
-    const { removeAuth, user } = useAuthStore();
+    const { removeAuth } = useAuthStore();
+    const [loading, setLoading] = useState<boolean>(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [user, setUser] = useState<User | null>();
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            console.log('Fetching user profile...');
+
+            const response = await userApi.getProfile();
+
+            if (response.data.success) {
+                setUser(response.data.data);
+            }
+        } catch (error) {
+            console.log('Error while fetching user profile', error);
+            setUser(null);
+        }
+    };
+
+    const handleRefresh = () =>{
+        fetchProfile();
+    }
     const handleLogout = async () => {
         setLogoutModalVisible(false);
         await removeAuth();
@@ -87,7 +115,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
         upcoming: 0,
     };
 
-    if (!user) {
+    if (loading) {
         return (
             <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
                 <Text style={styles.menuLabel}>Loading profile...</Text>
@@ -126,21 +154,27 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                    />
+                }
             >
                 {/* ── Avatar Card ── */}
                 <View style={styles.avatarCard}>
                     <View style={styles.avatarRing}>
-                        {user.profileImage ? (
-                            <Image source={{ uri: user.profileImage }} style={styles.avatar} />
+                        {user?.profileImage ? (
+                            <Image source={{ uri: user?.profileImage }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                 <Text style={styles.avatarText}>
-                                    {user.name.charAt(0).toUpperCase()}
+                                    {user?.name.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
                         )}
                     </View>
-                    <Text style={styles.name}>{user.name}</Text>
+                    <Text style={styles.name}>{user?.name}</Text>
 
                     {/* Role pill with vector icon */}
                     <View style={styles.rolePill}>
@@ -174,10 +208,10 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Personal Information ── */}
                 <SectionHeader title="PERSONAL INFORMATION" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="email" label="Email" sublabel={user.email} />
+                    <MenuRow icon="email" label="Email" sublabel={user?.email} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="phone" label="Phone" sublabel={user.phone} />
-                    {user.alternateMobile && (
+                    <MenuRow icon="phone" label="Phone" sublabel={user?.phone} />
+                    {user?.alternateMobile && (
                         <>
                             <View style={styles.rowDivider} />
                             <MenuRow
@@ -192,8 +226,8 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                     <View style={styles.rowDivider} />
                     <MenuRow icon="cake" label="Age" sublabel={getDateOfBirth()} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="wc" label="Gender" sublabel={user.gender} />
-                    {user.bloodGroup && user.bloodGroup !== 'Unknown' && (
+                    <MenuRow icon="wc" label="Gender" sublabel={user?.gender} />
+                    {user?.bloodGroup && user?.bloodGroup !== 'Unknown' && (
                         <>
                             <View style={styles.rowDivider} />
                             <MenuRow
@@ -206,9 +240,9 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 </View>
 
                 {/* ── Medical Information ── */}
-                {user.allergies?.length ||
-                user.chronicDiseases?.length ||
-                user.currentMedications?.length ? (
+                {user?.allergies?.length ||
+                user?.chronicDiseases?.length ||
+                user?.currentMedications?.length ? (
                     <>
                         <SectionHeader title="MEDICAL INFORMATION" />
                         <View style={styles.menuCard}>
@@ -244,7 +278,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 ) : null}
 
                 {/* ── Insurance Information ── */}
-                {user.hasInsurance && (
+                {user?.hasInsurance && (
                     <>
                         <SectionHeader title="INSURANCE" />
                         <View style={styles.menuCard}>
@@ -294,7 +328,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 )}
 
                 {/* ── Emergency Contact ── */}
-                {user.emergencyContactName && (
+                {user?.emergencyContactName && (
                     <>
                         <SectionHeader title="EMERGENCY CONTACT" />
                         <View style={styles.menuCard}>
@@ -372,7 +406,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                     <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => {}} />
                     <View style={styles.rowDivider} />
                     <MenuRow icon="description" label="Terms of Service" onPress={() => {}} />
-                        <MenuRow icon="info" label="About" onPress={() => {}} />
+                    <MenuRow icon="info" label="About" onPress={() => {}} />
                 </View>
 
                 {/* ── Danger Zone ── */}
@@ -385,7 +419,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                         onPress={() => setLogoutModalVisible(true)}
                     />
                 </View>
-                <View style={{height:40, marginBottom: 28}}></View>
+                <View style={{ height: 40, marginBottom: 28 }}></View>
             </ScrollView>
 
             {/* ── Logout Confirmation Modal ── */}

@@ -23,6 +23,7 @@ import Loader from '@/components/Loader';
 import { useAlert } from '@/context/AlertContext';
 import { userApi } from '@/service/apis/userService';
 import { useAuthStore } from '@/store/useAuthStore';
+import { vendorAPI } from '@/service/apis/vendorService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,7 +35,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [userType, setUserType] = useState<'patient' | 'labpartner' | 'Vendor'>('patient');
+    const [userType, setUserType] = useState<'patient' | 'Vendor'>('patient');
     const alert = useAlert();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -75,10 +76,6 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        // FIX 2: Was `emailRegex.test(email)` — a value like " user@email.com "
-        //         passes the non-empty check but fails the regex. Now tests the
-        //         already-trimmed value so validation is consistent.
         if (!emailRegex.test(trimmedEmail)) {
             alert.warning('Invalid Email', 'Please enter a valid email address');
             return;
@@ -86,10 +83,18 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
         try {
             setIsLoading(true);
-            const response = await userApi.login({ email: trimmedEmail, password });
+            const response =
+                userType === 'patient'
+                    ? await userApi.login({ email: trimmedEmail, password })
+                    : await vendorAPI.loginVendor({ email: trimmedEmail, password });
+
             if (response.data?.success) {
+                console.log('Login response : ', response.data);
+
                 alert.success('Login Successful', 'Welcome back!');
-                setAuth(response.data.data.user, response.data.data.token);
+
+                setAuth(userType === 'Vendor' ? response.data.data?.vendor : response.data.data.user, userType, response.data.data.token);
+
                 if (userType === 'Vendor') {
                     navigation.replace('VendorTab', { screen: 'Dashboard' });
                 } else {
@@ -98,15 +103,16 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             } else {
                 alert.error('Login Failed', 'Invalid email or password. Please try again.');
             }
-        } catch (error) {
-            alert.error('Login Failed', 'An error occurred while logging in. Please try again.');
+        } catch (error:any) {
+            console.error('Error while vendor loggin : ', error);
+            alert.error('Login Failed', error?.message || 'An error occurred while logging in. Please try again.');
         } finally {
             setIsLoading(false);
         }
     };
 
     const userTypes: {
-        key: 'patient' | 'labpartner' | 'Vendor';
+        key: 'patient' | 'Vendor';
         label: string;
         icon: string; // MaterialIcons name
     }[] = [
@@ -293,11 +299,11 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                         {/* ── Register Link ───────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.registerLink}
-                            onPress={() =>{
-                                if(userType === 'Vendor'){
-                                    navigation.navigate('VendorRegister')
-                                }else{
-                                    navigation.navigate('Register')
+                            onPress={() => {
+                                if (userType === 'Vendor') {
+                                    navigation.navigate('VendorRegister');
+                                } else {
+                                    navigation.navigate('Register');
                                 }
                             }}
                             activeOpacity={0.7}

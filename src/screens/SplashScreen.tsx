@@ -119,12 +119,18 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
     useEffect(() => {
         const handleNavigation = async () => {
             await loadAuth();
-            const { isAuthenticated } = useAuthStore.getState();
+            const { isAuthenticated, loggedInRole } = useAuthStore.getState();
 
             if (isAuthenticated) {
-                navigation.replace('UserTab', {
-                    screen: 'Dashboard',
-                });
+                if (loggedInRole === 'Vendor') {
+                    navigation.replace('VendorTab', {
+                        screen: 'Dashboard',
+                    });
+                } else {
+                    navigation.replace('UserTab', {
+                        screen: 'Dashboard',
+                    });
+                }
             } else {
                 navigation.replace('Login');
             }

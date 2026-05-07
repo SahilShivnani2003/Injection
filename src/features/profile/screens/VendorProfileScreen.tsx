@@ -8,6 +8,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Image,
+    RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,14 +19,18 @@ import { Vendor } from '../types/Vendor';
 import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RootStackParamList } from '@/types/RootStackParamList';
+import { useAlert } from '@/context/AlertContext';
 
 type VendorProfileProps = NativeBottomTabScreenProps<VendorTabParamList, 'Profile'>;
 
 const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
+    const alert = useAlert();
     const rootNav = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
     const vendorData = useAuthStore().user;
+    const { removeAuth } = useAuthStore();
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
     useEffect(() => {
         if (vendorData?._id) {
@@ -34,14 +39,15 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
     }, [vendorData?._id]);
 
     const fetchVendorProfile = async () => {
-        if(!vendorData?._id){
-            console.log('Vendor id not found')
+        if (!vendorData?._id) {
+            console.log('Vendor id not found');
             return;
         }
         setLoading(true);
         try {
             const response = await vendorAPI.fetchProfile(vendorData._id);
-            setVendor(response.data?.vendor ?? response.data);
+            console.log('Vendor profile response ', response.data);
+            setVendor(response.data?.data);
         } catch (error) {
             console.warn('Unable to load vendor profile', error);
         } finally {
@@ -60,6 +66,27 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
         );
     };
 
+    const handleRefresh = () => {
+        fetchVendorProfile();
+    };
+
+    const handleLogOut = () => {
+        alert.show({
+            title: 'Log Out',
+            message: 'Are you sure, you want to log out ?',
+            buttons: [
+                { label: 'No', onPress: alert.dismiss, style: 'ghost' },
+                {
+                    label: 'Log Out',
+                    onPress: async () => {
+                        await removeAuth();
+                        rootNav.navigate('Login');
+                    },
+                    style: 'danger',
+                },
+            ],
+        });
+    };
     const renderDocument = (label: string, doc?: { url?: string }) => {
         if (!doc?.url) return null;
         return (
@@ -77,18 +104,6 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
             </View>
         );
     }
-
-    if (!vendor) {
-        return (
-            <View style={[styles.root, styles.centered]}>
-                <Text style={styles.emptyText}>Vendor profile is unavailable.</Text>
-                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.goBack()}>
-                    <Text style={styles.actionText}>Go Back</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
     return (
         <View style={styles.root}>
             <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
@@ -104,24 +119,34 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                 <Text style={styles.headerTitle}>Vendor Profile</Text>
             </LinearGradient>
 
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+                }
+            >
                 <View style={styles.profileCard}>
-                    {vendor.profileImage ? (
+                    {vendor?.profileImage ? (
                         <Image source={{ uri: vendor.profileImage }} style={styles.avatar} />
                     ) : (
                         <View style={styles.avatarPlaceholder}>
-                            <Text style={styles.avatarInitial}>{vendor.name?.charAt(0)?.toUpperCase() ?? 'V'}</Text>
+                            <Text style={styles.avatarInitial}>
+                                {vendor?.name?.charAt(0)?.toUpperCase() ?? 'V'}
+                            </Text>
                         </View>
                     )}
-                    <Text style={styles.vendorName}>{vendor.businessName || vendor.name}</Text>
-                    <Text style={styles.vendorSubtitle}>{vendor.name}</Text>
+                    <Text style={styles.vendorName}>{vendor?.businessName || vendor?.name}</Text>
+                    <Text style={styles.vendorSubtitle}>{vendor?.name}</Text>
                     <View style={styles.badgeRow}>
-                        <View style={styles.badge}> 
-                            <Text style={styles.badgeText}>{vendor.businessType}</Text>
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{vendor?.businessType}</Text>
                         </View>
-                        {vendor.isVerified && (
+                        {vendor?.isVerified && (
                             <View style={[styles.badge, styles.verifiedBadge]}>
-                                <Text style={[styles.badgeText, styles.verifiedText]}>Verified</Text>
+                                <Text style={[styles.badgeText, styles.verifiedText]}>
+                                    Verified
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -129,27 +154,27 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionHeading}>Contact</Text>
-                    {renderRow('Email', vendor.email)}
-                    {renderRow('Phone', vendor.phone)}
-                    {renderRow('Alternate', vendor.alternatePhone)}
-                    {renderRow('Address', vendor.address)}
-                    {renderRow('City', vendor.city)}
-                    {renderRow('State', vendor.state)}
-                    {renderRow('Pincode', vendor.pincode)}
+                    {renderRow('Email', vendor?.email)}
+                    {renderRow('Phone', vendor?.phone)}
+                    {renderRow('Alternate', vendor?.alternatePhone)}
+                    {renderRow('Address', vendor?.address)}
+                    {renderRow('City', vendor?.city)}
+                    {renderRow('State', vendor?.state)}
+                    {renderRow('Pincode', vendor?.pincode)}
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionHeading}>Business</Text>
-                    {renderRow('Business Type', vendor.businessType)}
-                    {renderRow('Registration #', vendor.registrationNumber)}
-                    {renderRow('GST Number', vendor.gstNumber)}
-                    {renderRow('Services Offered', vendor.servicesOffered)}
-                    {renderRow('Specialization', vendor.specialization)}
-                    {renderRow('Experience', vendor.experience)}
-                    {renderRow('Service Areas', vendor.serviceAreas)}
+                    {renderRow('Business Type', vendor?.businessType)}
+                    {renderRow('Registration #', vendor?.registrationNumber)}
+                    {renderRow('GST Number', vendor?.gstNumber)}
+                    {renderRow('Services Offered', vendor?.servicesOffered)}
+                    {renderRow('Specialization', vendor?.specialization)}
+                    {renderRow('Experience', vendor?.experience)}
+                    {renderRow('Service Areas', vendor?.serviceAreas)}
                 </View>
 
-                {vendor.bio ? (
+                {vendor?.bio ? (
                     <View style={styles.section}>
                         <Text style={styles.sectionHeading}>About</Text>
                         <Text style={styles.bioText}>{vendor.bio}</Text>
@@ -158,23 +183,34 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionHeading}>Bank Details</Text>
-                    {renderRow('Bank', vendor.bankDetails?.bankName)}
-                    {renderRow('Account', vendor.bankDetails?.accountNumber)}
-                    {renderRow('IFSC', vendor.bankDetails?.ifscCode)}
-                    {renderRow('Branch', vendor.bankDetails?.branch)}
+                    {renderRow('Bank', vendor?.bankDetails?.bankName)}
+                    {renderRow('Account', vendor?.bankDetails?.accountNumber)}
+                    {renderRow('IFSC', vendor?.bankDetails?.ifscCode)}
+                    {renderRow('Branch', vendor?.bankDetails?.branch)}
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionHeading}>Documents</Text>
-                    {renderDocument('Identity Proof', vendor.documents?.identityProof)}
-                    {renderDocument('Qualification', vendor.documents?.qualificationCertificate)}
-                    {renderDocument('License', vendor.documents?.businessLicense)}
-                    {renderDocument('Insurance', vendor.documents?.insuranceCertificate)}
+                    {renderDocument('Identity Proof', vendor?.documents?.identityProof)}
+                    {renderDocument('Qualification', vendor?.documents?.qualificationCertificate)}
+                    {renderDocument('License', vendor?.documents?.businessLicense)}
+                    {renderDocument('Insurance', vendor?.documents?.insuranceCertificate)}
                 </View>
 
-                <TouchableOpacity style={styles.actionButton} onPress={() => rootNav.navigate('VendorRegister')}>
+                <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => rootNav.navigate('VendorRegister')}
+                >
                     <Text style={styles.actionText}>Edit Registration</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.logOutButton}
+                    onPress={handleLogOut}
+                >
+                    <Text style={styles.actionText}>Log Out</Text>
+                </TouchableOpacity>
+                <View style={{ height: 40, marginBottom: 28 }}></View>
             </ScrollView>
         </View>
     );
@@ -323,6 +359,13 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 6,
+    },
+    logOutButton: {
+        backgroundColor: '#ed3755',
+        borderRadius: 16,
+        paddingVertical: 16,
+        alignItems: 'center',
+        marginTop: 10,
     },
     actionText: {
         color: Colors.white,

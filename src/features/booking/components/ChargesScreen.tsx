@@ -22,10 +22,10 @@ const ServiceRow: React.FC<{
         </View>
         <View style={styles.serviceInfo}>
             <Text style={styles.serviceRowName}>{service.serviceName}</Text>
-            {service.quantity > 1 && <Text style={styles.serviceQty}>x{service.quantity}</Text>}
+            {(service.quantity ?? 1) > 1 && <Text style={styles.serviceQty}>x{service.quantity ?? 1}</Text>}
         </View>
         <Text style={styles.serviceRowCharge}>
-            ₹{(service.price * service.quantity).toLocaleString('en-IN')}
+            ₹{(service.price * (service.quantity ?? 1)).toLocaleString('en-IN')}
         </Text>
     </View>
 );

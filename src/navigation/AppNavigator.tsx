@@ -4,17 +4,15 @@ import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../features/auth/screens/LoginScreen';
 import EmailLoginScreen from '../features/auth/screens/EmailLoginScreen';
 import RegisterScreen from '../features/auth/screens/RegisterScreen';
-import BasicDetailsScreen from '../screens/user/booking/BasicDetailsScreen';
+import BasicDetailsScreen from '../features/booking/components/BasicDetailsScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
-import LabPartnerScreen from '../screens/vendor/LabPartnerScreen';
 import VendorRegisterScreen from '../features/auth/screens/VendorRegistrationScreen';
 import VendorTabNavigation from './VendorTabNavigation';
-import StaffPanelScreen from '../screens/staff/StaffPanelScreen';
 import TabNavigator from './TabNavigator';
 import { useColorScheme } from 'react-native';
 import { AlertProvider } from '../context/AlertContext';
-import BookingScreen from '../screens/user/BookingScreen';
-import BookingDetailScreen from '@/screens/user/BookingDetailScreen';
+import BookingScreen from '../features/booking/screens/BookingScreen';
+import BookingDetailScreen from '@/features/booking/screens/BookingDetailScreen';
 import { RootStackParamList } from '@/types/RootStackParamList';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,10 +37,8 @@ export default function AppNavigator() {
                     <Stack.Screen name="Register" component={RegisterScreen} />
                     <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
-                    <Stack.Screen name="LabPartner" component={LabPartnerScreen} />
                     <Stack.Screen name="VendorRegister" component={VendorRegisterScreen} />
                     <Stack.Screen name="VendorTab" component={VendorTabNavigation} />
-                    <Stack.Screen name="StaffPanel" component={StaffPanelScreen} />
                     <Stack.Screen name="UserTab" component={TabNavigator} />
                     <Stack.Screen name="Booking" component={BookingScreen} />
                     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />

@@ -1,3 +1,4 @@
+export type BookingStatus = 'pending' | 'accepted' | 'in-progress' | 'completed' | 'cancelled';
 export interface Booking {
     _id?: string;
     // Patient Information
@@ -78,7 +79,7 @@ export interface Booking {
     vendorId?: string | null;
 
     // Booking Status
-    bookingStatus?: 'pending' | 'accepted' | 'in-progress' | 'completed' | 'cancelled';
+    bookingStatus?: BookingStatus;
     acceptedAt?: Date;
     startedAt?: Date;
     completedAt?: Date;

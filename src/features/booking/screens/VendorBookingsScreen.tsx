@@ -47,8 +47,6 @@ const VendorBookingsScreen = ({ navigation }: NativeBottomTabScreenProps<VendorT
                 await bookingAPI.vendorStartBooking({ bookingId });
             } else if (action === 'complete') {
                 await bookingAPI.vendorCompleteBooking({ bookingId });
-            } else {
-                await bookingAPI.vendorCancelBooking({ bookingId });
             }
             await fetchBookings();
         } catch (error) {
