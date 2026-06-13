@@ -15,6 +15,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../../theme/colors';
 import { vendorAPI } from '../../../service/apis/vendorService';
 import { Vendor } from '../types/Vendor';
@@ -30,9 +31,14 @@ const { width } = Dimensions.get('window');
 // ── Verification badge config ──────────────────────────────────────────────────
 
 const VERIFICATION_CONFIG = {
-    pending: { label: 'Pending Review', bg: '#FFF8E6', text: '#C07800', icon: '⏳' },
-    verified: { label: 'Verified', bg: '#E6FFF5', text: '#00A07A', icon: '✅' },
-    rejected: { label: 'Rejected', bg: '#FFF0F0', text: '#CC2200', icon: '❌' },
+    pending: { label: 'Pending Review', bg: '#FFF8E6', text: '#C07800', icon: 'time-outline' },
+    verified: {
+        label: 'Verified',
+        bg: '#E6FFF5',
+        text: '#00A07A',
+        icon: 'checkmark-circle',
+    },
+    rejected: { label: 'Rejected', bg: '#FFF0F0', text: '#CC2200', icon: 'close-circle' },
 } as const;
 
 // ── Section Header ────────────────────────────────────────────────────────────
@@ -40,7 +46,7 @@ const VERIFICATION_CONFIG = {
 const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
     <View style={sh.row}>
         <View style={sh.iconBox}>
-            <Text style={sh.icon}>{icon}</Text>
+            <Ionicons name={icon} size={15} color={Colors.gradientStart} />
         </View>
         <Text style={sh.title}>{title}</Text>
         <View style={sh.line} />
@@ -57,7 +63,6 @@ const sh = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    icon: { fontSize: 15 },
     title: {
         fontSize: 12,
         fontWeight: '700',
@@ -73,7 +78,7 @@ const sh = StyleSheet.create({
 const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
     <View style={ir.row}>
         <View style={ir.iconBox}>
-            <Text style={ir.icon}>{icon}</Text>
+            <Ionicons name={icon} size={16} color={Colors.gradientStart} />
         </View>
         <View style={{ flex: 1 }}>
             <Text style={ir.label}>{label}</Text>
@@ -100,7 +105,6 @@ const ir = StyleSheet.create({
         justifyContent: 'center',
         marginTop: 2,
     },
-    icon: { fontSize: 15 },
     label: {
         fontSize: 11,
         fontWeight: '700',
@@ -112,19 +116,19 @@ const ir = StyleSheet.create({
     value: { fontSize: 13, fontWeight: '600', color: Colors.textDark, lineHeight: 19 },
 });
 
-// ── Services Chip List ────────────────────────────────────────────────────────
+// ── Chip List ─────────────────────────────────────────────────────────────────
 
-const ServicesChips = ({ services }: { services: string[] }) => (
-    <View style={sc.wrap}>
-        {services.map(s => (
-            <View key={s} style={sc.chip}>
-                <Text style={sc.text}>{s}</Text>
+const ChipList = ({ items }: { items: string[] }) => (
+    <View style={cl.wrap}>
+        {items.map(item => (
+            <View key={item} style={cl.chip}>
+                <Text style={cl.text}>{item}</Text>
             </View>
         ))}
     </View>
 );
 
-const sc = StyleSheet.create({
+const cl = StyleSheet.create({
     wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
     chip: {
         backgroundColor: Colors.gradientStart + '18',
@@ -159,6 +163,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
         isRefresh ? setRefreshing(true) : setLoading(true);
         try {
             const response = await vendorAPI.fetchProfile(vendorData._id);
+            console.log('response : ', response.data);
             setVendor(response.data?.data ?? null);
         } catch (error) {
             console.warn('Unable to load vendor profile', error);
@@ -195,7 +200,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     onPress: async () => {
                         await removeAuth();
                         alert.dismiss();
-                        rootNav.navigate('Login');
+                        rootNav?.navigate('Login');
                     },
                 },
             ],
@@ -214,6 +219,8 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
             .slice(0, 2)
             .toUpperCase();
 
+    const formatCurrency = (value: number) => `₹${value.toLocaleString('en-IN')}`;
+
     // ── Loading ───────────────────────────────────────────────────────────────
 
     if (loading) {
@@ -227,9 +234,31 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
     const verif = VERIFICATION_CONFIG[vendor?.verificationStatus ?? 'pending'];
 
+    const hasBankDetails =
+        !!vendor?.bankDetails?.bankName ||
+        !!vendor?.bankDetails?.accountHolderName ||
+        !!vendor?.bankDetails?.accountNumber ||
+        !!vendor?.bankDetails?.ifscCode ||
+        !!vendor?.bankDetails?.branch;
+
+    const hasDocuments =
+        !!vendor?.documents?.identityProof?.url ||
+        !!vendor?.documents?.qualificationCertificate?.url ||
+        !!vendor?.documents?.businessLicense?.url ||
+        !!vendor?.documents?.insuranceCertificate?.url;
+
+    const hasAvailability =
+        !!vendor?.availability?.days?.length ||
+        !!vendor?.availability?.timeSlots?.length ||
+        vendor?.availability?.emergencyAvailable != null;
+
+    const hasPricing =
+        vendor?.pricing?.consultationFee != null ||
+        vendor?.pricing?.homeVisitFee != null ||
+        vendor?.pricing?.emergencyFee != null;
+
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -287,7 +316,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             </View>
                         )}
                         <View style={[styles.verifBadge, { backgroundColor: verif.bg }]}>
-                            <Text style={styles.verifIcon}>{verif.icon}</Text>
+                            <Ionicons name={verif.icon} size={12} color={verif.text} />
                             <Text style={[styles.verifText, { color: verif.text }]}>
                                 {verif.label}
                             </Text>
@@ -328,64 +357,85 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                 >
                     {/* ── Contact ── */}
                     <View style={styles.card}>
-                        <SectionHeader icon="📞" title="Contact" />
-                        {vendor?.email && <InfoRow icon="✉️" label="Email" value={vendor.email} />}
-                        {vendor?.phone && <InfoRow icon="📱" label="Phone" value={vendor.phone} />}
+                        <SectionHeader icon="call-outline" title="Contact" />
+                        {vendor?.email && (
+                            <InfoRow icon="mail-outline" label="Email" value={vendor.email} />
+                        )}
+                        {vendor?.phone && (
+                            <InfoRow
+                                icon="phone-portrait-outline"
+                                label="Phone"
+                                value={vendor.phone}
+                            />
+                        )}
                         {vendor?.alternatePhone && (
-                            <InfoRow icon="📟" label="Alternate" value={vendor.alternatePhone} />
+                            <InfoRow
+                                icon="call-outline"
+                                label="Alternate"
+                                value={vendor.alternatePhone}
+                            />
                         )}
                         {vendor?.address && (
-                            <InfoRow icon="🏠" label="Address" value={vendor.address} />
+                            <InfoRow icon="home-outline" label="Address" value={vendor.address} />
                         )}
                         {(vendor?.city || vendor?.state) && (
                             <InfoRow
-                                icon="📍"
+                                icon="location-outline"
                                 label="City / State"
                                 value={[vendor?.city, vendor?.state].filter(Boolean).join(', ')}
                             />
                         )}
                         {vendor?.pincode && (
-                            <InfoRow icon="🔢" label="Pincode" value={vendor.pincode} />
+                            <InfoRow icon="keypad-outline" label="Pincode" value={vendor.pincode} />
                         )}
                     </View>
 
                     {/* ── Business ── */}
                     <View style={styles.card}>
-                        <SectionHeader icon="🏢" title="Business" />
+                        <SectionHeader icon="business-outline" title="Business" />
                         {vendor?.registrationNumber && (
                             <InfoRow
-                                icon="📋"
+                                icon="document-text-outline"
                                 label="Registration #"
                                 value={vendor.registrationNumber}
                             />
                         )}
                         {vendor?.gstNumber && (
-                            <InfoRow icon="🧾" label="GST Number" value={vendor.gstNumber} />
+                            <InfoRow
+                                icon="receipt-outline"
+                                label="GST Number"
+                                value={vendor.gstNumber}
+                            />
                         )}
                         {vendor?.specialization && (
                             <InfoRow
-                                icon="🎯"
+                                icon="ribbon-outline"
                                 label="Specialization"
                                 value={vendor.specialization}
                             />
                         )}
-                        {vendor?.serviceAreas && (
+                        {vendor?.experience != null && (
                             <InfoRow
-                                icon="🗺️"
+                                icon="trophy-outline"
+                                label="Experience"
+                                value={`${vendor.experience} year${
+                                    vendor.experience === 1 ? '' : 's'
+                                }`}
+                            />
+                        )}
+                        {(vendor?.serviceAreas?.length ?? 0) > 0 && (
+                            <InfoRow
+                                icon="map-outline"
                                 label="Service Areas"
-                                value={
-                                    Array.isArray(vendor.serviceAreas)
-                                        ? vendor.serviceAreas.join(', ')
-                                        : vendor.serviceAreas
-                                }
+                                value={vendor!.serviceAreas!.join(', ')}
                             />
                         )}
 
                         {/* Services as chips */}
-                        {(vendor?.servicesOffered?.length ?? 0) > 0 && (
+                        {(vendor?.services?.length ?? 0) > 0 && (
                             <View style={{ marginTop: 8 }}>
                                 <Text style={styles.chipSectionLabel}>Services Offered</Text>
-                                <ServicesChips services={vendor!.servicesOffered as string[]} />
+                                <ChipList items={vendor!.services!.map(s => s.serviceName)} />
                             </View>
                         )}
                     </View>
@@ -393,41 +443,125 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     {/* ── About ── */}
                     {!!vendor?.bio && (
                         <View style={styles.card}>
-                            <SectionHeader icon="💬" title="About" />
+                            <SectionHeader icon="chatbubble-ellipses-outline" title="About" />
                             <Text style={styles.bioText}>{vendor.bio}</Text>
                         </View>
                     )}
 
-                    {/* ── Bank Details ── */}
-                    {(vendor?.bankDetails?.bankName ||
-                        vendor?.bankDetails?.accountNumber ||
-                        vendor?.bankDetails?.ifscCode) && (
+                    {/* ── Qualifications ── */}
+                    {(vendor?.qualifications?.length ?? 0) > 0 && (
                         <View style={styles.card}>
-                            <SectionHeader icon="🏦" title="Bank Details" />
+                            <SectionHeader icon="school-outline" title="Qualifications" />
+                            {vendor!.qualifications!.map((q, idx) => (
+                                <InfoRow
+                                    key={`${q.degree ?? 'qual'}-${idx}`}
+                                    icon="ribbon-outline"
+                                    label={q.degree ?? 'Qualification'}
+                                    value={
+                                        [q.institution, q.year ? `${q.year}` : null]
+                                            .filter(Boolean)
+                                            .join(' · ') || '—'
+                                    }
+                                />
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ── Availability ── */}
+                    {hasAvailability && (
+                        <View style={styles.card}>
+                            <SectionHeader icon="calendar-outline" title="Availability" />
+                            {(vendor?.availability?.days?.length ?? 0) > 0 && (
+                                <View style={{ marginBottom: 8 }}>
+                                    <Text style={styles.chipSectionLabel}>Available Days</Text>
+                                    <ChipList items={vendor!.availability!.days as string[]} />
+                                </View>
+                            )}
+                            {vendor?.availability?.timeSlots?.map((slot, idx) => (
+                                <InfoRow
+                                    key={`slot-${idx}`}
+                                    icon="time-outline"
+                                    label={`Time Slot ${idx + 1}`}
+                                    value={
+                                        slot.from && slot.to
+                                            ? `${slot.from} – ${slot.to}`
+                                            : slot.from || slot.to || '—'
+                                    }
+                                />
+                            ))}
+                            {vendor?.availability?.emergencyAvailable != null && (
+                                <InfoRow
+                                    icon="alert-circle-outline"
+                                    label="Emergency Available"
+                                    value={vendor.availability.emergencyAvailable ? 'Yes' : 'No'}
+                                />
+                            )}
+                        </View>
+                    )}
+
+                    {/* ── Pricing ── */}
+                    {hasPricing && (
+                        <View style={styles.card}>
+                            <SectionHeader icon="cash-outline" title="Pricing" />
+                            {vendor?.pricing?.consultationFee != null && (
+                                <InfoRow
+                                    icon="cash-outline"
+                                    label="Consultation Fee"
+                                    value={formatCurrency(vendor.pricing.consultationFee)}
+                                />
+                            )}
+                            {vendor?.pricing?.homeVisitFee != null && (
+                                <InfoRow
+                                    icon="cash-outline"
+                                    label="Home Visit Fee"
+                                    value={formatCurrency(vendor.pricing.homeVisitFee)}
+                                />
+                            )}
+                            {vendor?.pricing?.emergencyFee != null && (
+                                <InfoRow
+                                    icon="cash-outline"
+                                    label="Emergency Fee"
+                                    value={formatCurrency(vendor.pricing.emergencyFee)}
+                                />
+                            )}
+                        </View>
+                    )}
+
+                    {/* ── Bank Details ── */}
+                    {hasBankDetails && (
+                        <View style={styles.card}>
+                            <SectionHeader icon="library-outline" title="Bank Details" />
+                            {vendor?.bankDetails?.accountHolderName && (
+                                <InfoRow
+                                    icon="finger-print-outline"
+                                    label="Account Holder"
+                                    value={vendor.bankDetails.accountHolderName}
+                                />
+                            )}
                             {vendor?.bankDetails?.bankName && (
                                 <InfoRow
-                                    icon="🏛️"
+                                    icon="business-outline"
                                     label="Bank"
                                     value={vendor.bankDetails.bankName}
                                 />
                             )}
                             {vendor?.bankDetails?.accountNumber && (
                                 <InfoRow
-                                    icon="💳"
+                                    icon="card-outline"
                                     label="Account Number"
                                     value={vendor.bankDetails.accountNumber}
                                 />
                             )}
                             {vendor?.bankDetails?.ifscCode && (
                                 <InfoRow
-                                    icon="🔑"
+                                    icon="key-outline"
                                     label="IFSC Code"
                                     value={vendor.bankDetails.ifscCode}
                                 />
                             )}
                             {vendor?.bankDetails?.branch && (
                                 <InfoRow
-                                    icon="📌"
+                                    icon="bookmark-outline"
                                     label="Branch"
                                     value={vendor.bankDetails.branch}
                                 />
@@ -436,15 +570,12 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     )}
 
                     {/* ── Documents ── */}
-                    {(vendor?.documents?.identityProof?.url ||
-                        vendor?.documents?.qualificationCertificate?.url ||
-                        vendor?.documents?.businessLicense?.url ||
-                        vendor?.documents?.insuranceCertificate?.url) && (
+                    {hasDocuments && (
                         <View style={styles.card}>
-                            <SectionHeader icon="📂" title="Documents" />
+                            <SectionHeader icon="folder-open-outline" title="Documents" />
                             {vendor?.documents?.identityProof?.url && (
                                 <InfoRow
-                                    icon="🪪"
+                                    icon="finger-print-outline"
                                     label="Identity Proof"
                                     value={vendor.documents.identityProof.url.replace(
                                         /^https?:\/\//,
@@ -454,7 +585,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             )}
                             {vendor?.documents?.qualificationCertificate?.url && (
                                 <InfoRow
-                                    icon="🎓"
+                                    icon="school-outline"
                                     label="Qualification"
                                     value={vendor.documents.qualificationCertificate.url.replace(
                                         /^https?:\/\//,
@@ -464,7 +595,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             )}
                             {vendor?.documents?.businessLicense?.url && (
                                 <InfoRow
-                                    icon="📜"
+                                    icon="document-outline"
                                     label="Business License"
                                     value={vendor.documents.businessLicense.url.replace(
                                         /^https?:\/\//,
@@ -474,7 +605,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             )}
                             {vendor?.documents?.insuranceCertificate?.url && (
                                 <InfoRow
-                                    icon="🛡️"
+                                    icon="shield-checkmark-outline"
                                     label="Insurance Cert"
                                     value={vendor.documents.insuranceCertificate.url.replace(
                                         /^https?:\/\//,
@@ -488,7 +619,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     {/* ── Actions ── */}
                     <TouchableOpacity
                         style={styles.editBtn}
-                        onPress={() => rootNav.navigate('VendorRegister')}
+                        onPress={() => rootNav?.navigate('VendorRegister')}
                         activeOpacity={0.85}
                     >
                         <LinearGradient
@@ -497,7 +628,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             end={{ x: 1, y: 0 }}
                             style={styles.editBtnGradient}
                         >
-                            <Text style={styles.editBtnIcon}>✏️</Text>
+                            <Ionicons name="create-outline" size={18} color="#fff" />
                             <Text style={styles.editBtnText}>Edit Profile</Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -507,11 +638,11 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                         onPress={handleLogOut}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.logoutIcon}>🚪</Text>
+                        <Ionicons name="log-out-outline" size={18} color="#CC1133" />
                         <Text style={styles.logoutText}>Log Out</Text>
                     </TouchableOpacity>
 
-                    <View style={{ height: 48 , marginBottom: 28}} />
+                    <View style={{ height: 48, marginBottom: 28 }} />
                 </Animated.View>
             </ScrollView>
         </View>
@@ -624,7 +755,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
     },
-    verifIcon: { fontSize: 12 },
     verifText: { fontSize: 12, fontWeight: '700' },
 
     statsStrip: {
@@ -679,7 +809,6 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingVertical: 16,
     },
-    editBtnIcon: { fontSize: 18 },
     editBtnText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
 
     logoutBtn: {
@@ -693,7 +822,6 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#FF3B5530',
     },
-    logoutIcon: { fontSize: 18 },
     logoutText: { color: '#CC1133', fontSize: 15, fontWeight: '800' },
 });
 

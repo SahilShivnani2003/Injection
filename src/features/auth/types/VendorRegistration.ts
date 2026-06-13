@@ -68,7 +68,7 @@ export const INITIAL_FORM: VendorForm = {
     branch: '',
 };
 
-export const INITIAL_DOCUMENTS: Record<DocumentField, UploadedFile | null> = {
+export const INITIAL_DOCUMENTS: Record<DocumentField, string | null> = {
     identityProof: null,
     qualificationCertificate: null,
     businessLicense: null,

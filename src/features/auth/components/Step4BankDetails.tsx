@@ -1,32 +1,64 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import { FieldInput } from '../../../components/FieldInput';
 import { Colors } from '../../../theme/colors';
-import { VendorForm, UploadedFile, DocumentField } from '../types/VendorRegistration';
+import { VendorForm, DocumentField } from '../types/VendorRegistration';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { vendorAPI } from '@/service/apis/vendorService';
 
 type Props = {
     form: VendorForm;
     updateField: (key: keyof VendorForm, value: string | string[]) => void;
-    profileImage: UploadedFile | null;
-    setProfileImage: (file: UploadedFile | null) => void;
-    documents: Record<DocumentField, UploadedFile | null>;
-    setDocuments: React.Dispatch<React.SetStateAction<Record<DocumentField, UploadedFile | null>>>;
+    profileImage: string | null;
+    setProfileImage: (file: string | null) => void;
+    documents: Record<DocumentField, string | null>;
+    setDocuments: React.Dispatch<React.SetStateAction<Record<DocumentField, string | null>>>;
     onImageError: (msg: string) => void;
 };
 
-const DOCUMENT_FIELDS: { field: DocumentField; label: string }[] = [
-    { field: 'identityProof', label: 'Identity Proof' },
-    { field: 'qualificationCertificate', label: 'Qualification' },
-    { field: 'businessLicense', label: 'Business License' },
-    { field: 'insuranceCertificate', label: 'Insurance Cert' },
+const DOCUMENT_FIELDS: { field: DocumentField; label: string; icon: string }[] = [
+    { field: 'identityProof', label: 'Identity Proof', icon: 'badge' },
+    { field: 'qualificationCertificate', label: 'Qualification', icon: 'school' },
+    { field: 'businessLicense', label: 'Business License', icon: 'store' },
+    { field: 'insuranceCertificate', label: 'Insurance Cert', icon: 'health-and-safety' },
 ];
 
-const trimFileName = (file: UploadedFile | null, fallback: string) =>
-    file ? file.name.replace(/^.*[\\/]/, '') : fallback;
+// ── Section header (matches StepContactBusiness style) ────────────────────────
+const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
+    <View style={sectionStyles.header}>
+        <View style={sectionStyles.iconBox}>
+            <Icon name={icon} size={16} color={Colors.gradientStart} />
+        </View>
+        <Text style={sectionStyles.title}>{title}</Text>
+    </View>
+);
 
+const sectionStyles = StyleSheet.create({
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 14,
+        marginTop: 8,
+    },
+    iconBox: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: '#EDF6FB',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    title: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: Colors.textDark,
+    },
+});
+
+// ── Main component ─────────────────────────────────────────────────────────────
 const StepBankDocuments = ({
     form,
     updateField,
@@ -36,22 +68,67 @@ const StepBankDocuments = ({
     setDocuments,
     onImageError,
 }: Props) => {
-    const handleSelectProfileImage = async () => {
+    // Per-item upload loading state
+    const [uploadingField, setUploadingField] = useState<DocumentField | 'profile' | null>(null);
+
+    // ── Upload helper ──────────────────────────────────────────────────────────
+    const handleUpload = async (
+        file: { uri: string; name: string; type: string },
+        isProfilePhoto: boolean,
+        field?: DocumentField,
+    ) => {
         try {
-            const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
-            if (result.assets?.[0]) {
-                const asset = result.assets[0];
-                setProfileImage({
-                    uri: asset.uri ?? '',
-                    name: asset.fileName ?? 'profile.jpg',
-                    type: asset.type ?? 'image/jpeg',
-                });
+            const formData = new FormData();
+
+            formData.append('file', {
+                uri: file.uri,
+                name: file.name,
+                type: file.type,
+            } as any);
+
+            const response = await vendorAPI.uploadImage(formData);
+
+            if (response.data?.success) {
+                const url: string = response.data?.data?.url;
+
+                if (isProfilePhoto) {
+                    setProfileImage(url);
+                } else if (field) {
+                    setDocuments(prev => ({ ...prev, [field]: url }));
+                }
+            } else {
+                onImageError(response.data?.message ?? 'Upload failed.');
             }
-        } catch {
-            onImageError('Unable to open the image library.');
+        } catch (error: any) {
+            console.error('File upload failed:', error);
+            onImageError(error?.response?.data?.message ?? error?.message ?? 'Upload failed.');
         }
     };
 
+    // ── Profile image picker ───────────────────────────────────────────────────
+    const handleSelectProfileImage = async () => {
+        try {
+            const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
+            if (result.didCancel) return;
+            if (!result.assets?.[0]) return;
+
+            const asset = result.assets[0];
+            const file = {
+                uri: asset.uri ?? '',
+                name: asset.fileName ?? 'profile.jpg',
+                type: asset.type ?? 'image/jpeg',
+            };
+
+            setUploadingField('profile');
+            await handleUpload(file, true);
+        } catch {
+            onImageError('Unable to open the image library.');
+        } finally {
+            setUploadingField(null);
+        }
+    };
+
+    // ── Document picker ────────────────────────────────────────────────────────
     const handlePickDocument = async (field: DocumentField) => {
         try {
             const [result] = await pick({
@@ -59,125 +136,192 @@ const StepBankDocuments = ({
                 copyTo: 'cachesDirectory',
             });
             if (!result?.uri) return;
-            setDocuments(prev => ({
-                ...prev,
-                [field]: {
-                    uri: result.uri,
-                    name: result.name ?? `${field}.pdf`,
-                    type: result.type ?? 'application/pdf',
-                },
-            }));
-        } catch(error) {
-            console.error('Error while picking document : ', error)
+
+            const file = {
+                uri: result.uri,
+                name: result.name ?? `${field}.pdf`,
+                type: result.type ?? 'application/pdf',
+            };
+
+            setUploadingField(field);
+            await handleUpload(file, false, field);
+        } catch (error) {
+            // User cancelled — ignore silently
+        } finally {
+            setUploadingField(null);
         }
     };
 
+    // ── Remove helpers ─────────────────────────────────────────────────────────
+    const removeProfileImage = () => setProfileImage(null);
+    const removeDocument = (field: DocumentField) =>
+        setDocuments(prev => ({ ...prev, [field]: null }));
+
     return (
         <View>
-            <Text style={styles.sectionTitle}>Bank Details</Text>
+            {/* ── Bank Details ── */}
+            <SectionHeader icon="account-balance" title="Bank Details" />
 
             <FieldInput
                 label="Bank Name"
                 value={form.bankName}
                 onChangeText={v => updateField('bankName', v)}
-                placeholder="Bank name"
+                placeholder="e.g. State Bank of India"
             />
             <FieldInput
                 label="Account Number"
                 value={form.accountNumber}
-                onChangeText={v => updateField('accountNumber', v)}
-                placeholder="Account number"
+                onChangeText={v => updateField('accountNumber', v.replace(/[^0-9]/g, ''))}
+                placeholder="Enter account number"
                 keyboardType="number-pad"
             />
-            <FieldInput
-                label="IFSC Code"
-                value={form.ifscCode}
-                onChangeText={v => updateField('ifscCode', v)}
-                placeholder="IFSC code"
-            />
-            <FieldInput
-                label="Branch"
-                value={form.branch}
-                onChangeText={v => updateField('branch', v)}
-                placeholder="Branch name"
-            />
-
-            <Text style={styles.sectionTitle}>Profile Image</Text>
-
-            <TouchableOpacity style={styles.imageButton} onPress={handleSelectProfileImage}>
-                <View style={[styles.iconCircle, profileImage && styles.iconCircleFilled]}>
-                    <Icon
-                        name={profileImage ? 'check-circle' : 'photo-camera'}
-                        size={22}
-                        color={profileImage ? Colors.white : Colors.gradientStart}
+            <View style={styles.row}>
+                <View style={styles.rowItem}>
+                    <FieldInput
+                        label="IFSC Code"
+                        value={form.ifscCode}
+                        onChangeText={v => updateField('ifscCode', v.toUpperCase())}
+                        placeholder="e.g. SBIN0001234"
                     />
                 </View>
+                <View style={styles.rowItem}>
+                    <FieldInput
+                        label="Branch"
+                        value={form.branch}
+                        onChangeText={v => updateField('branch', v)}
+                        placeholder="Branch name"
+                    />
+                </View>
+            </View>
+
+            {/* ── Profile Image ── */}
+            <SectionHeader icon="photo-camera" title="Profile Image" />
+
+            <TouchableOpacity
+                style={[styles.imageButton, profileImage && styles.imageButtonFilled]}
+                onPress={handleSelectProfileImage}
+                activeOpacity={0.75}
+                disabled={uploadingField === 'profile'}
+            >
+                {/* Left: preview or camera icon */}
+                {profileImage ? (
+                    <Image source={{ uri: profileImage }} style={styles.profileThumb} />
+                ) : (
+                    <View style={styles.iconCircle}>
+                        <Icon name="photo-camera" size={22} color={Colors.gradientStart} />
+                    </View>
+                )}
+
                 <View style={styles.imageTextWrap}>
                     <Text style={styles.imageLabel}>
-                        {profileImage ? 'Image selected' : 'Select profile image'}
+                        {profileImage ? 'Profile image uploaded' : 'Select profile image'}
                     </Text>
-                    {profileImage && (
-                        <Text style={styles.imageName} numberOfLines={1}>
-                            {trimFileName(profileImage, 'profile.jpg')}
-                        </Text>
-                    )}
+                    <Text style={styles.imageSubLabel}>
+                        {profileImage ? 'Tap to change photo' : 'JPG or PNG, max 5MB'}
+                    </Text>
                 </View>
-                <Text style={styles.imageAction}>{profileImage ? 'Change' : 'Upload'}</Text>
+
+                {uploadingField === 'profile' ? (
+                    <ActivityIndicator size="small" color={Colors.gradientStart} />
+                ) : profileImage ? (
+                    <TouchableOpacity
+                        onPress={removeProfileImage}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Icon name="close" size={20} color="#E53935" />
+                    </TouchableOpacity>
+                ) : (
+                    <Text style={styles.imageAction}>Upload</Text>
+                )}
             </TouchableOpacity>
 
-            <Text style={styles.sectionTitle}>Verification Documents</Text>
+            {/* ── Verification Documents ── */}
+            <SectionHeader icon="folder-open" title="Verification Documents" />
             <Text style={styles.hint}>Upload PDF, DOC, or image files for each document.</Text>
 
             {DOCUMENT_FIELDS.map(item => {
-                const file = documents[item.field];
+                const url = documents[item.field];
+                const isUploading = uploadingField === item.field;
+
                 return (
                     <TouchableOpacity
                         key={item.field}
-                        style={[styles.docRow, file && styles.docRowFilled]}
+                        style={[styles.docRow, url && styles.docRowFilled]}
                         onPress={() => handlePickDocument(item.field)}
                         activeOpacity={0.75}
+                        disabled={isUploading}
                     >
-                        <View style={[styles.iconCircle, file && styles.iconCircleFilled]}>
+                        {/* Left icon */}
+                        <View style={[styles.iconCircle, url && styles.iconCircleFilled]}>
                             <Icon
-                                name={file ? 'insert-drive-file' : 'upload-file'}
+                                name={url ? 'insert-drive-file' : item.icon}
                                 size={20}
-                                color={file ? Colors.white : Colors.gradientStart}
+                                color={url ? Colors.white : Colors.gradientStart}
                             />
                         </View>
+
+                        {/* Text */}
                         <View style={styles.docTextWrap}>
                             <Text style={styles.docLabel}>{item.label}</Text>
                             <Text
-                                style={[styles.docName, !file && styles.docNameEmpty]}
+                                style={[styles.docSubLabel, !url && styles.docSubLabelEmpty]}
                                 numberOfLines={1}
                             >
-                                {file ? trimFileName(file, item.label) : 'Tap to upload'}
+                                {isUploading
+                                    ? 'Uploading...'
+                                    : url
+                                    ? 'Uploaded successfully'
+                                    : 'Tap to upload'}
                             </Text>
                         </View>
-                        {file && (
-                            <Icon name="check-circle" size={20} color={Colors.gradientStart} />
+
+                        {/* Right: loader / check / remove */}
+                        {isUploading ? (
+                            <ActivityIndicator size="small" color={Colors.gradientStart} />
+                        ) : url ? (
+                            <TouchableOpacity
+                                onPress={() => removeDocument(item.field)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Icon name="close" size={18} color="#E53935" />
+                            </TouchableOpacity>
+                        ) : (
+                            <Icon name="chevron-right" size={20} color={Colors.textMedium} />
                         )}
                     </TouchableOpacity>
                 );
             })}
+
+            {/* ── Upload summary ── */}
+            {(() => {
+                const uploadedCount = Object.values(documents).filter(Boolean).length;
+                const total = DOCUMENT_FIELDS.length;
+                if (uploadedCount === 0) return null;
+                return (
+                    <View style={styles.summaryRow}>
+                        <Icon name="check-circle" size={14} color={Colors.gradientStart} />
+                        <Text style={styles.summaryText}>
+                            {uploadedCount} of {total} documents uploaded
+                        </Text>
+                    </View>
+                );
+            })()}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    sectionTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: Colors.textDark,
-        marginTop: 8,
-        marginBottom: 14,
-    },
+    row: { flexDirection: 'row', gap: 10 },
+    rowItem: { flex: 1 },
+
     hint: {
         fontSize: 12,
         color: Colors.textMedium,
         marginBottom: 12,
+        marginTop: -6,
     },
 
-    // Shared icon container
+    // Shared icon circle
     iconCircle: {
         width: 40,
         height: 40,
@@ -200,20 +344,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#F4F8FB',
         borderRadius: 16,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#D8E8EE',
         padding: 14,
         marginBottom: 20,
     },
-    imageTextWrap: {
-        flex: 1,
+    imageButtonFilled: {
+        borderColor: Colors.gradientStart,
+        backgroundColor: '#EDF6FB',
     },
+    profileThumb: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        marginRight: 12,
+        borderWidth: 2,
+        borderColor: Colors.gradientStart,
+    },
+    imageTextWrap: { flex: 1 },
     imageLabel: {
         fontSize: 13,
         fontWeight: '600',
         color: Colors.textDark,
     },
-    imageName: {
+    imageSubLabel: {
         fontSize: 11,
         color: Colors.textMedium,
         marginTop: 2,
@@ -230,7 +384,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#F4F8FB',
         borderRadius: 14,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#D8E8EE',
         padding: 14,
         marginBottom: 10,
@@ -239,22 +393,33 @@ const styles = StyleSheet.create({
         borderColor: Colors.gradientStart,
         backgroundColor: '#EDF6FB',
     },
-    docTextWrap: {
-        flex: 1,
-    },
+    docTextWrap: { flex: 1 },
     docLabel: {
         fontSize: 13,
         fontWeight: '600',
         color: Colors.textDark,
     },
-    docName: {
+    docSubLabel: {
         fontSize: 11,
         color: Colors.gradientStart,
         marginTop: 2,
         fontWeight: '500',
     },
-    docNameEmpty: {
+    docSubLabelEmpty: {
         color: Colors.textMedium,
+    },
+
+    // Summary
+    summaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+    summaryText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.gradientStart,
     },
 });
 

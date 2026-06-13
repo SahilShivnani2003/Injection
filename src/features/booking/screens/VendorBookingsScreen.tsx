@@ -69,7 +69,8 @@ const VendorBookingsScreen = ({
     const fetchBookings = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const response = await bookingAPI.vendorBookings();
+            const response = await bookingAPI.availableBookings();
+            console.log('Booking response : ', response.data);
             setBookings(response.data?.data ?? response.data?.bookings ?? response.data ?? []);
         } catch (error) {
             console.warn('Unable to load bookings', error);
@@ -225,7 +226,6 @@ const VendorBookingsScreen = ({
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             {/* Header */}
             <LinearGradient
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        paddingTop: 56,
+        paddingTop: 24,
         paddingBottom: 0,
         paddingHorizontal: 20,
         borderBottomLeftRadius: 24,

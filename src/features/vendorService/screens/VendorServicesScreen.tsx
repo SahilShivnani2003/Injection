@@ -13,6 +13,7 @@ import {
     Platform,
     Animated,
     Dimensions,
+    Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -58,35 +59,6 @@ const CATEGORIES: Service['category'][] = [
 ];
 
 const SERVICE_TYPES: NonNullable<Service['serviceType']>[] = ['At Home', 'At Clinic', 'Both'];
-
-// ── Category icon map ─────────────────────────────────────────────────────────
-
-const CATEGORY_ICON: Record<string, string> = {
-    'Home Injections': '💉',
-    'IV Drip Services': '🩸',
-    'Wound Dressing': '🩹',
-    'Day Care at Home': '🏠',
-    'Patient Monitoring': '📊',
-    'Old Age Patient Care': '👴',
-    '24 HR Patient Care': '🌙',
-    'Field Survey Service': '📋',
-    'Data Collection Service': '📂',
-    'Field Sample Collection': '🧪',
-    'Community Survey': '👥',
-    'Awareness Activities': '📢',
-    'Lab-based Training': '🔬',
-    'BSC/MSC Training': '🎓',
-    'DMLT Training': '🧫',
-    'Nursing Training': '👩‍⚕️',
-    'Dissertation Program': '📖',
-    'Placement Services': '💼',
-    'Blood Collection': '🩸',
-    'BP/Sugar Monitoring': '❤️',
-    'ECG at Home': '💓',
-    'Catheter Care': '🏥',
-    'Physiotherapy Session': '🤸',
-    Other: '⚕️',
-};
 
 // ── New Service Form ──────────────────────────────────────────────────────────
 
@@ -165,7 +137,7 @@ const AddServiceModal = ({
                             colors={[Colors.gradientStart, Colors.gradientMid]}
                             style={modal.titleIconWrap}
                         >
-                            <Text style={{ fontSize: 20 }}>⚕️</Text>
+                            <Ionicons name="medical" size={22} color="#fff" />
                         </LinearGradient>
                         <View>
                             <Text style={modal.title}>Add New Service</Text>
@@ -202,7 +174,11 @@ const AddServiceModal = ({
                                 >
                                     {form.category || 'Select a category'}
                                 </Text>
-                                <Text style={modal.pickerChevron}>{categoryOpen ? '▲' : '▼'}</Text>
+                                <Ionicons
+                                    name={categoryOpen ? 'chevron-up' : 'chevron-down'}
+                                    size={16}
+                                    color={Colors.textMuted}
+                                />
                             </TouchableOpacity>
                             {categoryOpen && (
                                 <View style={modal.categoryList}>
@@ -225,9 +201,19 @@ const AddServiceModal = ({
                                                 }}
                                                 activeOpacity={0.75}
                                             >
-                                                <Text style={modal.categoryItemIcon}>
-                                                    {CATEGORY_ICON[cat] ?? '⚕️'}
-                                                </Text>
+                                                <Ionicons
+                                                    name={
+                                                        form.category === cat
+                                                            ? 'checkmark-circle'
+                                                            : 'medical-outline'
+                                                    }
+                                                    size={18}
+                                                    color={
+                                                        form.category === cat
+                                                            ? Colors.gradientStart
+                                                            : Colors.textMuted
+                                                    }
+                                                />
                                                 <Text
                                                     style={[
                                                         modal.categoryItemText,
@@ -452,7 +438,6 @@ const modal = StyleSheet.create({
     pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     pickerValue: { fontSize: 14, color: Colors.textDark, fontWeight: '500', flex: 1 },
     pickerPlaceholder: { fontSize: 14, color: '#B0BEC5', flex: 1 },
-    pickerChevron: { fontSize: 11, color: Colors.textMuted },
     categoryList: {
         borderWidth: 1.5,
         borderColor: '#E0E8EF',
@@ -471,7 +456,6 @@ const modal = StyleSheet.create({
         borderBottomColor: '#F0F4F8',
     },
     categoryItemActive: { backgroundColor: Colors.gradientStart + '15' },
-    categoryItemIcon: { fontSize: 16, width: 22 },
     categoryItemText: { fontSize: 13, fontWeight: '600', color: Colors.textDark },
     categoryItemTextActive: { color: Colors.gradientStart },
     twoCol: { flexDirection: 'row', gap: 12 },
@@ -525,7 +509,6 @@ const ServiceCard = ({
         onToggle();
     };
 
-    const icon = CATEGORY_ICON[service.category] ?? '⚕️';
     const active = service.isActive ?? false;
 
     return (
@@ -538,7 +521,15 @@ const ServiceCard = ({
                         { backgroundColor: active ? Colors.gradientStart + '18' : '#F3F7FA' },
                     ]}
                 >
-                    <Text style={{ fontSize: 20 }}>{icon}</Text>
+                    {service.image ? (
+                        <Image source={{ uri: service.image }} style={styles.serviceImage} />
+                    ) : (
+                        <Ionicons
+                            name="medical"
+                            size={22}
+                            color={active ? Colors.gradientStart : Colors.textMuted}
+                        />
+                    )}
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.serviceTitle} numberOfLines={1}>
@@ -569,20 +560,20 @@ const ServiceCard = ({
             {/* Meta chips */}
             <View style={styles.metaRow}>
                 <View style={styles.metaChip}>
-                    <Text style={styles.metaIcon}>💰</Text>
+                    <Ionicons name="cash-outline" size={13} color={Colors.textDark} />
                     <Text style={styles.metaText}>
                         ₹{service.basePrice?.toLocaleString('en-IN')}
                     </Text>
                 </View>
                 {!!service.duration && (
                     <View style={styles.metaChip}>
-                        <Text style={styles.metaIcon}>⏱</Text>
+                        <Ionicons name="time-outline" size={13} color={Colors.textDark} />
                         <Text style={styles.metaText}>{service.duration} min</Text>
                     </View>
                 )}
                 {!!service.serviceType && (
                     <View style={styles.metaChip}>
-                        <Text style={styles.metaIcon}>📍</Text>
+                        <Ionicons name="location-outline" size={13} color={Colors.textDark} />
                         <Text style={styles.metaText}>{service.serviceType}</Text>
                     </View>
                 )}
@@ -602,7 +593,12 @@ const ServiceCard = ({
             {/* Requirements */}
             {!!service.requirements && (
                 <View style={styles.reqRow}>
-                    <Text style={styles.reqIcon}>⚠️</Text>
+                    <Ionicons
+                        name="alert-circle-outline"
+                        size={15}
+                        color="#C07800"
+                        style={{ marginTop: 1 }}
+                    />
                     <Text style={styles.reqText} numberOfLines={2}>
                         {service.requirements}
                     </Text>
@@ -625,7 +621,11 @@ const ServiceCard = ({
                         <ActivityIndicator size="small" color={active ? '#CC2200' : '#00A07A'} />
                     ) : (
                         <>
-                            <Text style={styles.toggleIcon}>{active ? '⏸' : '▶️'}</Text>
+                            <Ionicons
+                                name={active ? 'pause-circle' : 'play-circle'}
+                                size={16}
+                                color={active ? '#CC2200' : '#00A07A'}
+                            />
                             <Text
                                 style={[
                                     styles.toggleText,
@@ -767,7 +767,6 @@ const VendorServicesScreen = ({
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             {/* ── Add Service Modal ── */}
             <AddServiceModal
@@ -800,7 +799,7 @@ const VendorServicesScreen = ({
                         onPress={openModal}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.addBtnIcon}>＋</Text>
+                        <Ionicons name="add" size={18} color="#fff" />
                         <Text style={styles.addBtnText}>Add</Text>
                     </TouchableOpacity>
                 </View>
@@ -810,7 +809,12 @@ const VendorServicesScreen = ({
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {services.length === 0 ? (
                     <View style={styles.emptyCard}>
-                        <Text style={{ fontSize: 48, marginBottom: 14 }}>🩺</Text>
+                        <Ionicons
+                            name="medkit-outline"
+                            size={48}
+                            color={Colors.gradientStart}
+                            style={{ marginBottom: 14 }}
+                        />
                         <Text style={styles.emptyTitle}>No Services Yet</Text>
                         <Text style={styles.emptyText}>
                             Tap the <Text style={{ fontWeight: '800' }}>+ Add</Text> button above to
@@ -851,7 +855,7 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        paddingTop: 56,
+        paddingTop: 24,
         paddingBottom: 22,
         paddingHorizontal: 20,
         borderBottomLeftRadius: 26,
@@ -881,7 +885,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.3)',
     },
-    addBtnIcon: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
     addBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
     // Content
@@ -906,7 +909,9 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
     },
+    serviceImage: { width: 46, height: 46, borderRadius: 14 },
     serviceTitle: { fontSize: 15, fontWeight: '800', color: Colors.textDark, marginBottom: 2 },
     serviceCategory: { fontSize: 12, fontWeight: '600', color: Colors.gradientMid },
     statusPill: {
@@ -937,7 +942,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
     },
-    metaIcon: { fontSize: 12 },
     metaText: { fontSize: 12, fontWeight: '700', color: Colors.textDark },
 
     // Tags
@@ -962,7 +966,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#F5A62330',
     },
-    reqIcon: { fontSize: 13, marginTop: 1 },
     reqText: { flex: 1, fontSize: 12, color: '#7A5000', fontWeight: '500', lineHeight: 18 },
 
     // Toggle
@@ -980,7 +983,6 @@ const styles = StyleSheet.create({
     activateBtn: { backgroundColor: '#E6FFF5', borderWidth: 1.5, borderColor: '#00D4A033' },
     deactivateBtn: { backgroundColor: '#FFF1F0', borderWidth: 1.5, borderColor: '#FF5A5F33' },
     toggleBtnDisabled: { opacity: 0.6 },
-    toggleIcon: { fontSize: 14 },
     toggleText: { fontSize: 13, fontWeight: '800' },
 
     // Empty state

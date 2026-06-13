@@ -152,7 +152,6 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
 
     return (
         <View style={styles.root}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
             {/* Header */}
             <LinearGradient
@@ -346,7 +345,7 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        paddingTop: 56,
+        paddingTop: 24,
         paddingBottom: 20,
         paddingHorizontal: 20,
         borderBottomLeftRadius: 28,

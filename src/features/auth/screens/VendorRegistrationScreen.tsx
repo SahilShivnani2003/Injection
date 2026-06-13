@@ -40,9 +40,9 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
     const [step, setStep] = useState(0); // 0-indexed
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState<VendorForm>(INITIAL_FORM);
-    const [profileImage, setProfileImage] = useState<UploadedFile | null>(null);
+    const [profileImage, setProfileImage] = useState<string | null>(null);
     const [documents, setDocuments] =
-        useState<Record<DocumentField, UploadedFile | null>>(INITIAL_DOCUMENTS);
+        useState<Record<DocumentField, string | null>>(INITIAL_DOCUMENTS);
 
     const scrollRef = useRef<ScrollView>(null);
 
@@ -154,20 +154,12 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
         formData.append('bankDetails[branch]', form.branch.trim());
 
         if (profileImage) {
-            formData.append('profileImage', {
-                uri: profileImage.uri,
-                name: profileImage.name,
-                type: profileImage.type,
-            } as any);
+            formData.append('profileImage', profileImage);
         }
 
         Object.entries(documents).forEach(([key, file]) => {
             if (file) {
-                formData.append(key, {
-                    uri: file.uri,
-                    name: file.name,
-                    type: file.type,
-                } as any);
+                formData.append(key, file);
             }
         });
 

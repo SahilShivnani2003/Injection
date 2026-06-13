@@ -3,8 +3,10 @@ import { privateClient, publicClient } from "../apiClient";
 export const bookingAPI = {
   // Booking CRUD operations
   createBooking: (data: any) => privateClient.post('/bookings/create', data),
+  userCreateBooking: (data:any) => privateClient.post('user-bookings/create', data),
   userBookings: () => privateClient.get('/bookings/user/me'),
   vendorBookings: () => privateClient.get('/bookings/vendor/me'),
+  availableBookings: () => privateClient.get('/bookings/available' ),
   getBookingDetails: (bookingId: string) => privateClient.get(`/bookings/${bookingId}`),
   CancelBooking: (data: any) => privateClient.post(`/bookings/${data.bookingId}/cancel`, data),
 

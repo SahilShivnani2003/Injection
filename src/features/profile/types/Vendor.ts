@@ -1,4 +1,5 @@
 export interface Vendor {
+    _id?: string;
     // Basic Information
     name: string;
     email: string;
@@ -13,7 +14,13 @@ export interface Vendor {
     registrationNumber?: string;
     gstNumber?: string;
 
-    services?: string[]; 
+    services?: {
+        _id: string;
+        serviceName: string;
+        category: string;
+        basePrice: number;
+        duration: number;
+    }[];
 
     // Professional Details
     qualifications?: Qualification[];

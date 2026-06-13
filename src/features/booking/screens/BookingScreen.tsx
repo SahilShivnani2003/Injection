@@ -295,11 +295,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 reportUrl: null,
             };
 
-            const response = await bookingAPI.createBooking(payload);
+            const response = await bookingAPI.userCreateBooking(payload);
 
             if (response?.data?.success || response?.data?._id || response?.status === 201) {
                 
-                alert.success('Booking Confirmed! 🎉',
+                alert.success('Booking Confirmed!  ',
                     `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
                 navigation.goBack();
             } else {
