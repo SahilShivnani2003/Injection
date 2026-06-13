@@ -1,11 +1,11 @@
 export interface Vendor {
-    _id?:string;
     // Basic Information
     name: string;
     email: string;
     password: string;
     phone: string;
     alternatePhone?: string;
+    gender?: 'Male' | 'Female' | 'Other';
 
     // Business Information
     businessName: string;
@@ -13,34 +13,10 @@ export interface Vendor {
     registrationNumber?: string;
     gstNumber?: string;
 
-    // Services Offered
-    servicesOffered?: (
-        | 'Home Injections'
-        | 'IV Drip Services'
-        | 'Wound Dressing'
-        | 'Day Care at Home'
-        | 'Patient Monitoring'
-        | 'Old Age Patient Care'
-        | '24 HR Patient Care'
-        | 'Field Survey Service'
-        | 'Data Collection Service'
-        | 'Field Sample Collection'
-        | 'Community Survey'
-        | 'Awareness Activities'
-        | 'Lab-based Training'
-        | 'BSC/MSC Training'
-        | 'DMLT Training'
-        | 'Nursing Training'
-        | 'Dissertation Program'
-        | 'Placement Services'
-    )[];
+    services?: string[]; 
 
     // Professional Details
-    qualifications?: {
-        degree?: string;
-        institution?: string;
-        year?: number;
-    }[];
+    qualifications?: Qualification[];
     experience?: number;
     specialization?: string;
 
@@ -52,49 +28,13 @@ export interface Vendor {
     serviceAreas?: string[];
 
     // Documents
-    documents?: {
-        identityProof?: {
-            type?: string;
-            url?: string;
-        };
-        qualificationCertificate?: {
-            type?: string;
-            url?: string;
-        };
-        businessLicense?: {
-            type?: string;
-            url?: string;
-        };
-        insuranceCertificate?: {
-            type?: string;
-            url?: string;
-        };
-    };
+    documents?: Documents;
 
     // Availability
-    availability?: {
-        days?: (
-            | 'Monday'
-            | 'Tuesday'
-            | 'Wednesday'
-            | 'Thursday'
-            | 'Friday'
-            | 'Saturday'
-            | 'Sunday'
-        )[];
-        timeSlots?: {
-            from?: string;
-            to?: string;
-        }[];
-        emergencyAvailable?: boolean;
-    };
+    availability?: Availability;
 
     // Pricing
-    pricing?: {
-        consultationFee?: number;
-        homeVisitFee?: number;
-        emergencyFee?: number;
-    };
+    pricing?: Pricing;
 
     // Status and Verification
     isVerified?: boolean;
@@ -111,14 +51,62 @@ export interface Vendor {
     bio?: string;
 
     // Bank Details
-    bankDetails?: {
-        accountHolderName?: string;
-        accountNumber?: string;
-        ifscCode?: string;
-        bankName?: string;
-        branch?: string;
-    };
+    bankDetails?: BankDetails;
 
+    // Timestamps
     createdAt?: Date;
     updatedAt?: Date;
+}
+
+// Sub-interfaces
+
+export interface Qualification {
+    degree?: string;
+    institution?: string;
+    year?: number;
+}
+
+export interface Documents {
+    identityProof?: DocumentFile;
+    qualificationCertificate?: DocumentFile;
+    businessLicense?: DocumentFile;
+    insuranceCertificate?: DocumentFile;
+}
+
+export interface DocumentFile {
+    type?: string;
+    url?: string;
+}
+
+export interface Availability {
+    days?: (
+        | 'Monday'
+        | 'Tuesday'
+        | 'Wednesday'
+        | 'Thursday'
+        | 'Friday'
+        | 'Saturday'
+        | 'Sunday'
+    )[];
+    timeSlots?: TimeSlot[];
+    emergencyAvailable?: boolean;
+}
+
+export interface TimeSlot {
+    from?: string;
+    to?: string;
+}
+
+export interface Pricing {
+    consultationFee?: number;
+    homeVisitFee?: number;
+    emergencyFee?: number;
+}
+
+export interface BankDetails {
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    bankName?: string;
+    branch?: string;
 }

@@ -13,6 +13,7 @@ export const FieldInput: React.FC<{
     required?: boolean;
     rightIcon?: React.ReactNode;
     editable?: boolean;
+    secureTextEntry?: boolean;
 }> = ({
     label,
     value,
@@ -24,6 +25,7 @@ export const FieldInput: React.FC<{
     required,
     rightIcon,
     editable = true,
+    secureTextEntry,
 }) => {
     const [focused, setFocused] = useState(false);
     const borderAnim = useRef(new Animated.Value(0)).current;
@@ -70,6 +72,7 @@ export const FieldInput: React.FC<{
                     onBlur={handleBlur} // ✅ stable
                     autoCorrect={false}
                     autoCapitalize="none" // ✅ stops capital/small flicker
+                    secureTextEntry={secureTextEntry}
                 />
                 {rightIcon && <View style={styles.fieldRight}>{rightIcon}</View>}
             </Animated.View>

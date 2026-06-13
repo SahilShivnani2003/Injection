@@ -530,7 +530,13 @@ const LoginScreen = ({ navigation }: LoginProps) => {
                         {/* ── Register Link ─────────────────────────────────── */}
                         <TouchableOpacity
                             style={styles.registerLink}
-                            onPress={() => navigation.navigate('Register')}
+                            onPress={() => {
+                                if(userType === 'Vendor'){
+                                    navigation.navigate('VendorRegister')
+                                }else if(userType === 'patient'){
+                                    navigation.navigate('Register')
+                                }
+                            }}
                             activeOpacity={0.7}
                         >
                             <Text style={styles.registerText}>

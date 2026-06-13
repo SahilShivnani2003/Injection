@@ -1,4 +1,5 @@
 export interface Service {
+    _id?:string;
     // Service Information
     serviceName: string;
     description: string;
