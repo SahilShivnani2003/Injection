@@ -15,6 +15,7 @@ import BookingScreen from '../features/booking/screens/BookingScreen';
 import BookingDetailScreen from '@/features/booking/screens/BookingDetailScreen';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { NotificationScreen } from '@/features/notification/screen/NotificationScreen';
+import { UserProfileEditScreen } from '@/features/profile/screens/UserProfileEditScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -43,6 +44,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="Booking" component={BookingScreen} />
                     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />
                     <Stack.Screen name="Notification" component={NotificationScreen} />
+                    <Stack.Screen name="EditProfile" component={UserProfileEditScreen}/>
                 </Stack.Navigator>
             </NavigationContainer>
         </AlertProvider>

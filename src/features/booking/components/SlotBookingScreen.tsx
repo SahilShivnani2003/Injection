@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { StaffPreference } from '@/types/booking';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /* ─────────────────────── Props ─────────────────────── */
 
@@ -59,9 +60,9 @@ const STATIC_TIMES: string[] = [
 ];
 
 const STAFF_OPTIONS: { id: StaffPreference; icon: string }[] = [
-    { id: 'Any Available', icon: '👨‍⚕️' },
-    { id: 'Male Staff', icon: '👨' },
-    { id: 'Female Staff', icon: '👩' },
+    { id: 'Any Available', icon: 'human-male-female' },
+    { id: 'Male Staff', icon: 'human-male' },
+    { id: 'Female Staff', icon: 'human-female' },
 ];
 
 /* ─────────────────────── Calendar ─────────────────────── */
@@ -376,7 +377,10 @@ const SlotBookingScreen: React.FC<SlotBookingScreenProps> = ({
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Select Preferred Date</Text>
                 {selectedDate && (
-                    <Text style={styles.selectedBadge}>📅 {formatDisplayDate(selectedDate)}</Text>
+                    <View style={{ flexDirection: 'row' }}>
+                        <MaterialCommunityIcons name='calendar-month-outline' size={23} style={{ color: Colors.gradientEnd,}} />
+                        <Text style={styles.selectedBadge}>{formatDisplayDate(selectedDate)}</Text>
+                    </View>
                 )}
                 <Calendar
                     selectedDate={selectedDate}
@@ -409,7 +413,8 @@ const SlotBookingScreen: React.FC<SlotBookingScreenProps> = ({
                             onPress={() => setStaffPreference(staff.id)}
                             activeOpacity={0.7}
                         >
-                            <Text style={styles.staffIcon}>{staff.icon}</Text>
+                            <MaterialCommunityIcons name={staff.icon}
+                                style={[styles.staffIcon, staffPreference === staff.id && styles.staffNameSelected]} />
                             <Text
                                 style={[
                                     styles.staffName,

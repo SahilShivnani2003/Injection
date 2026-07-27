@@ -1,33 +1,15 @@
 export interface Service {
-    _id?:string;
+    _id?: string;
     // Service Information
     serviceName: string;
     description: string;
-    category:
-    | 'Home Injections'
-    | 'IV Drip Services'
-    | 'Wound Dressing'
-    | 'Day Care at Home'
-    | 'Patient Monitoring'
-    | 'Old Age Patient Care'
-    | '24 HR Patient Care'
-    | 'Field Survey Service'
-    | 'Data Collection Service'
-    | 'Field Sample Collection'
-    | 'Community Survey'
-    | 'Awareness Activities'
-    | 'Lab-based Training'
-    | 'BSC/MSC Training'
-    | 'DMLT Training'
-    | 'Nursing Training'
-    | 'Dissertation Program'
-    | 'Placement Services'
-    | 'Blood Collection'
-    | 'BP/Sugar Monitoring'
-    | 'ECG at Home'
-    | 'Catheter Care'
-    | 'Physiotherapy Session'
-    | 'Other';
+    category: {
+        createdAt: string;
+        name: string;
+        updatedAt: string;
+        __v: number;
+        _id: string;
+    };
 
     // Pricing
     basePrice: number;

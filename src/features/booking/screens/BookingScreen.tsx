@@ -257,9 +257,8 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 ? (formData.sex as Gender)
                 : 'Other';
 
-            const preferredTimeSlot = `${formData.selectedDate ?? ''} ${
-                formData.selectedTime ?? ''
-            }`.trim();
+            const preferredTimeSlot = `${formData.selectedDate ?? ''} ${formData.selectedTime ?? ''
+                }`.trim();
             if (!preferredTimeSlot) {
                 Alert.alert('Error', 'Invalid time slot. Please go back and select date and time.');
                 return;
@@ -298,7 +297,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
             const response = await bookingAPI.userCreateBooking(payload);
 
             if (response?.data?.success || response?.data?._id || response?.status === 201) {
-                
+
                 alert.success('Booking Confirmed!  ',
                     `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
                 navigation.goBack();

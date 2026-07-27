@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { ComplimentaryService } from '@/types/booking';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import Fontisto from 'react-native-vector-icons/Fontisto';
 
 /* ─────────────────────── Props ─────────────────────── */
 
@@ -26,10 +29,10 @@ const COMPLIMENTARY_OPTIONS: {
     icon: string;
     desc: string;
 }[] = [
-    { id: 'Blood Sugar', name: 'Blood Sugar', icon: '🍬', desc: 'Random / Fasting' },
-    { id: 'Blood Group', name: 'Blood Group', icon: '🩸', desc: 'ABO & Rh Typing' },
-    { id: 'Haemoglobin', name: 'Haemoglobin', icon: '⚗️', desc: 'Hb Level Check' },
-];
+        { id: 'Blood Sugar', name: 'Blood Sugar', icon: 'blood', desc: 'Random / Fasting' },
+        { id: 'Blood Group', name: 'Blood Group', icon: 'blood-drop', desc: 'ABO & Rh Typing' },
+        { id: 'Haemoglobin', name: 'Haemoglobin', icon: 'blood-test', desc: 'Hb Level Check' },
+    ];
 
 /* ─────────────────────── Complimentary Card ─────────────────────── */
 
@@ -80,7 +83,7 @@ const CompCard: React.FC<{
                             <Text style={styles.freeBadgeText}>FREE</Text>
                         </View>
                     )}
-                    <Text style={styles.compIcon}>{item.icon}</Text>
+                    <Fontisto name={item.icon} style={[styles.compIcon, selected && styles.compDescSelected]} />
                     <Text style={[styles.compName, selected && styles.compNameSelected]}>
                         {item.name}
                     </Text>
@@ -127,20 +130,29 @@ const ComplimentaryScreen: React.FC<ComplimentaryScreenProps> = ({
             {/* ── Booking summary card ── */}
             <View style={styles.summaryCard}>
                 <View style={styles.summaryIconWrap}>
-                    <Text style={styles.summaryIcon}>📋</Text>
+                    <Ionicons name='library-outline' size={25} style={{ color: Colors.gradientStart }} />
                 </View>
                 <View style={styles.summaryText}>
                     <Text style={styles.summaryTitle}>Booking Summary</Text>
-                    <Text style={styles.summaryLine}>
-                        👤 {bookingSummary.patientName || 'Patient'}
-                    </Text>
-                    <Text style={styles.summaryLine}>
-                        📅 {bookingSummary.date || '—'} · 🕐 {bookingSummary.time || '—'}
-                    </Text>
-                    <Text style={styles.summaryLine}>
-                        🔬 {bookingSummary.serviceCount} service
-                        {bookingSummary.serviceCount !== 1 ? 's' : ''} booked
-                    </Text>
+                    <View style={{ flexDirection: 'row' }}>
+                        <Ionicons name='person-outline' size={17} style={{ padding: 2, color: Colors.gradientStart }} />
+                        <Text style={styles.summaryLine}>
+                            {bookingSummary.patientName || 'Patient'}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row' }}>
+                        <Ionicons name='calendar-outline' size={17} style={{ padding: 2, color: Colors.gradientStart }} />
+                        <Text style={styles.summaryLine}>
+                            {bookingSummary.date || '—'} · 🕐 {bookingSummary.time || '—'}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row' }}>
+                        <Ionicons name='cart-outline' size={17} style={{ padding: 2, color: Colors.gradientStart }} />
+                        <Text style={styles.summaryLine}>
+                            {bookingSummary.serviceCount} service
+                            {bookingSummary.serviceCount !== 1 ? 's' : ''} booked
+                        </Text>
+                    </View>
                 </View>
             </View>
 

@@ -30,4 +30,7 @@ export type RootStackParamList = {
         booking: Booking;
         notificationId: string
     }
+    EditProfile:{
+        userData: any
+    }
 };

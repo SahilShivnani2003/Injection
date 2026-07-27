@@ -107,7 +107,7 @@ const ServiceListItem: React.FC<ServiceListItemProps> = React.memo(
             onPress();
         };
 
-        const icon = getCategoryIcon(service.category);
+        const icon = getCategoryIcon(service.category.name);
         // Single interpolation node — avoids the duplicate/conditional interpolate bug
         const checkScale = checkAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
@@ -155,7 +155,7 @@ const ServiceListItem: React.FC<ServiceListItemProps> = React.memo(
                                     color={Colors.textMuted}
                                 />
                                 <Text style={styles.listMetaText} numberOfLines={1}>
-                                    {service.category ?? 'General'}
+                                    {service.category.name ?? 'General'}
                                 </Text>
                             </View>
 
@@ -179,8 +179,8 @@ const ServiceListItem: React.FC<ServiceListItemProps> = React.memo(
                                             service.serviceType === 'At Home'
                                                 ? 'home-outline'
                                                 : service.serviceType === 'At Clinic'
-                                                ? 'business-outline'
-                                                : 'swap-horizontal-outline'
+                                                    ? 'business-outline'
+                                                    : 'swap-horizontal-outline'
                                         }
                                         size={10}
                                         color={Colors.textMuted}
@@ -343,6 +343,7 @@ const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
         try {
             const res = await serviceAPI.getAllServices();
             // Normalise multiple possible API response shapes
+            console.log('response services:', res.data);
             const raw: ServiceDoc[] =
                 res.data?.data ?? res.data?.services ?? (Array.isArray(res.data) ? res.data : []);
 
@@ -433,7 +434,9 @@ const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
     return (
         <View style={styles.root}>
             {/* Selected summary bar */}
-            <SelectedBar selectedServices={selectedServices} onClear={clearAll} />
+            {selectedServices.length > 0 && (
+                <SelectedBar selectedServices={selectedServices} onClear={clearAll} />
+            )}
 
             {/* Header row */}
             <View style={styles.headerRow}>

@@ -78,7 +78,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
         }
     };
 
-    const handleRefresh = () =>{
+    const handleRefresh = () => {
         fetchProfile();
     }
     const handleLogout = async () => {
@@ -124,6 +124,11 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
     }
 
     const role = getRoleDisplay();
+    const handelEdit = () => {
+        navigation
+            .getParent<NativeStackNavigationProp<RootStackParamList>>()
+            ?.navigate('EditProfile', { userData: user });
+    }
 
     return (
         <View style={styles.root}>
@@ -241,8 +246,8 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
 
                 {/* ── Medical Information ── */}
                 {user?.allergies?.length ||
-                user?.chronicDiseases?.length ||
-                user?.currentMedications?.length ? (
+                    user?.chronicDiseases?.length ||
+                    user?.currentMedications?.length ? (
                     <>
                         <SectionHeader title="MEDICAL INFORMATION" />
                         <View style={styles.menuCard}>
@@ -316,8 +321,8 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                         sublabel={
                                             user.insuranceExpiryDate instanceof Date
                                                 ? user.insuranceExpiryDate.toLocaleDateString(
-                                                      'en-IN',
-                                                  )
+                                                    'en-IN',
+                                                )
                                                 : String(user.insuranceExpiryDate)
                                         }
                                     />
@@ -364,13 +369,13 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Account ── */}
                 <SectionHeader title="ACCOUNT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="edit" label="Edit Profile" onPress={() => {}} />
+                    <MenuRow icon="edit" label="Edit Profile" onPress={handelEdit} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="lock" label="Change Password" onPress={() => {}} />
+                    <MenuRow icon="lock" label="Change Password" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="folder-shared" label="Medical Records" onPress={() => {}} />
+                    <MenuRow icon="folder-shared" label="Medical Records" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => {}} />
+                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => { }} />
                 </View>
 
                 {/* ── Preferences ── */}
@@ -399,14 +404,14 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Support ── */}
                 <SectionHeader title="SUPPORT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => {}} />
+                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => {}} />
+                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => {}} />
+                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="description" label="Terms of Service" onPress={() => {}} />
-                    <MenuRow icon="info" label="About" onPress={() => {}} />
+                    <MenuRow icon="description" label="Terms of Service" onPress={() => { }} />
+                    <MenuRow icon="info" label="About" onPress={() => { }} />
                 </View>
 
                 {/* ── Danger Zone ── */}

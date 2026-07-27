@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Colors } from '../../../theme/colors';
 import { SelectedService } from '@/types/booking';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 /* ─────────────────────── Props ─────────────────────── */
 
@@ -119,16 +120,15 @@ const ChargesScreen: React.FC<ChargesScreenProps> = ({ selectedServices }) => {
             <View style={styles.chipRow}>
                 {[
                     {
-                        icon: '🛒',
-                        label: `${selectedServices.length} service${
-                            selectedServices.length !== 1 ? 's' : ''
-                        }`,
+                        icon: 'cart-outline',
+                        label: `${selectedServices.length} service${selectedServices.length !== 1 ? 's' : ''
+                            }`,
                     },
-                    { icon: '🕐', label: 'Est. 45 mins' },
-                    { icon: '🏠', label: 'At Home' },
+                    { icon: 'clock-outline', label: 'Est. 45 mins' },
+                    { icon: 'home-plus-outline', label: 'At Home' },
                 ].map(c => (
                     <View key={c.label} style={styles.chip}>
-                        <Text style={styles.chipIcon}>{c.icon}</Text>
+                        <MaterialCommunityIcons name={c.icon} size={20} style={{ color: Colors.gradientEnd }} />
                         <Text style={styles.chipText}>{c.label}</Text>
                     </View>
                 ))}

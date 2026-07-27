@@ -1,0 +1,375 @@
+import React, { useState } from 'react';
+import {
+      Modal,
+      View,
+      Text,
+      StyleSheet,
+      TouchableOpacity,
+      Alert,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+// If you're on Expo, replace the import above with:
+// import { LinearGradient } from 'expo-linear-gradient';
+import RazorpayCheckout, {
+      CheckoutOptions,
+      SuccessResponse,
+      ErrorResponse,
+} from 'react-native-razorpay';
+import { Colors, Spacing, Fonts } from '../../../theme/colors'; // adjust path to your shared theme file
+import { privateClient } from '@/service/apiClient';
+
+type PaymentMethod = 'cash' | 'razorpay';
+
+interface PaymentMethodModalProps {
+      visible: boolean;
+      onClose: () => void;
+      bookingId: string;
+      patientName: string;
+      amount: number; // in rupees
+      razorpayKey: string; // your Razorpay API key
+      onCashPayment: () => void;
+      onRazorpaySuccess: (response: SuccessResponse) => void;
+      onRazorpayFailure?: (error: ErrorResponse) => void;
+}
+
+export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
+      visible,
+      onClose,
+      bookingId,
+      patientName,
+      amount,
+      razorpayKey,
+      onCashPayment,
+      onRazorpaySuccess,
+      onRazorpayFailure,
+}) => {
+      const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('razorpay');
+
+      const handlePay = () => {
+            if (selectedMethod === 'cash') {
+                  onCashPayment();
+                  onClose();
+                  return;
+            }
+            openRazorpayCheckout();
+      };
+
+      const order = privateClient.post(`/bookings/${bookingId}/pay/razorpay-order`);
+      console.log('order res:', order);
+
+      const openRazorpayCheckout = () => {
+            const options: CheckoutOptions = {
+                  order_id: '',
+                  description: `Payment for Booking`,
+                  currency: 'INR',
+                  key: razorpayKey,
+                  amount: Math.round(amount * 100), // Razorpay expects amount in paise
+                  name: 'Injection',
+                  prefill: {
+                        name: patientName,
+                        email: '',
+                        contact: '',
+                  },
+                  theme: { color: Colors.gradientMid },
+            };
+
+            RazorpayCheckout.open(options)
+                  .then((data: SuccessResponse) => {
+                        onRazorpaySuccess(data);
+                        onClose();
+                  })
+                  .catch((error: ErrorResponse) => {
+                        if (onRazorpayFailure) {
+                              onRazorpayFailure(error);
+                        } else {
+                              Alert.alert('Payment Failed', error.description || 'Something went wrong');
+                        }
+                  });
+      };
+
+      return (
+            <Modal
+                  visible={visible}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={onClose}
+            >
+                  <View style={styles.overlay}>
+                        <View style={styles.card}>
+                              {/* Header */}
+                              <LinearGradient
+                                    colors={[Colors.gradientStart, Colors.accent]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.header}
+                              >
+                                    <View style={styles.headerTextWrap}>
+                                          <Text style={styles.headerTitle}>Process Payment</Text>
+                                          {/* <Text style={styles.headerSubtitle}>Booking ID: {bookingId}</Text> */}
+                                    </View>
+                                    <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                          <Text style={styles.closeIcon}>✕</Text>
+                                    </TouchableOpacity>
+                              </LinearGradient>
+
+                              {/* Body */}
+                              <View style={styles.body}>
+                                    {/* Patient / Amount info */}
+                                    <View style={styles.infoBox}>
+                                          <View style={styles.infoRow}>
+                                                <Text style={styles.infoLabel}>Patient:</Text>
+                                                <Text style={styles.infoValue}>{patientName}</Text>
+                                          </View>
+                                          <View style={styles.infoRow}>
+                                                <Text style={styles.infoLabel}>Amount to Pay:</Text>
+                                                <Text style={styles.infoAmount}>₹{amount}</Text>
+                                          </View>
+                                    </View>
+
+                                    {/* Section label */}
+                                    <Text style={styles.sectionLabel}>SELECT PAYMENT METHOD</Text>
+
+                                    {/* Payment method options */}
+                                    <View style={styles.methodsRow}>
+                                          <TouchableOpacity
+                                                style={[
+                                                      styles.methodCard,
+                                                      selectedMethod === 'cash' && styles.methodCardSelected,
+                                                ]}
+                                                onPress={() => setSelectedMethod('cash')}
+                                                activeOpacity={0.8}
+                                          >
+                                                <Text style={styles.methodIcon}>💵</Text>
+                                                <Text
+                                                      style={[
+                                                            styles.methodLabel,
+                                                            selectedMethod === 'cash' && styles.methodLabelSelected,
+                                                      ]}
+                                                >
+                                                      Cash Payment
+                                                </Text>
+                                          </TouchableOpacity>
+
+                                          <TouchableOpacity
+                                                style={[
+                                                      styles.methodCard,
+                                                      selectedMethod === 'razorpay' && styles.methodCardSelected,
+                                                ]}
+                                                onPress={() => setSelectedMethod('razorpay')}
+                                                activeOpacity={0.8}
+                                          >
+                                                <Text style={styles.methodIcon}>💳</Text>
+                                                <Text
+                                                      style={[
+                                                            styles.methodLabel,
+                                                            selectedMethod === 'razorpay' && styles.methodLabelSelected,
+                                                      ]}
+                                                >
+                                                      Razorpay
+                                                </Text>
+                                          </TouchableOpacity>
+                                    </View>
+
+                                    {/* Info note (only for Razorpay) */}
+                                    {selectedMethod === 'razorpay' && (
+                                          <View style={styles.noteBox}>
+                                                <Text style={styles.noteText}>
+                                                      💡 <Text style={styles.noteBold}>Razorpay:</Text> This launches the
+                                                      secure Razorpay payment checkout window. You can pay via
+                                                      Credit/Debit card, UPI, Netbanking, or Wallet.
+                                                </Text>
+                                          </View>
+                                    )}
+
+                                    {/* Divider */}
+                                    <View style={styles.divider} />
+
+                                    {/* Actions */}
+                                    <View style={styles.actionsRow}>
+                                          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                          </TouchableOpacity>
+
+                                          <TouchableOpacity onPress={handlePay} activeOpacity={0.85}>
+                                                <LinearGradient
+                                                      colors={[Colors.gradientMid, Colors.accent]}
+                                                      start={{ x: 0, y: 0 }}
+                                                      end={{ x: 1, y: 0 }}
+                                                      style={styles.payButton}
+                                                >
+                                                      <Text style={styles.payButtonText}>
+                                                            {selectedMethod === 'cash' ? 'Confirm Cash Payment' : 'Pay via Razorpay'}
+                                                      </Text>
+                                                </LinearGradient>
+                                          </TouchableOpacity>
+                                    </View>
+                              </View>
+                        </View>
+                  </View>
+            </Modal>
+      );
+};
+
+const styles = StyleSheet.create({
+      overlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: Spacing.xl,
+      },
+      card: {
+            width: '100%',
+            maxWidth: 400,
+            backgroundColor: Colors.white,
+            borderRadius: Spacing.lg,
+            overflow: 'hidden',
+            shadowColor: Colors.shadowColor,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.25,
+            shadowRadius: 12,
+            elevation: 8,
+      },
+      header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            paddingHorizontal: Spacing.xl,
+            paddingVertical: Spacing.xl,
+      },
+      headerTextWrap: {
+            flex: 1,
+      },
+      headerTitle: {
+            color: Colors.textLight,
+            fontSize: Fonts.sizes.xxl,
+            fontWeight: '700',
+      },
+      headerSubtitle: {
+            color: Colors.textLight,
+            fontSize: Fonts.sizes.sm,
+            marginTop: Spacing.xs,
+            opacity: 0.9,
+      },
+      closeIcon: {
+            color: Colors.textLight,
+            fontSize: Fonts.sizes.xl,
+            fontWeight: '600',
+      },
+      body: {
+            padding: Spacing.xl,
+      },
+      infoBox: {
+            backgroundColor: Colors.background,
+            borderRadius: Spacing.md,
+            padding: Spacing.lg,
+            marginBottom: Spacing.xl,
+      },
+      infoRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: Spacing.sm,
+      },
+      infoLabel: {
+            color: Colors.textMuted,
+            fontSize: Fonts.sizes.md,
+      },
+      infoValue: {
+            color: Colors.textDark,
+            fontSize: Fonts.sizes.lg,
+            fontWeight: '700',
+      },
+      infoAmount: {
+            color: Colors.textDark,
+            fontSize: Fonts.sizes.xl,
+            fontWeight: '700',
+      },
+      sectionLabel: {
+            color: Colors.textMedium,
+            fontSize: Fonts.sizes.sm,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+            marginBottom: Spacing.md,
+      },
+      methodsRow: {
+            flexDirection: 'row',
+            gap: Spacing.md,
+            marginBottom: Spacing.lg,
+      },
+      methodCard: {
+            flex: 1,
+            borderWidth: 1.5,
+            borderColor: Colors.checkboxBorder,
+            borderRadius: Spacing.md,
+            paddingVertical: Spacing.xl,
+            alignItems: 'center',
+            backgroundColor: Colors.white,
+      },
+      methodCardSelected: {
+            borderColor: Colors.gradientMid,
+            backgroundColor: Colors.background,
+      },
+      methodIcon: {
+            fontSize: Fonts.sizes.xxl,
+            marginBottom: Spacing.sm,
+      },
+      methodLabel: {
+            color: Colors.textDark,
+            fontSize: Fonts.sizes.md,
+            fontWeight: '600',
+      },
+      methodLabelSelected: {
+            color: Colors.gradientMid,
+      },
+      noteBox: {
+            backgroundColor: Colors.background,
+            borderRadius: Spacing.md,
+            padding: Spacing.lg,
+            marginBottom: Spacing.lg,
+      },
+      noteText: {
+            color: Colors.textMedium,
+            fontSize: Fonts.sizes.sm,
+            lineHeight: 20,
+      },
+      noteBold: {
+            fontWeight: '700',
+            color: Colors.textDark,
+      },
+      divider: {
+            height: 1,
+            backgroundColor: Colors.background,
+            marginBottom: Spacing.lg,
+      },
+      actionsRow: {
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: Spacing.md,
+      },
+      cancelButton: {
+            borderWidth: 1,
+            borderColor: Colors.inputBorder,
+            borderRadius: Spacing.sm + 4,
+            paddingHorizontal: Spacing.xl,
+            paddingVertical: Spacing.md,
+      },
+      cancelButtonText: {
+            color: Colors.textMedium,
+            fontSize: Fonts.sizes.md,
+            fontWeight: '600',
+      },
+      payButton: {
+            borderRadius: Spacing.sm + 4,
+            paddingHorizontal: Spacing.xl,
+            paddingVertical: Spacing.md,
+      },
+      payButtonText: {
+            color: Colors.textLight,
+            fontSize: Fonts.sizes.md,
+            fontWeight: '700',
+      },
+});
+
+export default PaymentMethodModal;

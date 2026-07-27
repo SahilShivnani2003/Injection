@@ -18,6 +18,7 @@ import { pick, types } from '@react-native-documents/picker';
 import { Colors } from '../../../theme/colors';
 import { UploadedFile } from '../screens/BookingScreen';
 import { Service } from '@/features/vendorService/types/Service';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const { width } = Dimensions.get('window');
 
@@ -113,21 +114,21 @@ const UploadPickerSheet: React.FC<{
                             {
                                 label: 'Camera',
                                 sub: 'Take a photo',
-                                emoji: '📷',
+                                iconName: 'camera',
                                 colors: [Colors.gradientStart, Colors.gradientEnd],
                                 fn: handleCamera,
                             },
                             {
                                 label: 'Gallery',
                                 sub: 'Choose image',
-                                emoji: '🖼️',
+                                iconName: 'images',
                                 colors: ['#7ED321', '#5EA300'],
                                 fn: handleGallery,
                             },
                             {
                                 label: 'Document',
                                 sub: 'PDF / Word',
-                                emoji: '📄',
+                                iconName: 'document-text',
                                 colors: ['#00B4E8', '#0090CC'],
                                 fn: handleDocument,
                             },
@@ -145,7 +146,7 @@ const UploadPickerSheet: React.FC<{
                                 end={{ x: 1, y: 1 }}
                                 style={ss.optionIcon}
                             >
-                                <Text style={ss.optionEmoji}>{opt.emoji}</Text>
+                                <Ionicons name={opt.iconName} style={ss.optionEmoji}></Ionicons>
                             </LinearGradient>
                             <Text style={ss.optionLabel}>{opt.label}</Text>
                             <Text style={ss.optionSub}>{opt.sub}</Text>
@@ -210,7 +211,7 @@ const ss = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
     },
-    optionEmoji: { fontSize: 26 },
+    optionEmoji: { fontSize: 26, color: Colors.white },
     optionLabel: { fontSize: 13, fontWeight: '700', color: Colors.textDark, marginBottom: 3 },
     optionSub: { fontSize: 11, color: Colors.textMuted },
     cancelBtn: {
@@ -267,7 +268,7 @@ const ServiceCard: React.FC<{ service: Service; selected: boolean; onPress: () =
             Other: '⚕️',
         };
 
-        return categoryIcons[service.category] || '⚕️';
+        return categoryIcons[service.category.name] || '⚕️';
     };
 
     return (
@@ -432,7 +433,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                     activeOpacity={0.8}
                 >
                     <View style={styles.uploadIconBox}>
-                        <Text style={styles.uploadIconText}>📄</Text>
+                        <Ionicons name='cloud-upload' style={styles.uploadIconText} />
                     </View>
                     <View style={styles.uploadTextBox}>
                         <Text style={styles.uploadTitle}>Upload Prescription</Text>
@@ -501,8 +502,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                                 policyFetched
                                     ? [Colors.accent, Colors.accentDark]
                                     : insurancePolicyNumber.trim()
-                                    ? [Colors.gradientStart, Colors.gradientEnd]
-                                    : ['#C8DCE4', '#B8CCCC']
+                                        ? [Colors.gradientStart, Colors.gradientEnd]
+                                        : ['#C8DCE4', '#B8CCCC']
                             }
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
@@ -512,8 +513,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                                 {policyFetched
                                     ? '✓  Policy Verified'
                                     : fetchingPolicy
-                                    ? 'Verifying...'
-                                    : 'Fetch Policy Details'}
+                                        ? 'Verifying...'
+                                        : 'Fetch Policy Details'}
                             </Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -657,7 +658,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    uploadIconText: { fontSize: 20 },
+    uploadIconText: { fontSize: 20, color: Colors.gradientEnd},
     uploadTextBox: { flex: 1 },
     uploadTitle: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
     uploadSub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },

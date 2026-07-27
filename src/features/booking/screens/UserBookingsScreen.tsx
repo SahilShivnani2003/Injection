@@ -11,6 +11,9 @@ import { RootStackParamList } from '@/types/RootStackParamList';
 import { UserTabParamList } from '@/types/UserTabParamList';
 import { Booking } from '../types/Booking';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { PaymentMethodModal } from '../components/PaymentScreen';
+
+const RazorPay_Key = 'rzp_test_SzRBgNqSTAHvYZ';
 
 type BookingsProps = NativeBottomTabScreenProps<UserTabParamList, 'Bookings'>;
 
@@ -18,6 +21,8 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
     const alert = useAlert();
     const [loading, setLoading] = useState(false);
     const [bookings, setBookings] = useState<Booking[]>([]);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
     useEffect(() => {
         fetchBookings();
@@ -97,6 +102,26 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
         }
     };
 
+    const handlePay = (booking: Booking) => {
+        setSelectedBooking(booking);
+        setShowModal(true);
+    };
+
+    const markBookingPaid = (payMethod: string, payId?: string) => {
+        if (payMethod === 'cash' || payMethod === 'Cash') {
+            setShowModal(false);
+        }
+    }
+    const onSuccessPay = () => {
+        alert.success('Payment Confirmed!  ',
+            `Your amount ${selectedBooking?.grandTotal} for this booking has been paid successfully.`)
+        navigation.goBack();
+    }
+    const onFail = () => {
+        alert.error('Failed',
+            'Payment method failed.Please try again latter')
+    }
+
     const renderItem = ({ item }: { item: Booking }) => (
         <TouchableOpacity
             style={styles.card}
@@ -135,17 +160,27 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                     </Text>
                 </View>
             </View>
-
-            <TouchableOpacity
-                style={styles.cancelBtn}
-                activeOpacity={0.8}
-                onPress={() => {
-                    handleNavigation(item)
-                }}
-            >
-                <Text style={styles.cancelText}>View Detail</Text>
-                <Icon name="arrow-right" size={25} color={Colors.white} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                    style={styles.cancelBtn}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        handleNavigation(item)
+                    }}
+                >
+                    <Text style={styles.cancelText}>View Detail</Text>
+                    <Icon name="arrow-right" size={25} color={Colors.white} />
+                </TouchableOpacity>
+                {item.bookingStatus === 'accepted' ? (
+                    <TouchableOpacity
+                        style={styles.cancelBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handlePay(item)}
+                    >
+                        <Text style={styles.cancelText}>Pay</Text>
+                    </TouchableOpacity>
+                ) : null}
+            </View>
         </TouchableOpacity>
     );
 
@@ -198,8 +233,19 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                         onRefresh={fetchBookings}
                     />
                 )}
-                <View style={{height: 42, marginBottom: 24}}></View>
+                <View style={{ height: 42, marginBottom: 24 }}></View>
             </View>
+            <PaymentMethodModal
+                visible={showModal}
+                onClose={() => setShowModal(false)}
+                bookingId={selectedBooking?._id || ''}
+                patientName={selectedBooking?.patientName.trim() || ''}
+                amount={selectedBooking?.grandTotal || 0.00}
+                razorpayKey={RazorPay_Key}
+                onCashPayment={() => markBookingPaid('cash')}
+                onRazorpaySuccess={onSuccessPay}
+                onRazorpayFailure={onFail}
+            />
         </View>
     );
 };
