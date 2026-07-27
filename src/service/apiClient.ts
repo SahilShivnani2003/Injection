@@ -2,7 +2,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { ApiError } from "@/types/ApiError";
 import axios from "axios";
 
-const BASE_URL = 'https://injection-hkgt.onrender.com/api'
+// const BASE_URL = 'https://injection-hkgt.onrender.com/api'
+const BASE_URL = 'https://api.prlthealthcare.com/api'
 
 export const publicClient = axios.create({
     baseURL: BASE_URL,

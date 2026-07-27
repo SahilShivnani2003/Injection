@@ -69,7 +69,7 @@ const VendorBookingsScreen = ({
     const fetchBookings = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const response = await bookingAPI.availableBookings();
+            const response = await bookingAPI.vendorBookings();
             console.log('Booking response : ', response.data);
             setBookings(response.data?.data ?? response.data?.bookings ?? response.data ?? []);
         } catch (error) {
@@ -146,7 +146,8 @@ const VendorBookingsScreen = ({
                     break;
             }
             await fetchBookings(true);
-        } catch {
+        } catch(error) {
+            console.log('Error while updating status : ', error);
             Alert.alert('Action failed', 'Unable to update booking status. Please try again.');
         } finally {
             setProcessingId(null);

@@ -14,6 +14,7 @@ import { AlertProvider } from '../context/AlertContext';
 import BookingScreen from '../features/booking/screens/BookingScreen';
 import BookingDetailScreen from '@/features/booking/screens/BookingDetailScreen';
 import { RootStackParamList } from '@/types/RootStackParamList';
+import { NotificationScreen } from '@/features/notification/screen/NotificationScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -35,13 +36,13 @@ export default function AppNavigator() {
                     <Stack.Screen name="Login" component={LoginScreen} />
                     <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
                     <Stack.Screen name="Register" component={RegisterScreen} />
-                    <Stack.Screen name="BasicDetails" component={BasicDetailsScreen} />
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
                     <Stack.Screen name="VendorRegister" component={VendorRegisterScreen} />
                     <Stack.Screen name="VendorTab" component={VendorTabNavigation} />
                     <Stack.Screen name="UserTab" component={TabNavigator} />
                     <Stack.Screen name="Booking" component={BookingScreen} />
                     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />
+                    <Stack.Screen name="Notification" component={NotificationScreen} />
                 </Stack.Navigator>
             </NavigationContainer>
         </AlertProvider>

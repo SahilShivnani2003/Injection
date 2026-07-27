@@ -1,6 +1,7 @@
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { UserTabParamList } from "./UserTabParamList";
 import { VendorTabParamList } from "./VendorTabParamList";
+import { Booking } from "@/features/booking/types/Booking";
 
 export type RootStackParamList = {
     Splash: undefined;
@@ -24,4 +25,9 @@ export type RootStackParamList = {
     BookingDetail: {
         bookingId: string;
     };
+    Notification: undefined;
+    VendorBookingDetail:{
+        booking: Booking;
+        notificationId: string
+    }
 };

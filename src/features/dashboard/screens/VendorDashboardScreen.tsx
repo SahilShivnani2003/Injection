@@ -20,6 +20,8 @@ import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { Colors } from '@/theme/colors';
 import { Booking } from '@/features/booking/types/Booking';
 import { Service } from '@/features/vendorService/types/Service';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/types/RootStackParamList';
 
 type VendorDashboardProps = NativeBottomTabScreenProps<VendorTabParamList, 'Dashboard'>;
 
@@ -56,6 +58,7 @@ const formatINR = (amount?: number): string =>
 // ─── component ──────────────────────────────────────────────────────────────
 
 const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
+    const rootNav = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
     const { user } = useAuthStore();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [services, setServices] = useState<Service[]>([]);
@@ -152,7 +155,6 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
 
     return (
         <View style={styles.root}>
-
             {/* Header */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -165,13 +167,22 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
                         <Text style={styles.greeting}>Welcome back,</Text>
                         <Text style={styles.vendorName}>{user?.name ?? 'Vendor'}</Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.headerAction}
-                        onPress={() => navigation.navigate('Profile')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <Ionicons name="person-circle" size={40} color={Colors.white} />
-                    </TouchableOpacity>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity
+                            style={styles.headerAction}
+                            onPress={() => navigation.navigate('Profile')}
+                            hitSlop={{ top: 8, bottom: 8 }}
+                        >
+                            <Ionicons name="person-circle" size={40} color={Colors.white} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.headerAction}
+                            onPress={() => rootNav.navigate('Notification')}
+                            hitSlop={{ top: 8, bottom: 8 }}
+                        >
+                            <Ionicons name="notifications" size={40} color={Colors.white} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Earnings strip inside header */}
@@ -355,6 +366,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
+    },
+    headerRight: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 6
     },
     greeting: {
         color: Colors.white,

@@ -4,12 +4,10 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    Alert,
     Animated,
     ActivityIndicator,
     FlatList,
-    RefreshControl,
-    ScrollView,
+    Image,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../../theme/colors';
@@ -63,7 +61,7 @@ const DEFAULT_ICON: IconDef = {
 const getCategoryIcon = (category?: string): IconDef => {
     if (!category) return DEFAULT_ICON;
     return CATEGORY_ICON[category] ?? DEFAULT_ICON;
-}
+};
 
 /* ─────────────────────── Props ─────────────────────── */
 
@@ -121,14 +119,23 @@ const ServiceListItem: React.FC<ServiceListItemProps> = React.memo(
                     activeOpacity={0.85}
                 >
                     {/* Left — category icon */}
-                    <View
-                        style={[
-                            styles.listIconBox,
-                            { backgroundColor: selected ? icon.color + '22' : icon.bg },
-                        ]}
-                    >
-                        <Ionicons name={icon.name as any} size={22} color={icon.color} />
-                    </View>
+                    {/* Left — service image, falls back to category icon */}
+                    {service.image ? (
+                        <Image
+                            source={{ uri: service.image }}
+                            style={[styles.listImage, selected && styles.listImageSelected]}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View
+                            style={[
+                                styles.listIconBox,
+                                { backgroundColor: selected ? icon.color + '22' : icon.bg },
+                            ]}
+                        >
+                            <Ionicons name={icon.name as any} size={22} color={icon.color} />
+                        </View>
+                    )}
 
                     {/* Center — name + meta chips */}
                     <View style={styles.listInfo}>
@@ -604,6 +611,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginRight: 12,
         flexShrink: 0,
+    },
+    listImage: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        marginRight: 12,
+        flexShrink: 0,
+        backgroundColor: '#F2F7FA', // placeholder while the image loads
+    },
+    listImageSelected: {
+        borderWidth: 2,
+        borderColor: Colors.gradientStart,
     },
 
     listInfo: { flex: 1, marginRight: 8 },
