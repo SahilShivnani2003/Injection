@@ -10,6 +10,7 @@ import {
     Modal,
     StatusBar,
     RefreshControl,
+    Linking
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -21,6 +22,7 @@ import { UserTabParamList } from '@/types/UserTabParamList';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { User } from '../types/User';
 import { userApi } from '@/service/apis/userService';
+import { useAlert } from '@/context/AlertContext';
 
 type ProfileProps = NativeBottomTabScreenProps<UserTabParamList, 'Profile'>;
 
@@ -58,6 +60,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [user, setUser] = useState<User | null>();
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+    const alert = useAlert();
 
     useEffect(() => {
         fetchProfile();
@@ -129,6 +132,20 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
             .getParent<NativeStackNavigationProp<RootStackParamList>>()
             ?.navigate('EditProfile', { userData: user });
     }
+
+    const openWebsite = async (url: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                alert.error('Error', 'Unable to open the link.');
+            }
+        } catch (error) {
+            alert.error('Error', 'Something went wrong while opening the link.');
+        }
+    };
 
     return (
         <View style={styles.root}>
@@ -373,9 +390,9 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                     <View style={styles.rowDivider} />
                     <MenuRow icon="lock" label="Change Password" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="folder-shared" label="Medical Records" onPress={() => { }} />
+                    {/* <MenuRow icon="folder-shared" label="Medical Records" onPress={() => { }} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => { }} />
+                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => { }} /> */}
                 </View>
 
                 {/* ── Preferences ── */}
@@ -404,14 +421,14 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 {/* ── Support ── */}
                 <SectionHeader title="SUPPORT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => { }} />
+                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => openWebsite('https://www.prlthealthcare.com/')} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => { }} />
+                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => openWebsite('https://www.prlthealthcare.com/')} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => { }} />
+                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => openWebsite('https://www.prlthealthcare.com/privacy')} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="description" label="Terms of Service" onPress={() => { }} />
-                    <MenuRow icon="info" label="About" onPress={() => { }} />
+                    <MenuRow icon="description" label="Terms of Service" onPress={() => openWebsite('https://www.prlthealthcare.com/terms')} />
+                    <MenuRow icon="info" label="About" onPress={() => openWebsite('https://www.prlthealthcare.com/about')} />
                 </View>
 
                 {/* ── Danger Zone ── */}

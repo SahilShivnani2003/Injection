@@ -21,6 +21,8 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { Booking, BookingStatus } from '../types/Booking';
 import { useAlert } from '@/context/AlertContext';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const { width } = Dimensions.get('window');
 
@@ -104,7 +106,7 @@ const STATUS_CONFIG: Record<
 const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
     <View style={sectionStyles.row}>
         <View style={sectionStyles.iconBox}>
-            <Text style={sectionStyles.icon}>{icon}</Text>
+            <MaterialCommunityIcons name={icon} style={sectionStyles.icon}></MaterialCommunityIcons>
         </View>
         <Text style={sectionStyles.title}>{title}</Text>
         <View style={sectionStyles.line} />
@@ -532,9 +534,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                 setBooking(prev =>
                     prev
                         ? {
-                              ...prev,
-                              preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
-                          }
+                            ...prev,
+                            preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
+                        }
                         : prev,
                 );
                 alert.success('Success', 'Booking rescheduled successfully.');
@@ -704,7 +706,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 { backgroundColor: status.bg, transform: [{ scale: statusScale }] },
                             ]}
                         >
-                            <Text style={styles.statusIcon}>{status.icon}</Text>
+                            {/* <Text style={styles.statusIcon}>{status.icon}</Text> */}
                             <Text style={[styles.statusText, { color: status.text }]}>
                                 {status.label}
                             </Text>
@@ -714,17 +716,17 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* Slot + Duration strip */}
                     <View style={styles.slotStrip}>
                         <View style={styles.slotChip}>
-                            <Text style={styles.slotIcon}>⏰</Text>
+                            <Ionicons name='calendar-number-outline' style={styles.slotIcon}></Ionicons>
                             <Text style={styles.slotText}>{booking.preferredTimeSlot}</Text>
                         </View>
                         <View style={styles.slotDivider} />
                         <View style={styles.slotChip}>
-                            <Text style={styles.slotIcon}>⏱</Text>
+                            <Ionicons name='timer-outline' style={styles.slotIcon}></Ionicons>
                             <Text style={styles.slotText}>~{booking.estimatedDuration} min</Text>
                         </View>
                         <View style={styles.slotDivider} />
                         <View style={styles.slotChip}>
-                            <Text style={styles.slotIcon}>👤</Text>
+                            <Ionicons name='people-outline' style={styles.slotIcon}></Ionicons>
                             <Text style={styles.slotText}>{booking.staffPreference}</Text>
                         </View>
                     </View>
@@ -753,7 +755,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     showsVerticalScrollIndicator={false}
                 >
                     {/* ── Services ── */}
-                    <SectionHeader icon="🩺" title="Services" />
+                    <SectionHeader icon="stethoscope" title="Services" />
                     <View style={styles.card}>
                         {booking.selectedServices.map((s, i) => (
                             <ServiceRow
@@ -820,7 +822,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     </View>
 
                     {/* ── Patient Info ── */}
-                    <SectionHeader icon="👤" title="Patient Information" />
+                    <SectionHeader icon="hand-heart-outline" title="Patient Information" />
                     <View style={styles.card}>
                         <InfoRow label="Full Name" value={booking.patientName} />
                         <InfoRow label="Age / Sex" value={`${booking.age} yrs / ${booking.sex}`} />
@@ -967,7 +969,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Notes ── */}
                     {(booking.notes?.length ?? 0) > 0 && (
                         <>
-                            <SectionHeader icon="🗒️" title="Notes" />
+                            <SectionHeader icon="note-outline" title="Notes" />
                             <View style={styles.card}>
                                 {booking.notes!.map((note, i) => (
                                     <View
@@ -978,7 +980,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         ]}
                                     >
                                         <View style={styles.noteAvatar}>
-                                            <Text style={{ fontSize: 13 }}>👩‍⚕️</Text>
+                                            <Ionicons name='person-outline' style={{ fontSize: 13 }}></Ionicons>
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.noteText}>{note.text}</Text>
@@ -993,7 +995,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     )}
 
                     {/* ── Timeline ── */}
-                    <SectionHeader icon="🕒" title="Timeline" />
+                    <SectionHeader icon="timer-outline" title="Timeline" />
                     <View style={styles.card}>
                         {[
                             {
