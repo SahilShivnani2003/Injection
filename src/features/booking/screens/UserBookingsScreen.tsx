@@ -240,7 +240,6 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                 visible={showModal}
                 onClose={() => setShowModal(false)}
                 bookingId={selectedBooking?._id || ''}
-                patientName={user}
                 amount={selectedBooking?.grandTotal || 0.00}
                 onCashPayment={() => markBookingPaid('cash')}
                 onRazorpaySuccess={onSuccessPay}

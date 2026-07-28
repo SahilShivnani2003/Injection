@@ -18,6 +18,7 @@ import { privateClient } from '@/service/apiClient';
 import { useAlert } from '@/context/AlertContext';
 import { envConfig } from '@/config/env';
 import { User } from '@/features/profile/types/User';
+import { useAuthStore } from '@/store/useAuthStore';
 
 type PaymentMethod = 'cash' | 'razorpay';
 
@@ -25,7 +26,6 @@ interface PaymentMethodModalProps {
       visible: boolean;
       onClose: () => void;
       bookingId: string;
-      patient: User;
       amount: number; // in rupees
       onCashPayment: () => void;
       onRazorpaySuccess: (response: SuccessResponse) => void;
@@ -36,13 +36,12 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
       visible,
       onClose,
       bookingId,
-      patient,
       amount,
       onCashPayment,
       onRazorpaySuccess,
       onRazorpayFailure,
 }) => {
-      debugger
+      const {user} = useAuthStore();
       const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('razorpay');
       const alert = useAlert();
 
@@ -72,9 +71,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   amount: Math.round(amount * 100), // Razorpay expects amount in paise
                   name: 'Injection',
                   prefill: {
-                        name: patient.name,
-                        email: patient.email,
-                        contact: patient.phone,
+                        name: user?.name || '',
+                        email: user?.email || '',
+                        contact: user?.phone || '',
                   },
                   theme: { color: Colors.gradientMid },
             };
@@ -125,7 +124,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                                     <View style={styles.infoBox}>
                                           <View style={styles.infoRow}>
                                                 <Text style={styles.infoLabel}>Patient:</Text>
-                                                <Text style={styles.infoValue}>{patient.name}</Text>
+                                                <Text style={styles.infoValue}>{user?.name || ''}</Text>
                                           </View>
                                           <View style={styles.infoRow}>
                                                 <Text style={styles.infoLabel}>Amount to Pay:</Text>
