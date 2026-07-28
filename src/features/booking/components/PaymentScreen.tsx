@@ -17,6 +17,7 @@ import RazorpayCheckout, {
 } from 'react-native-razorpay';
 import { Colors, Spacing, Fonts } from '../../../theme/colors'; // adjust path to your shared theme file
 import { privateClient } from '@/service/apiClient';
+import { useAlert } from '@/context/AlertContext';
 
 type PaymentMethod = 'cash' | 'razorpay';
 
@@ -43,7 +44,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
       onRazorpaySuccess,
       onRazorpayFailure,
 }) => {
+      debugger
       const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('razorpay');
+      const alert = useAlert();
 
       const handlePay = () => {
             if (selectedMethod === 'cash') {
@@ -54,10 +57,15 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             openRazorpayCheckout();
       };
 
-      const order = privateClient.post(`/bookings/${bookingId}/pay/razorpay-order`);
-      console.log('order res:', order);
+
 
       const openRazorpayCheckout = () => {
+            const order = privateClient.post(`/bookings/${bookingId}/pay/razorpay-order`);
+            console.log('order res:', order);
+            if (order === null) {
+                  alert.error('Failed',
+                        'Unable to create order. Please try again.')
+            }
             const options: CheckoutOptions = {
                   order_id: '',
                   description: `Payment for Booking`,
@@ -81,6 +89,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   .catch((error: ErrorResponse) => {
                         if (onRazorpayFailure) {
                               onRazorpayFailure(error);
+                              console.log('error:', error);
                         } else {
                               Alert.alert('Payment Failed', error.description || 'Something went wrong');
                         }

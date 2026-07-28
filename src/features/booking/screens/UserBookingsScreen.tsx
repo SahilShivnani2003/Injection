@@ -160,7 +160,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                     </Text>
                 </View>
             </View>
-            <View style={{ flexDirection: 'row' }}>
+            <View style={{ flex: 1, flexDirection: 'row', gap: 7 }}>
                 <TouchableOpacity
                     style={styles.cancelBtn}
                     activeOpacity={0.8}
@@ -173,7 +173,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                 </TouchableOpacity>
                 {item.bookingStatus === 'accepted' ? (
                     <TouchableOpacity
-                        style={styles.cancelBtn}
+                        style={styles.payBtn}
                         activeOpacity={0.8}
                         onPress={() => handlePay(item)}
                     >
@@ -373,6 +373,7 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
     },
     cancelBtn: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -380,6 +381,15 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.gradientMid,
         borderRadius: 8,
         paddingVertical: 10,
+    },
+    payBtn: {
+        // flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.gradientMid,
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
     },
     cancelText: {
         color: Colors.white,
