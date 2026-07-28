@@ -161,9 +161,9 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         ]).start();
     }, []);
 
-    const fetchDashboardData = async (isRefreshing = false) => {
+    const fetchDashboardData = async () => {
         try {
-            if (!isRefreshing) setLoading(true);
+           setLoading(true);
             const response = await dashboardService.dashboardStats();
             if (response?.data?.success) {
                 setDashboardData(response.data.data as DashboardData);
@@ -172,18 +172,19 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             console.error('Error fetching dashboard data:', error);
         } finally {
             setLoading(false);
-            if (isRefreshing) setRefreshing(false);
+            
         }
     };
 
     useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
+         fetchDashboardData();
+    }, []);
 
-    const onRefresh = useCallback(() => {
+    const onRefresh = async() => {
         setRefreshing(true);
-        fetchDashboardData(true);
-    }, [fetchDashboardData]);
+        await fetchDashboardData();
+        setRefreshing(false);
+    };
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 

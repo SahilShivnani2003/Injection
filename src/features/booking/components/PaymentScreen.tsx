@@ -56,15 +56,16 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
 
 
-      const openRazorpayCheckout = () => {
-            const order = privateClient.post(`/bookings/${bookingId}/pay/razorpay-order`);
-            console.log('order res:', order);
+      const openRazorpayCheckout = async() => {
+            const order = await privateClient.post(`/bookings/${bookingId}/pay/razorpay-order`);
+            console.log('order res:', order.data);
             if (order === null) {
                   alert.error('Failed',
                         'Unable to create order. Please try again.')
             }
+            debugger
             const options: CheckoutOptions = {
-                  order_id: '',
+                  order_id: order.data?.orderId || '',
                   description: `Payment for Booking`,
                   currency: 'INR',
                   key: envConfig.RAZORPAYKEY,

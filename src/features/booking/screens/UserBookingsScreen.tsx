@@ -33,6 +33,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
         try {
             setLoading(true);
             const response = await bookingAPI.userBookings();
+            console.log('loading user booking : ', response);
             setBookings(response.data?.data);
         } catch (error) {
             console.error('Error fetching bookings:', error);
@@ -226,7 +227,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                     <FlatList
                         data={bookings}
                         // Use _id for reliable unique keys
-                        keyExtractor={item => item._id ?? Math.random().toString()}
+                        keyExtractor={item => item._id ?? Math.random().toString()}                        
                         renderItem={renderItem}
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
