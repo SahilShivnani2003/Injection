@@ -58,6 +58,7 @@ type RegisterProps = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 const RegisterScreen = ({ navigation }: RegisterProps) => {
     const alert = useAlert();
+    const {setAuth} = useAuthStore();
     const [userType, setUserType] = useState<'patient' | 'labpartner' | 'staff'>('patient');
 
     // FIX 3: Form now typed as RegisterForm (from the provided interface) instead
@@ -128,11 +129,12 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
             const response = await userApi.register(payload);
 
             if (response.data.success) {
+                setAuth(response.data?.user, response.data?.token);
                 alert.success(
                     'Registration Successful',
                     'Your account has been created. Please login.',
                 );
-                navigation.navigate('Login');
+                navigation.navigate('UserTab', { screen: 'Dashboard' });
             } else {
                 alert.error('Registration Failed', 'Unable to create account. Please try again.');
             }
@@ -312,7 +314,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                     </View>
 
                     {/* ── Password + Confirm in one row to reduce scrolling ─── */}
-                    <View style={styles.rowGroup}>
+                    <View style={styles.passwordGroup}>
                         <View style={[styles.inputGroup, styles.halfGroup]}>
                             <Text style={styles.inputLabel}>Password</Text>
                             <TextInput
@@ -484,6 +486,10 @@ const styles = StyleSheet.create({
     },
     textArea: { height: 80, textAlignVertical: 'top' },
 
+    passowrdGroup : {
+        flexDirection: 'column',
+        gap: 12,
+    },
     // REDUCE SCROLL: Row layout for paired short fields.
     rowGroup: {
         flexDirection: 'row',

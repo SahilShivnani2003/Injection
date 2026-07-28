@@ -36,12 +36,19 @@ export const useAuthStore = create<AuthState>((set) => ({
 
             await AsyncStorage.setItem(STORAGE_KEY, data);
 
+            set({
+                isAuthenticated: true,
+                user: user,
+                token: token,
+                loggedInRole: role
+            })
+
             const hasPermission = await requestNotificationPermission();
 
             if (hasPermission) {
                 const fcmToken = await messaging().getToken();
 
-                const registerDeviceData : IRegisterDevice = {
+                const registerDeviceData: IRegisterDevice = {
                     token: fcmToken,
                     deviceType: 'android',
                     platform: 'app',
@@ -50,12 +57,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
                 await registerDevice(registerDeviceData);
             }
-            set({
-                isAuthenticated: true,
-                user: user,
-                token: token,
-                loggedInRole: role
-            })
 
         } catch (error: any) {
             console.error('ERROR WHILE SAVING AUTH : ', error);

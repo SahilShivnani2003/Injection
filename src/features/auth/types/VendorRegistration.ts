@@ -10,7 +10,8 @@ export type DocumentField =
     | 'identityProof'
     | 'qualificationCertificate'
     | 'businessLicense'
-    | 'insuranceCertificate';
+    | 'insuranceCertificate'
+    | 'policeVerification';
 
 export type VendorForm = {
     // Step 1
@@ -73,6 +74,7 @@ export const INITIAL_DOCUMENTS: Record<DocumentField, string | null> = {
     qualificationCertificate: null,
     businessLicense: null,
     insuranceCertificate: null,
+    policeVerification: null,
 };
 
 export const BUSINESS_TYPES = [

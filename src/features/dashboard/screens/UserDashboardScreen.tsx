@@ -161,7 +161,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
         ]).start();
     }, []);
 
-    const fetchDashboardData = useCallback(async (isRefreshing = false) => {
+    const fetchDashboardData = async (isRefreshing = false) => {
         try {
             if (!isRefreshing) setLoading(true);
             const response = await dashboardService.dashboardStats();
@@ -174,7 +174,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             setLoading(false);
             if (isRefreshing) setRefreshing(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
         fetchDashboardData();

@@ -23,6 +23,7 @@ const DOCUMENT_FIELDS: { field: DocumentField; label: string; icon: string }[] =
     { field: 'qualificationCertificate', label: 'Qualification', icon: 'school' },
     { field: 'businessLicense', label: 'Business License', icon: 'store' },
     { field: 'insuranceCertificate', label: 'Insurance Cert', icon: 'health-and-safety' },
+    { field: 'policeVerification', label: 'Police Verification', icon: 'verified-user' }
 ];
 
 // ── Section header (matches StepContactBusiness style) ────────────────────────
