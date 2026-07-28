@@ -8,16 +8,16 @@ import {
       Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-// If you're on Expo, replace the import above with:
-// import { LinearGradient } from 'expo-linear-gradient';
 import RazorpayCheckout, {
       CheckoutOptions,
       SuccessResponse,
       ErrorResponse,
 } from 'react-native-razorpay';
-import { Colors, Spacing, Fonts } from '../../../theme/colors'; // adjust path to your shared theme file
+import { Colors, Spacing, Fonts } from '../../../theme/colors'; 
 import { privateClient } from '@/service/apiClient';
 import { useAlert } from '@/context/AlertContext';
+import { envConfig } from '@/config/env';
+import { User } from '@/features/profile/types/User';
 
 type PaymentMethod = 'cash' | 'razorpay';
 
@@ -25,9 +25,8 @@ interface PaymentMethodModalProps {
       visible: boolean;
       onClose: () => void;
       bookingId: string;
-      patientName: string;
+      patient: User;
       amount: number; // in rupees
-      razorpayKey: string; // your Razorpay API key
       onCashPayment: () => void;
       onRazorpaySuccess: (response: SuccessResponse) => void;
       onRazorpayFailure?: (error: ErrorResponse) => void;
@@ -37,9 +36,8 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
       visible,
       onClose,
       bookingId,
-      patientName,
+      patient,
       amount,
-      razorpayKey,
       onCashPayment,
       onRazorpaySuccess,
       onRazorpayFailure,
@@ -70,13 +68,13 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   order_id: '',
                   description: `Payment for Booking`,
                   currency: 'INR',
-                  key: razorpayKey,
+                  key: envConfig.RAZORPAYKEY,
                   amount: Math.round(amount * 100), // Razorpay expects amount in paise
                   name: 'Injection',
                   prefill: {
-                        name: patientName,
-                        email: '',
-                        contact: '',
+                        name: patient.name,
+                        email: patient.email,
+                        contact: patient.phone,
                   },
                   theme: { color: Colors.gradientMid },
             };
@@ -127,7 +125,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                                     <View style={styles.infoBox}>
                                           <View style={styles.infoRow}>
                                                 <Text style={styles.infoLabel}>Patient:</Text>
-                                                <Text style={styles.infoValue}>{patientName}</Text>
+                                                <Text style={styles.infoValue}>{patient.name}</Text>
                                           </View>
                                           <View style={styles.infoRow}>
                                                 <Text style={styles.infoLabel}>Amount to Pay:</Text>

@@ -1,7 +1,11 @@
 import { User } from "@/features/profile/types/User";
 import { Vendor } from "@/features/profile/types/Vendor";
+import requestNotificationPermission from "@/utils/requestNotificationPermission";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import messaging from '@react-native-firebase/messaging';
+import { IRegisterDevice, registerDevice } from "@/features/notification/service/notification.service";
+import { DeviceConfig } from "@/config/deviceConfig";
 
 type AuthState = {
     isAuthenticated: boolean;
@@ -32,6 +36,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 
             await AsyncStorage.setItem(STORAGE_KEY, data);
 
+            const hasPermission = await requestNotificationPermission();
+
+            if (hasPermission) {
+                const fcmToken = await messaging().getToken();
+
+                const registerDeviceData : IRegisterDevice = {
+                    token: fcmToken,
+                    deviceType: 'android',
+                    platform: 'app',
+                    appVersion: DeviceConfig.version,
+                }
+
+                await registerDevice(registerDeviceData);
+            }
             set({
                 isAuthenticated: true,
                 user: user,

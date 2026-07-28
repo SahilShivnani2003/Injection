@@ -12,13 +12,14 @@ import { UserTabParamList } from '@/types/UserTabParamList';
 import { Booking } from '../types/Booking';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PaymentMethodModal } from '../components/PaymentScreen';
+import { useAuthStore } from '@/store/useAuthStore';
 
-const RazorPay_Key = 'rzp_test_SzRBgNqSTAHvYZ';
 
 type BookingsProps = NativeBottomTabScreenProps<UserTabParamList, 'Bookings'>;
 
 const BookingsScreen = ({ navigation }: BookingsProps) => {
     const alert = useAlert();
+    const {user} = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [showModal, setShowModal] = useState(false);
@@ -239,9 +240,8 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
                 visible={showModal}
                 onClose={() => setShowModal(false)}
                 bookingId={selectedBooking?._id || ''}
-                patientName={selectedBooking?.patientName.trim() || ''}
+                patientName={user}
                 amount={selectedBooking?.grandTotal || 0.00}
-                razorpayKey={RazorPay_Key}
                 onCashPayment={() => markBookingPaid('cash')}
                 onRazorpaySuccess={onSuccessPay}
                 onRazorpayFailure={onFail}
