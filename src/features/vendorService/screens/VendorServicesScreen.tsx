@@ -24,39 +24,15 @@ import { Colors } from '@/theme/colors';
 import { Service } from '@/features/vendorService/types/Service';
 import { useAlert } from '@/context/AlertContext';
 
-// Service type needs _id from the API response
+// `_id` is already optional on Service, this alias just makes it required
+// for items we know came back from the list endpoint.
 type ServiceWithId = Service & { _id: string };
 
+// `category` on Service is an object (as returned by the backend), not a
+// string enum, so we work with that shape everywhere below.
+type ServiceCategory = Service['category'];
+
 const { width } = Dimensions.get('window');
-
-// ── Category list ─────────────────────────────────────────────────────────────
-
-const CATEGORIES: Service['category'][] = [
-    'Home Injections',
-    'IV Drip Services',
-    'Wound Dressing',
-    'Day Care at Home',
-    'Patient Monitoring',
-    'Old Age Patient Care',
-    '24 HR Patient Care',
-    'Field Survey Service',
-    'Data Collection Service',
-    'Field Sample Collection',
-    'Community Survey',
-    'Awareness Activities',
-    'Lab-based Training',
-    'BSC/MSC Training',
-    'DMLT Training',
-    'Nursing Training',
-    'Dissertation Program',
-    'Placement Services',
-    'Blood Collection',
-    'BP/Sugar Monitoring',
-    'ECG at Home',
-    'Catheter Care',
-    'Physiotherapy Session',
-    'Other',
-];
 
 const SERVICE_TYPES: NonNullable<Service['serviceType']>[] = ['At Home', 'At Clinic', 'Both'];
 
@@ -65,7 +41,7 @@ const SERVICE_TYPES: NonNullable<Service['serviceType']>[] = ['At Home', 'At Cli
 interface ServiceForm {
     serviceName: string;
     description: string;
-    category: Service['category'] | '';
+    category: ServiceCategory | null;
     basePrice: string;
     duration: string;
     serviceType: Service['serviceType'] | '';
@@ -75,7 +51,7 @@ interface ServiceForm {
 const FORM_DEFAULT: ServiceForm = {
     serviceName: '',
     description: '',
-    category: '',
+    category: null,
     basePrice: '',
     duration: '',
     serviceType: '',
@@ -93,13 +69,20 @@ const validateServiceForm = (form: ServiceForm): string | null => {
     return null;
 };
 
+// Fields other than `category` are still plain strings, so the modal keeps a
+// generic string setter for those and a dedicated setter for category.
+type StringField = Exclude<keyof ServiceForm, 'category'>;
+
 // ── Add Service Modal ─────────────────────────────────────────────────────────
 
 interface AddServiceModalProps {
     visible: boolean;
     submitting: boolean;
     form: ServiceForm;
-    onChange: (field: keyof ServiceForm, value: string) => void;
+    categories: ServiceCategory[];
+    categoriesLoading: boolean;
+    onChange: (field: StringField, value: string) => void;
+    onSelectCategory: (category: ServiceCategory) => void;
     onSubmit: () => void;
     onClose: () => void;
 }
@@ -108,7 +91,10 @@ const AddServiceModal = ({
     visible,
     submitting,
     form,
+    categories,
+    categoriesLoading,
     onChange,
+    onSelectCategory,
     onSubmit,
     onClose,
 }: AddServiceModalProps) => {
@@ -164,7 +150,7 @@ const AddServiceModal = ({
                             <TouchableOpacity
                                 style={[modal.input, modal.pickerBtn]}
                                 onPress={() => setCategoryOpen(o => !o)}
-                                disabled={submitting}
+                                disabled={submitting || categoriesLoading}
                                 activeOpacity={0.8}
                             >
                                 <Text
@@ -172,60 +158,76 @@ const AddServiceModal = ({
                                         form.category ? modal.pickerValue : modal.pickerPlaceholder
                                     }
                                 >
-                                    {form.category || 'Select a category'}
+                                    {categoriesLoading
+                                        ? 'Loading categories…'
+                                        : form.category?.name || 'Select a category'}
                                 </Text>
-                                <Ionicons
-                                    name={categoryOpen ? 'chevron-up' : 'chevron-down'}
-                                    size={16}
-                                    color={Colors.textMuted}
-                                />
+                                {categoriesLoading ? (
+                                    <ActivityIndicator size="small" color={Colors.textMuted} />
+                                ) : (
+                                    <Ionicons
+                                        name={categoryOpen ? 'chevron-up' : 'chevron-down'}
+                                        size={16}
+                                        color={Colors.textMuted}
+                                    />
+                                )}
                             </TouchableOpacity>
-                            {categoryOpen && (
+                            {categoryOpen && !categoriesLoading && (
                                 <View style={modal.categoryList}>
-                                    <ScrollView
-                                        style={{ maxHeight: 200 }}
-                                        nestedScrollEnabled
-                                        showsVerticalScrollIndicator={false}
-                                    >
-                                        {CATEGORIES.map(cat => (
-                                            <TouchableOpacity
-                                                key={cat}
-                                                style={[
-                                                    modal.categoryItem,
-                                                    form.category === cat &&
-                                                        modal.categoryItemActive,
-                                                ]}
-                                                onPress={() => {
-                                                    onChange('category', cat);
-                                                    setCategoryOpen(false);
-                                                }}
-                                                activeOpacity={0.75}
-                                            >
-                                                <Ionicons
-                                                    name={
-                                                        form.category === cat
-                                                            ? 'checkmark-circle'
-                                                            : 'medical-outline'
-                                                    }
-                                                    size={18}
-                                                    color={
-                                                        form.category === cat
-                                                            ? Colors.gradientStart
-                                                            : Colors.textMuted
-                                                    }
-                                                />
-                                                <Text
-                                                    style={[
-                                                        modal.categoryItemText,
-                                                        form.category === cat &&
-                                                            modal.categoryItemTextActive,
-                                                    ]}
-                                                >
-                                                    {cat}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                                    {categories.length === 0 ? (
+                                        <View style={modal.categoryEmpty}>
+                                            <Text style={modal.categoryEmptyText}>
+                                                No categories available.
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <ScrollView
+                                            style={{ maxHeight: 200 }}
+                                            nestedScrollEnabled
+                                            showsVerticalScrollIndicator={false}
+                                        >
+                                            {categories.map(cat => {
+                                                const active = form.category?._id === cat._id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={cat._id}
+                                                        style={[
+                                                            modal.categoryItem,
+                                                            active && modal.categoryItemActive,
+                                                        ]}
+                                                        onPress={() => {
+                                                            onSelectCategory(cat);
+                                                            setCategoryOpen(false);
+                                                        }}
+                                                        activeOpacity={0.75}
+                                                    >
+                                                        <Ionicons
+                                                            name={
+                                                                active
+                                                                    ? 'checkmark-circle'
+                                                                    : 'medical-outline'
+                                                            }
+                                                            size={18}
+                                                            color={
+                                                                active
+                                                                    ? Colors.gradientStart
+                                                                    : Colors.textMuted
+                                                            }
+                                                        />
+                                                        <Text
+                                                            style={[
+                                                                modal.categoryItemText,
+                                                                active &&
+                                                                    modal.categoryItemTextActive,
+                                                            ]}
+                                                        >
+                                                            {cat.name}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </ScrollView>
+                                    )}
                                 </View>
                             )}
                         </Field>
@@ -446,6 +448,8 @@ const modal = StyleSheet.create({
         backgroundColor: '#fff',
         overflow: 'hidden',
     },
+    categoryEmpty: { paddingHorizontal: 14, paddingVertical: 14 },
+    categoryEmptyText: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
     categoryItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -535,7 +539,7 @@ const ServiceCard = ({
                     <Text style={styles.serviceTitle} numberOfLines={1}>
                         {service.serviceName}
                     </Text>
-                    <Text style={styles.serviceCategory}>{service.category}</Text>
+                    <Text style={styles.serviceCategory}>{service.category?.name}</Text>
                 </View>
                 <View
                     style={[styles.statusPill, { backgroundColor: active ? '#E6FFF5' : '#FFF1F0' }]}
@@ -652,6 +656,11 @@ const VendorServicesScreen = ({
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
+    // Categories now come from the backend (they're full documents with
+    // their own _id), so they're fetched rather than hardcoded.
+    const [categories, setCategories] = useState<ServiceCategory[]>([]);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
+
     // Add service modal
     const [modalVisible, setModalVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -672,8 +681,25 @@ const VendorServicesScreen = ({
         }
     };
 
+    const fetchCategories = async () => {
+        setCategoriesLoading(true);
+        try {
+            // NOTE: rename this to match your actual endpoint, e.g.
+            // categoryAPI.list() — swap in whatever serviceAPI exposes.
+            const response = await serviceAPI.getCategories();
+            console.log('categories data: ', response);
+            setCategories((response.data?.data ?? []) as ServiceCategory[]);
+        } catch (error) {
+            console.warn('Unable to load service categories', error);
+            alert.error('Error', 'Unable to load categories.');
+        } finally {
+            setCategoriesLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchServices();
+        fetchCategories();
     }, []);
 
     // ── Toggle ────────────────────────────────────────────────────────────────
@@ -696,8 +722,12 @@ const VendorServicesScreen = ({
 
     // ── Add Service ───────────────────────────────────────────────────────────
 
-    const handleFormChange = (field: keyof ServiceForm, value: string) => {
+    const handleFormChange = (field: StringField, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSelectCategory = (category: ServiceCategory) => {
+        setForm(prev => ({ ...prev, category }));
     };
 
     const handleAddService = async () => {
@@ -711,7 +741,7 @@ const VendorServicesScreen = ({
         try {
             const payload: Partial<Service> = {
                 serviceName: form.serviceName.trim(),
-                category: form.category as Service['category'],
+                category: form.category as ServiceCategory,
                 description: form.description.trim(),
                 basePrice: parseFloat(form.basePrice),
                 duration: form.duration ? parseInt(form.duration, 10) : undefined,
@@ -767,13 +797,15 @@ const VendorServicesScreen = ({
 
     return (
         <View style={styles.root}>
-
             {/* ── Add Service Modal ── */}
             <AddServiceModal
                 visible={modalVisible}
                 submitting={submitting}
                 form={form}
+                categories={categories}
+                categoriesLoading={categoriesLoading}
                 onChange={handleFormChange}
+                onSelectCategory={handleSelectCategory}
                 onSubmit={handleAddService}
                 onClose={() => !submitting && setModalVisible(false)}
             />

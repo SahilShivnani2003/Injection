@@ -10,4 +10,5 @@ export const serviceAPI = {
     updateService: (serviceId:string, data:any) => privateClient.put(`/services/${serviceId}`, data),
     deleteService: (serviceId:string) => privateClient.delete(`/services/${serviceId}`),
     toggleServiceStatus: (serviceId:string) => privateClient.put(`/services/${serviceId}/toggle-status`),
+    getCategories: () => publicClient.get('/categories'),
 }
