@@ -18,6 +18,7 @@ import { userApi } from '@/service/apis/userService';
 import { Colors } from '@/theme/colors';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { RegisterForm } from '../types/RegisterForm';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // FIX 1: `Gender` type was used in GENDER_DATA but never defined in the file.
 type Gender = 'Male' | 'Female' | 'Other';
@@ -129,7 +130,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
             const response = await userApi.register(payload);
 
             if (response.data.success) {
-                setAuth(response.data?.user, response.data?.token);
+                setAuth(response.data?.user, 'patient',response.data?.token);
                 alert.success(
                     'Registration Successful',
                     'Your account has been created. Please login.',
@@ -314,7 +315,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                     </View>
 
                     {/* ── Password + Confirm in one row to reduce scrolling ─── */}
-                    <View style={styles.passwordGroup}>
+                    <View style={styles.passowrdGroup}>
                         <View style={[styles.inputGroup, styles.halfGroup]}>
                             <Text style={styles.inputLabel}>Password</Text>
                             <TextInput
