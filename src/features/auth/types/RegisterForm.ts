@@ -9,4 +9,6 @@ export interface RegisterForm {
     address: string;
     pincode: string;
     role: 'user';
+    city: string;     
+    state: string;
 }

@@ -17,6 +17,8 @@ import { bookingAPI } from '@/service/apis/bookingService';
 import { Booking } from '@/features/booking/types/Booking';
 import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { Colors } from '@/theme/colors';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/types/RootStackParamList';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -146,7 +148,7 @@ const VendorBookingsScreen = ({
                     break;
             }
             await fetchBookings(true);
-        } catch(error) {
+        } catch (error) {
             console.log('Error while updating status : ', error);
             Alert.alert('Action failed', 'Unable to update booking status. Please try again.');
         } finally {
@@ -227,7 +229,6 @@ const VendorBookingsScreen = ({
 
     return (
         <View style={styles.root}>
-
             {/* Header */}
             <LinearGradient
                 colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -325,7 +326,18 @@ const VendorBookingsScreen = ({
                         const amount = booking.grandTotal ?? booking.subtotal;
 
                         return (
-                            <View key={key} style={styles.bookingCard}>
+                            <View
+                                key={key}
+                                style={styles.bookingCard}
+                                onTouchStart={() =>
+                                    navigation
+                                        .getParent<NativeStackNavigationProp<RootStackParamList>>()
+                                        .navigate('VendorBookingDetail', {
+                                            booking: booking,
+                                            notificationId: '',
+                                        })
+                                }
+                            >
                                 {/* Card header */}
                                 <View style={styles.bookingHeader}>
                                     <Text style={styles.bookingTitle} numberOfLines={1}>

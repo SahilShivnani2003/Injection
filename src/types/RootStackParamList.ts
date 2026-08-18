@@ -32,5 +32,8 @@ export type RootStackParamList = {
     }
     EditProfile:{
         userData: any
+    },
+    BookingMap: {
+        bookingId: string;
     }
 };

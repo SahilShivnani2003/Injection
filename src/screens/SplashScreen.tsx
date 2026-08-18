@@ -132,7 +132,7 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
                     });
                 }
             } else {
-                navigation.replace('Login');
+                navigation.replace('EmailLogin');
             }
         };
 

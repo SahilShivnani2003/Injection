@@ -23,6 +23,7 @@ import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { useAlert } from '@/context/AlertContext';
+import { LogoutModal } from '../model/LogoutModal';
 
 type VendorProfileProps = NativeBottomTabScreenProps<VendorTabParamList, 'Profile'>;
 
@@ -152,6 +153,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [logoutModalVisible, setLogoutModalVisible] = useState<boolean>(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -188,22 +190,12 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
     // ── Logout ────────────────────────────────────────────────────────────────
 
-    const handleLogOut = () => {
-        alert.show({
-            title: 'Log Out',
-            message: 'Are you sure you want to log out?',
-            buttons: [
-                { label: 'Cancel', onPress: alert.dismiss, style: 'ghost' },
-                {
-                    label: 'Log Out',
-                    style: 'danger',
-                    onPress: async () => {
-                        await removeAuth();
-                        alert.dismiss();
-                        rootNav?.navigate('Login');
-                    },
-                },
-            ],
+    const handleLogOut = async () => {
+        await removeAuth();
+        alert.dismiss();
+        rootNav.reset({
+            index: 0,
+            routes: [{ name: 'EmailLogin' }],
         });
     };
 
@@ -259,7 +251,6 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
     return (
         <View style={styles.root}>
-
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 refreshControl={
@@ -635,7 +626,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
                     <TouchableOpacity
                         style={styles.logoutBtn}
-                        onPress={handleLogOut}
+                        onPress={()=> setLogoutModalVisible(true)}
                         activeOpacity={0.85}
                     >
                         <Ionicons name="log-out-outline" size={18} color="#CC1133" />
@@ -645,6 +636,12 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     <View style={{ height: 48, marginBottom: 28 }} />
                 </Animated.View>
             </ScrollView>
+
+            <LogoutModal
+                visible={logoutModalVisible}
+                onClose={()=>setLogoutModalVisible(false)}
+                logout={handleLogOut}
+            />
         </View>
     );
 };

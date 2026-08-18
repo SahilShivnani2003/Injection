@@ -118,7 +118,6 @@ const ServiceListItem: React.FC<ServiceListItemProps> = React.memo(
                     onPress={handlePress}
                     activeOpacity={0.85}
                 >
-                    {/* Left — category icon */}
                     {/* Left — service image, falls back to category icon */}
                     {service.image ? (
                         <Image

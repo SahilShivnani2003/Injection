@@ -17,9 +17,10 @@ import {
     Modal,
     Platform,
     KeyboardAvoidingView,
+    Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Booking, BookingStatus } from '../types/Booking';
+import { Booking, BookingStatus, PaymentStatus } from '../types/Booking';
 import { useAlert } from '@/context/AlertContext';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -46,11 +47,18 @@ interface PopulatedVendor {
     businessName: string;
 }
 
+interface PopulatedFamilyMember {
+    _id: string;
+    name: string;
+    relation?: string;
+}
+
 // Extend Booking so populated fields are typed properly
-type PopulatedBooking = Omit<Booking, 'userId' | 'vendorId'> & {
+type PopulatedBooking = Omit<Booking, 'userId' | 'vendorId' | 'familyMemberId'> & {
     _id: string;
     userId: PopulatedUser;
     vendorId: PopulatedVendor | null;
+    familyMemberId?: PopulatedFamilyMember | null;
 };
 
 // ─── Reschedule form state ────────────────────────────────────────────────────
@@ -99,6 +107,28 @@ const STATUS_CONFIG: Record<
     },
     completed: { label: 'Completed', bg: '#F0F0FF', text: '#5B5BD6', dot: '#7B7BFF', icon: '🏆' },
     cancelled: { label: 'Cancelled', bg: '#FFF0F0', text: '#CC2200', dot: '#FF4444', icon: '❌' },
+};
+
+const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; bg: string; text: string }> = {
+    pending: { label: 'Pending', bg: '#FFF8E6', text: '#C07800' },
+    paid: { label: 'Paid', bg: '#E6FFF5', text: '#00A07A' },
+    failed: { label: 'Failed', bg: '#FFF0F0', text: '#CC2200' },
+};
+
+const REQUESTED_ITEM_STATUS_CONFIG: Record<
+    'pending' | 'brought' | 'unavailable',
+    { label: string; bg: string; text: string }
+> = {
+    pending: { label: 'Pending', bg: '#FFF8E6', text: '#C07800' },
+    brought: { label: 'Brought', bg: '#E6FFF5', text: '#00A07A' },
+    unavailable: { label: 'Unavailable', bg: '#FFF0F0', text: '#CC2200' },
+};
+
+const REPORT_TYPE_LABEL: Record<string, string> = {
+    lab: 'Lab Report',
+    imaging: 'Imaging',
+    general: 'General',
+    other: 'Other',
 };
 
 // ─── Section Header ────────────────────────────────────────────────────────────
@@ -163,6 +193,34 @@ const infoStyles = StyleSheet.create({
     accentValue: { color: Colors.gradientMid },
 });
 
+// ─── Pill row (label + status pill) ───────────────────────────────────────────
+
+const PillRow = ({
+    label,
+    pillLabel,
+    bg,
+    text,
+    isLast,
+}: {
+    label: string;
+    pillLabel: string;
+    bg: string;
+    text: string;
+    isLast?: boolean;
+}) => (
+    <View style={[infoStyles.row, isLast && { borderBottomWidth: 0 }]}>
+        <Text style={infoStyles.label}>{label}</Text>
+        <View style={[pillStyles.pill, { backgroundColor: bg, alignSelf: 'flex-end' }]}>
+            <Text style={[pillStyles.pillText, { color: text }]}>{pillLabel}</Text>
+        </View>
+    </View>
+);
+
+const pillStyles = StyleSheet.create({
+    pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+    pillText: { fontSize: 11, fontWeight: '700' },
+});
+
 // ─── Service Row ───────────────────────────────────────────────────────────────
 
 const ServiceRow = ({
@@ -193,6 +251,33 @@ const srStyles = StyleSheet.create({
     price: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
 });
 
+// ─── Requested Item Row ────────────────────────────────────────────────────────
+
+const RequestedItemRow = ({
+    item,
+    isLast,
+}: {
+    item: { itemName: string; quantity?: number; status?: string; price?: number };
+    isLast: boolean;
+}) => {
+    const qty = item.quantity ?? 1;
+    const statusCfg =
+        REQUESTED_ITEM_STATUS_CONFIG[(item.status as 'pending' | 'brought' | 'unavailable') ?? 'pending'];
+    return (
+        <View style={[srStyles.row, !isLast && srStyles.border]}>
+            <View style={srStyles.dot} />
+            <Text style={srStyles.name}>
+                {item.itemName}
+                {qty > 1 ? `  ×${qty}` : ''}
+            </Text>
+            {item.price != null && <Text style={srStyles.price}>₹{item.price.toLocaleString()}</Text>}
+            <View style={[pillStyles.pill, { backgroundColor: statusCfg.bg, marginLeft: 8 }]}>
+                <Text style={[pillStyles.pillText, { color: statusCfg.text }]}>{statusCfg.label}</Text>
+            </View>
+        </View>
+    );
+};
+
 // ─── Helper: initials from name ───────────────────────────────────────────────
 
 const getInitials = (name: string) =>
@@ -204,6 +289,11 @@ const getInitials = (name: string) =>
         .join('')
         .slice(0, 2)
         .toUpperCase() || '?';
+
+const formatPaymentMethod = (method?: string | null) => {
+    if (!method) return '—';
+    return method === 'razorpay' ? 'Online (Razorpay)' : 'Cash';
+};
 
 // ─── Reschedule Modal ─────────────────────────────────────────────────────────
 
@@ -589,6 +679,12 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         });
     };
 
+    const handleOpenReport = (url: string) => {
+        Linking.openURL(url).catch(() =>
+            alert.error('Error', 'Could not open this report. Please try again.'),
+        );
+    };
+
     // ── Loading ────────────────────────────────────────────────────────────────
 
     if (loading) {
@@ -623,6 +719,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     }
 
     const status = STATUS_CONFIG[booking.bookingStatus ?? 'pending'] ?? STATUS_CONFIG.pending;
+    const paymentStatusCfg = booking.paymentStatus
+        ? PAYMENT_STATUS_CONFIG[booking.paymentStatus]
+        : null;
 
     // A booking is still actionable if it's not completed or cancelled
     const isActionable =
@@ -631,6 +730,23 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     // Reschedule is only available before a provider accepts
     const canReschedule =
         booking.bookingStatus === 'pending' || booking.bookingStatus === 'accepted';
+
+    // Combine legacy reportUrl + new reports array into one list for display
+    const allReports = [
+        ...(booking.reports ?? []),
+        ...(booking.reportUrl
+            ? [
+                {
+                    reportUrl: booking.reportUrl,
+                    reportType: 'general' as const,
+                    reportName: 'Report',
+                    addedAt: booking.reportGeneratedAt,
+                },
+            ]
+            : []),
+    ];
+
+    const displayBookingId = booking.bookingId ? `#${booking.bookingId}` : `#${booking._id?.slice(-8).toUpperCase()}`;
 
     return (
         <View style={styles.root}>
@@ -682,7 +798,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         <View style={{ flex: 1 }}>
                             <Text style={styles.headerTitle}>Booking Details</Text>
                             <Text style={styles.headerSub}>
-                                Created {formatDate(booking.createdAt)}
+                                {displayBookingId} · Created {formatDate(booking.createdAt)}
                             </Text>
                         </View>
                     </View>
@@ -698,6 +814,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             <Text style={styles.patientName}>{booking.patientName}</Text>
                             <Text style={styles.patientMeta}>
                                 {booking.age} yrs · {booking.sex} · {booking.currentLocation}
+                                {booking.familyMemberId?.relation
+                                    ? ` · ${booking.familyMemberId.relation}`
+                                    : ''}
                             </Text>
                         </View>
                         <Animated.View
@@ -779,6 +898,14 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                     ₹{booking.gstAmount.toLocaleString()}
                                 </Text>
                             </View>
+                            {!!booking.additionalAmount && (
+                                <View style={styles.totalRow}>
+                                    <Text style={styles.totalLabel}>Additional Charges</Text>
+                                    <Text style={styles.totalVal}>
+                                        ₹{booking.additionalAmount.toLocaleString()}
+                                    </Text>
+                                </View>
+                            )}
                             {booking.appliedCoupon?.discountAmount != null &&
                                 booking.appliedCoupon.discountAmount > 0 && (
                                     <View style={styles.totalRow}>
@@ -821,6 +948,42 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         </View>
                     </View>
 
+                    {/* ── Payment ── */}
+                    <SectionHeader icon="credit-card-outline" title="Payment" />
+                    <View style={styles.card}>
+                        <InfoRow label="Method" value={formatPaymentMethod(booking.paymentMethod)} />
+                        {paymentStatusCfg ? (
+                            <PillRow
+                                label="Status"
+                                pillLabel={paymentStatusCfg.label}
+                                bg={paymentStatusCfg.bg}
+                                text={paymentStatusCfg.text}
+                                isLast={!booking.razorpayPaymentId}
+                            />
+                        ) : (
+                            <InfoRow label="Status" value="—" />
+                        )}
+                        {booking.paymentMethod === 'razorpay' && booking.razorpayPaymentId && (
+                            <InfoRow label="Transaction ID" value={booking.razorpayPaymentId} />
+                        )}
+                    </View>
+
+                    {/* ── Requested Items ── */}
+                    {(booking.requestedItems?.length ?? 0) > 0 && (
+                        <>
+                            <SectionHeader icon="basket-outline" title="Requested Items" />
+                            <View style={styles.card}>
+                                {booking.requestedItems!.map((item, i) => (
+                                    <RequestedItemRow
+                                        key={i}
+                                        item={item}
+                                        isLast={i === booking.requestedItems!.length - 1}
+                                    />
+                                ))}
+                            </View>
+                        </>
+                    )}
+
                     {/* ── Patient Info ── */}
                     <SectionHeader icon="hand-heart-outline" title="Patient Information" />
                     <View style={styles.card}>
@@ -832,6 +995,21 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         <InfoRow label="Location" value={booking.currentLocation} />
                         {!!booking.alternateMobile && (
                             <InfoRow label="Alt. Mobile" value={booking.alternateMobile} />
+                        )}
+                        {booking.familyMemberId && (
+                            <InfoRow
+                                label="Booked For"
+                                value={
+                                    booking.familyMemberId.name
+                                        ? `${booking.familyMemberId.name}${
+                                              booking.familyMemberId.relation
+                                                  ? ` (${booking.familyMemberId.relation})`
+                                                  : ''
+                                          }`
+                                        : 'Family Member'
+                                }
+                                accent
+                            />
                         )}
                         {booking.hasInsurance && (
                             <InfoRow
@@ -874,6 +1052,16 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         </>
                     )}
 
+                    {/* ── Prescription Summary ── */}
+                    {!!booking.prescriptionSummary && (
+                        <>
+                            <SectionHeader icon="text-box-outline" title="Prescription Summary" />
+                            <View style={[styles.card, styles.reqCard]}>
+                                <Text style={styles.reqText}>{booking.prescriptionSummary}</Text>
+                            </View>
+                        </>
+                    )}
+
                     {/* ── Prescriptions ── */}
                     {(booking.prescriptions?.length ?? 0) > 0 && (
                         <>
@@ -907,6 +1095,12 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
                                     {expandedPrescription === idx && (
                                         <View style={styles.rxBody}>
+                                            {!!rx.patientComplaints && (
+                                                <InfoRow
+                                                    label="Complaints"
+                                                    value={rx.patientComplaints}
+                                                />
+                                            )}
                                             {!!rx.diagnosis && (
                                                 <InfoRow label="Diagnosis" value={rx.diagnosis} />
                                             )}
@@ -915,6 +1109,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                                     label="Reg. No."
                                                     value={rx.doctorRegistration}
                                                 />
+                                            )}
+                                            {!!rx.labTests && (
+                                                <InfoRow label="Lab Tests" value={rx.labTests} />
                                             )}
                                             {(rx.medications?.length ?? 0) > 0 && (
                                                 <View style={{ marginTop: 8 }}>
@@ -994,6 +1191,41 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         </>
                     )}
 
+                    {/* ── Runtime Notes (from vendor/admin during service) ── */}
+                    {(booking.runtimeNotes?.length ?? 0) > 0 && (
+                        <>
+                            <SectionHeader icon="chat-processing-outline" title="Provider Updates" />
+                            <View style={styles.card}>
+                                {booking.runtimeNotes!.map((note, i) => (
+                                    <View
+                                        key={i}
+                                        style={[
+                                            styles.noteRow,
+                                            i < booking.runtimeNotes!.length - 1 && styles.noteBorder,
+                                        ]}
+                                    >
+                                        <View style={[styles.noteAvatar, { backgroundColor: '#E8F9FF' }]}>
+                                            <Ionicons
+                                                name={
+                                                    note.addedBy === 'Admin'
+                                                        ? 'shield-outline'
+                                                        : 'briefcase-outline'
+                                                }
+                                                style={{ fontSize: 13 }}
+                                            ></Ionicons>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.noteText}>{note.text}</Text>
+                                            <Text style={styles.noteMeta}>
+                                                {note.addedBy ?? 'Team'} · {formatDate(note.addedAt)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </>
+                    )}
+
                     {/* ── Timeline ── */}
                     <SectionHeader icon="timer-outline" title="Timeline" />
                     <View style={styles.card}>
@@ -1025,7 +1257,49 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                     </View>
                                 </View>
                             ))}
+                        {booking.bookingStatus === 'cancelled' && !!booking.cancellationReason && (
+                            <View style={styles.specialNote}>
+                                <Text style={styles.specialNoteIcon}>ℹ️</Text>
+                                <Text style={styles.specialNoteText}>
+                                    {booking.cancellationReason}
+                                </Text>
+                            </View>
+                        )}
                     </View>
+
+                    {/* ── Reports ── */}
+                    {allReports.length > 0 && (
+                        <>
+                            <SectionHeader icon="file-chart-outline" title="Reports" />
+                            <View style={styles.card}>
+                                {allReports.map((r, i) => (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={[
+                                            styles.reportRow,
+                                            i < allReports.length - 1 && styles.noteBorder,
+                                        ]}
+                                        activeOpacity={0.8}
+                                        onPress={() => handleOpenReport(r.reportUrl)}
+                                    >
+                                        <View style={styles.reportIconWrap}>
+                                            <Ionicons name="document-text-outline" style={{ fontSize: 18, color: '#5B5BD6' }} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.reportName}>
+                                                {r.reportName || REPORT_TYPE_LABEL[r.reportType ?? 'general']}
+                                            </Text>
+                                            <Text style={styles.noteMeta}>
+                                                {REPORT_TYPE_LABEL[r.reportType ?? 'general']} ·{' '}
+                                                {formatDate(r.addedAt)}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="download-outline" style={{ fontSize: 18, color: Colors.gradientMid }} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </>
+                    )}
 
                     {/* ── Action Buttons ── */}
                     {isActionable && (
@@ -1064,13 +1338,23 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         </View>
                     )}
 
-                    {booking.bookingStatus === 'completed' && !booking.reportUrl && (
+                    {booking.bookingStatus === 'completed' && allReports.length === 0 && (
                         <View style={styles.reportPending}>
                             <Text style={styles.reportPendingIcon}>📊</Text>
                             <Text style={styles.reportPendingText}>
                                 Report is being prepared and will be available soon.
                             </Text>
                         </View>
+                    )}
+
+                    {booking.bookingStatus === 'completed' && !booking.isReviewedByCustomer && (
+                        <TouchableOpacity style={styles.reviewPrompt} activeOpacity={0.85}>
+                            <Text style={styles.reviewPromptIcon}>⭐</Text>
+                            <Text style={styles.reviewPromptText}>
+                                Rate your experience with this service
+                            </Text>
+                            <Ionicons name="chevron-forward" style={{ fontSize: 16, color: '#C07800' }} />
+                        </TouchableOpacity>
                     )}
 
                     <View style={{ height: 40 }} />
@@ -1282,7 +1566,7 @@ const styles = StyleSheet.create({
     specialNoteIcon: { fontSize: 15, marginTop: 1 },
     specialNoteText: { flex: 1, fontSize: 13, color: '#7A5000', fontWeight: '500', lineHeight: 19 },
 
-    // Requirements
+    // Requirements / summary
     reqCard: { backgroundColor: '#F8FCFF' },
     reqText: { fontSize: 14, color: Colors.textMedium, lineHeight: 22, fontStyle: 'italic' },
 
@@ -1299,6 +1583,18 @@ const styles = StyleSheet.create({
     },
     noteText: { fontSize: 13, fontWeight: '600', color: Colors.textDark, lineHeight: 19 },
     noteMeta: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
+
+    // Reports
+    reportRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+    reportIconWrap: {
+        width: 38,
+        height: 38,
+        borderRadius: 11,
+        backgroundColor: '#F0F0FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reportName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
 
     // Timeline
     timelineRow: { flexDirection: 'row', gap: 14, minHeight: 48 },
@@ -1376,6 +1672,21 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         lineHeight: 20,
     },
+
+    // Review prompt
+    reviewPrompt: {
+        marginTop: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#FFF8E6',
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#F5A62330',
+    },
+    reviewPromptIcon: { fontSize: 20 },
+    reviewPromptText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#C07800' },
 });
 
 export default BookingDetailScreen;

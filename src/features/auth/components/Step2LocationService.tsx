@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { DropdownSelect } from '../../../components/DropdownSelect';
 import { FieldInput } from '../../../components/FieldInput';
 import { Colors } from '../../../theme/colors';
 import { VendorForm } from '../types/VendorRegistration';
 import { Service } from '@/features/vendorService/types/Service';
 import { serviceAPI } from '@/service/apis/medicalServices';
+import { getStates, getCitiesByState, getCities } from '@/utils/location';
+import { coordinatesToAddress } from '@/utils/geocoding';
+import { getCurrentCoordinates, LocationPermissionDeniedError } from '@/utils/deviceLocation';
+import { useAlert } from '@/context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type Props = {
@@ -13,47 +18,125 @@ type Props = {
 };
 
 const StepLocationServices = ({ form, updateField }: Props) => {
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const alert = useAlert();
 
-    // ── Bug fix: compare by _id consistently ──────────────────────────────────
-    const toggleService = (serviceId: string) => {
-        const current = form.services;
-        const next = current.includes(serviceId)
-            ? current.filter(id => id !== serviceId)
-            : [...current, serviceId];
-        updateField('services', next);
-    };
+    const [services, setServices] = useState<Service[]>([]);
+    const [servicesLoading, setServicesLoading] = useState(false);
+    const [servicesError, setServicesError] = useState<string | null>(null);
+    const [locating, setLocating] = useState(false);
 
     useEffect(() => {
         fetchServices();
     }, []);
 
     const fetchServices = async () => {
-        setLoading(true);
-        setError(null);
+        setServicesLoading(true);
+        setServicesError(null);
         try {
-            console.log('Fetching services..');
             const response = await serviceAPI.getAllServices();
             if (response.data?.success) {
-                console.log('Fetched services : ', response.data);
                 setServices(response.data?.data ?? []);
             } else {
-                setError('Failed to load services.');
+                setServicesError('Failed to load services.');
             }
         } catch (err) {
             console.error('Error while fetching services:', err);
-            setError('Unable to load services. Please try again.');
+            setServicesError('Unable to load services. Please try again.');
         } finally {
-            setLoading(false);
+            setServicesLoading(false);
         }
     };
+
+    // ── Use current location ──────────────────────────────────────────────────
+    const handleUseCurrentLocation = async () => {
+        setLocating(true);
+        try {
+            const coords = await getCurrentCoordinates();
+            debugger
+            const geocoded = await coordinatesToAddress(coords);
+
+            if (!geocoded) {
+                alert.error(
+                    'Location Error',
+                    'Could not determine your address from your location. Please enter it manually.',
+                );
+                return;
+            }
+
+            if (geocoded.addressLine) updateField('address', geocoded.addressLine);
+            if (geocoded.state) updateField('state', geocoded.state);
+            if (geocoded.city) updateField('city', geocoded.city);
+            if (geocoded.pincode) updateField('pincode', geocoded.pincode);
+
+            alert.success('Location Found', 'Address fields have been auto-filled.');
+        } catch (error) {
+            if (error instanceof LocationPermissionDeniedError) {
+                alert.error(
+                    'Permission Denied',
+                    'Location access is needed to auto-fill your address. You can still enter it manually.',
+                );
+            } else {
+                console.error('Error getting current location:', error);
+                alert.error('Location Error', 'Unable to fetch your current location.');
+            }
+        } finally {
+            setLocating(false);
+        }
+    };
+
+    // ── State search ──────────────────────────────────────────────────────────
+    const searchStates = useCallback(async (query: string) => {
+        const states = await getStates(query || 'a');
+        return states.map(s => ({ label: s.name, value: s.name }));
+    }, []);
+
+    // ── City search — depends on selected state ─────────────────────────────
+    const searchCities = useCallback(
+        async (query: string) => {
+            if (!form.state) return [];
+            const cities = await getCitiesByState(query || form.state, form.state);
+            return cities.map(c => ({ label: c.name, value: c.name }));
+        },
+        [form.state],
+    );
+
+    // ── Service area search — plain city autocomplete, not state-scoped ─────
+    const searchServiceAreas = useCallback(async (query: string) => {
+        if (!query.trim()) return [];
+        const cities = await getCities(query);
+        return cities.map(c => ({ label: c.name, value: c.name }));
+    }, []);
+
+    const handleStateChange = (stateName: string) => {
+        updateField('state', stateName);
+        if (form.city) updateField('city', ''); // reset dependent city
+    };
+
+    const serviceOptions = services
+        .filter(s => !!s._id)
+        .map(s => ({ label: s.serviceName, value: s._id as string }));
 
     return (
         <View>
             {/* ── Business Address ── */}
-            <Text style={styles.sectionTitle}>Business Address</Text>
+            <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>Business Address</Text>
+                <TouchableOpacity
+                    style={[styles.locationBtn, locating && styles.locationBtnDisabled]}
+                    onPress={handleUseCurrentLocation}
+                    activeOpacity={0.75}
+                    disabled={locating}
+                >
+                    {locating ? (
+                        <ActivityIndicator size="small" color={Colors.gradientStart} />
+                    ) : (
+                        <Icon name="my-location" size={15} color={Colors.gradientStart} />
+                    )}
+                    <Text style={styles.locationBtnText}>
+                        {locating ? 'Locating...' : 'Use current location'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
 
             <FieldInput
                 label="Address"
@@ -62,18 +145,31 @@ const StepLocationServices = ({ form, updateField }: Props) => {
                 placeholder="Street address"
                 multiline
             />
-            <FieldInput
-                label="City"
-                value={form.city}
-                onChangeText={v => updateField('city', v)}
-                placeholder="City"
-            />
-            <FieldInput
+
+            <DropdownSelect
                 label="State"
+                placeholder="Select state"
                 value={form.state}
-                onChangeText={v => updateField('state', v)}
-                placeholder="State"
+                onChange={handleStateChange}
+                onSearch={searchStates}
+                searchable
+                required
+                emptyText="No matching states."
             />
+
+            <DropdownSelect
+                label="City"
+                placeholder="Select city"
+                value={form.city}
+                onChange={v => updateField('city', v)}
+                onSearch={searchCities}
+                searchable
+                required
+                disabled={!form.state}
+                disabledHint="Select a state first"
+                emptyText="No matching cities."
+            />
+
             <FieldInput
                 label="Pincode"
                 value={form.pincode}
@@ -81,31 +177,39 @@ const StepLocationServices = ({ form, updateField }: Props) => {
                 placeholder="6-digit pin code"
                 keyboardType="number-pad"
                 maxLength={6}
+                required
             />
-            <FieldInput
+
+            <DropdownSelect
                 label="Service Areas"
+                placeholder="Select areas you serve"
                 value={form.serviceAreas}
-                onChangeText={v => updateField('serviceAreas', v)}
-                placeholder="Cities or neighborhoods served"
+                onChange={v => updateField('serviceAreas', v)}
+                onSearch={searchServiceAreas}
+                searchable
+                multiple
+                emptyText="Type to search cities."
             />
 
             {/* ── Services Offered ── */}
             <Text style={styles.sectionTitle}>Services Offered</Text>
             <Text style={styles.hint}>Select all services your business provides.</Text>
 
-            {/* Loading state */}
-            {loading && (
-                <View style={styles.stateBox}>
-                    <ActivityIndicator size="small" color={Colors.gradientStart} />
-                    <Text style={styles.stateText}>Loading services...</Text>
-                </View>
-            )}
+            <DropdownSelect
+                label="Services"
+                placeholder="Select services"
+                value={form.services}
+                onChange={v => updateField('services', v)}
+                options={serviceOptions}
+                multiple
+                required
+                emptyText={servicesError ?? 'No services available.'}
+            />
 
-            {/* Error state with retry */}
-            {!loading && error && (
+            {servicesError && (
                 <View style={styles.errorBox}>
                     <Icon name="error-outline" size={18} color="#E53935" />
-                    <Text style={styles.errorText}>{error}</Text>
+                    <Text style={styles.errorText}>{servicesError}</Text>
                     <TouchableOpacity onPress={fetchServices} style={styles.retryBtn}>
                         <Icon name="refresh" size={14} color={Colors.gradientStart} />
                         <Text style={styles.retryText}>Retry</Text>
@@ -113,47 +217,26 @@ const StepLocationServices = ({ form, updateField }: Props) => {
                 </View>
             )}
 
-            {/* Empty state */}
-            {!loading && !error && services.length === 0 && (
-                <View style={styles.stateBox}>
-                    <Icon name="inbox" size={24} color={Colors.textMedium} />
-                    <Text style={styles.stateText}>No services available.</Text>
-                </View>
-            )}
-
-            {/* Service chips */}
-            {!loading && !error && services.length > 0 && (
+            {form.services.length > 0 && (
                 <View style={styles.serviceGrid}>
-                    {services.map(service => {
-                        const serviceId = service._id ?? '';
-                        const active = form.services.includes(serviceId);
+                    {form.services.map(id => {
+                        const svc = services.find(s => s._id === id);
+                        if (!svc) return null;
                         return (
-                            <TouchableOpacity
-                                key={serviceId}
-                                style={[styles.serviceChip, active && styles.serviceChipActive]}
-                                onPress={() => toggleService(serviceId)}
-                                activeOpacity={0.75}
-                            >
-                                {active && (
-                                    <Icon
-                                        name="check"
-                                        size={12}
-                                        color={Colors.white}
-                                        style={styles.chipCheckIcon}
-                                    />
-                                )}
-                                <Text
-                                    style={[styles.serviceText, active && styles.serviceTextActive]}
-                                >
-                                    {service.serviceName}
-                                </Text>
-                            </TouchableOpacity>
+                            <View key={id} style={styles.serviceChip}>
+                                <Icon
+                                    name="check"
+                                    size={12}
+                                    color={Colors.white}
+                                    style={styles.chipCheckIcon}
+                                />
+                                <Text style={styles.serviceText}>{svc.serviceName}</Text>
+                            </View>
                         );
                     })}
                 </View>
             )}
 
-            {/* Selected count badge */}
             {form.services.length > 0 && (
                 <View style={styles.selectedCountRow}>
                     <Icon name="check-circle" size={14} color={Colors.gradientStart} />
@@ -168,33 +251,38 @@ const StepLocationServices = ({ form, updateField }: Props) => {
 };
 
 const styles = StyleSheet.create({
+    sectionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 8,
+        marginBottom: 14,
+    },
     sectionTitle: {
         fontSize: 15,
         fontWeight: '700',
         color: Colors.textDark,
-        marginTop: 8,
-        marginBottom: 14,
     },
-    hint: {
-        fontSize: 12,
-        color: Colors.textMedium,
-        marginBottom: 12,
-    },
+    hint: { fontSize: 12, color: Colors.textMedium, marginBottom: 12 },
 
-    // Loading / empty / error shared box
-    stateBox: {
+    locationBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingVertical: 18,
-        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 7,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        backgroundColor: '#EDF6FB',
+        borderWidth: 1,
+        borderColor: '#D8E8EE',
     },
-    stateText: {
-        fontSize: 13,
-        color: Colors.textMedium,
+    locationBtnDisabled: { opacity: 0.7 },
+    locationBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.gradientStart,
     },
 
-    // Error box
     errorBox: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -205,13 +293,9 @@ const styles = StyleSheet.create({
         borderColor: '#FFCDD2',
         padding: 12,
         marginBottom: 12,
+        marginTop: -6,
     },
-    errorText: {
-        flex: 1,
-        fontSize: 12,
-        color: '#E53935',
-        fontWeight: '500',
-    },
+    errorText: { flex: 1, fontSize: 12, color: '#E53935', fontWeight: '500' },
     retryBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -221,57 +305,22 @@ const styles = StyleSheet.create({
         backgroundColor: '#EDF6FB',
         borderRadius: 8,
     },
-    retryText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: Colors.gradientStart,
-    },
+    retryText: { fontSize: 12, fontWeight: '700', color: Colors.gradientStart },
 
-    // Service chips
-    serviceGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-    },
+    serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
     serviceChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
+        paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 16,
-        backgroundColor: '#F3F7FA',
-        borderWidth: 1,
-        borderColor: '#E2ECF2',
-        marginBottom: 4,
-    },
-    serviceChipActive: {
         backgroundColor: Colors.gradientStart,
-        borderColor: Colors.gradientStart,
     },
-    chipCheckIcon: {
-        marginRight: 4,
-    },
-    serviceText: {
-        color: Colors.textMedium,
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    serviceTextActive: {
-        color: Colors.white,
-    },
+    chipCheckIcon: { marginRight: 4 },
+    serviceText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
 
-    // Selected count
-    selectedCountRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 10,
-    },
-    selectedCount: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: Colors.gradientStart,
-    },
+    selectedCountRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+    selectedCount: { fontSize: 12, fontWeight: '700', color: Colors.gradientStart },
 });
 
 export default StepLocationServices;

@@ -234,10 +234,6 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
 
     const formatCurrency = (amount: number): string => `₹${amount.toLocaleString('en-IN')}`;
 
-    // ── Derived flags ─────────────────────────────────────────────────────────
-
-    const isAdminOrStaff = Boolean(user?.isStaff || user?.role === 'admin');
-
     // ── Status meta ───────────────────────────────────────────────────────────
 
     const statusMeta: Record<
@@ -275,43 +271,6 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     const getMetricCards = (): MetricCardConfig[] => {
         if (!dashboardData) return [];
         const { summary } = dashboardData;
-
-        if (!isAdminOrStaff) {
-            return [
-                {
-                    label: 'Upcoming',
-                    value: String(summary.upcomingBookingsCount),
-                    bg: '#E8F9FF',
-                    accent: '#00B4E8',
-                    iconName: 'calendar-outline',
-                    iconLib: 'Ionicons',
-                },
-                {
-                    label: 'Total Bookings',
-                    value: String(summary.totalBookings),
-                    bg: '#E6FFF5',
-                    accent: '#00D4A0',
-                    iconName: 'clipboard-text-outline',
-                    iconLib: 'MaterialCommunityIcons',
-                },
-                {
-                    label: 'Completed',
-                    value: String(summary.completedBookings),
-                    bg: '#FFF8E6',
-                    accent: '#F5A623',
-                    iconName: 'checkmark-done-circle-outline',
-                    iconLib: 'Ionicons',
-                },
-                {
-                    label: 'Cancelled',
-                    value: String(summary.cancelledBookings),
-                    bg: '#FFE8F5',
-                    accent: '#E91E63',
-                    iconName: 'close-circle-outline',
-                    iconLib: 'Ionicons',
-                },
-            ];
-        }
 
         return [
             {
@@ -453,71 +412,8 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                 <Text style={styles.avatarText}>{getUserInitials()}</Text>
                             </View>
                         </View>
-                    </View>
-
-                    {/* Patient summary banner */}
-                    {!isAdminOrStaff && summary && (
-                        <View style={styles.healthBanner}>
-                            <View style={styles.healthScoreBlock}>
-                                <Text style={styles.healthScoreNum}>{summary.totalBookings}</Text>
-                                <Text style={styles.healthScoreLabel}>Total{'\n'}Bookings</Text>
-                            </View>
-                            <View style={styles.healthDivider} />
-                            <View style={styles.healthStatsRow}>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {summary.upcomingBookingsCount}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Upcoming</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {summary.completedBookings}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Done</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {formatCurrency(summary.totalSpent)}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Spent</Text>
-                                </View>
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Admin / staff revenue banner */}
-                    {isAdminOrStaff && summary && (
-                        <View style={styles.healthBanner}>
-                            <View style={styles.healthScoreBlock}>
-                                <Text style={styles.healthScoreNum}>
-                                    ₹{(getTotalRevenue() / 1000).toFixed(1)}K
-                                </Text>
-                                <Text style={styles.healthScoreLabel}>Total{'\n'}Revenue</Text>
-                            </View>
-                            <View style={styles.healthDivider} />
-                            <View style={styles.healthStatsRow}>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {summary.totalBookings}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Bookings</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {summary.completedBookings}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Completed</Text>
-                                </View>
-                                <View style={styles.healthStat}>
-                                    <Text style={styles.healthStatVal}>
-                                        {summary.upcomingBookingsCount}
-                                    </Text>
-                                    <Text style={styles.healthStatKey}>Upcoming</Text>
-                                </View>
-                            </View>
-                        </View>
-                    )}
+                    </View>                    
+                    
                 </Animated.View>
             </LinearGradient>
 

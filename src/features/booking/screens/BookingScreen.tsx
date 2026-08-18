@@ -48,6 +48,8 @@ export interface BookingFormData {
     age: string;
     sex: string;
     address: string;
+    city:string;
+    state:string;
     pincode: string;
     currentLocation: string;
     phoneNumber: string;
@@ -101,6 +103,8 @@ const FORM_DEFAULTS = (user: any): BookingFormData => ({
     sex: user?.gender ?? '',
     address: user?.address ?? '',
     pincode: user?.pincode ?? '',
+    state: user?.state ?? '',
+    city: user?.city ?? '',
     currentLocation: '',
     phoneNumber: user?.phone ?? '',
     email: user?.email ?? '',
@@ -331,6 +335,8 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                             age: formData.age,
                             sex: formData.sex,
                             address: formData.address,
+                            city: formData.city,
+                            state: formData.state,
                             pincode: formData.pincode,
                             currentLocation: formData.currentLocation,
                             phoneNumber: formData.phoneNumber,

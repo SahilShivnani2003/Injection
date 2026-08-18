@@ -5,15 +5,10 @@ import {
     ScrollView,
     TouchableOpacity,
     StyleSheet,
-    StatusBar,
     ActivityIndicator,
-    Modal,
-    TextInput,
-    KeyboardAvoidingView,
-    Platform,
     Animated,
-    Dimensions,
     Image,
+    RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -23,476 +18,86 @@ import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { Colors } from '@/theme/colors';
 import { Service } from '@/features/vendorService/types/Service';
 import { useAlert } from '@/context/AlertContext';
+import AddServiceModal from '../model/AddServiceModal';
 
-// `_id` is already optional on Service, this alias just makes it required
-// for items we know came back from the list endpoint.
 type ServiceWithId = Service & { _id: string };
 
-// `category` on Service is an object (as returned by the backend), not a
-// string enum, so we work with that shape everywhere below.
-type ServiceCategory = Service['category'];
+// ── Service Request API types ─────────────────────────────────────────────────
+// GET /vendor/service-requests (serviceAPI.myRequests()) response shape:
+// {
+//   "success": true,
+//   "count": 1,
+//   "data": [
+//     {
+//       "_id": "6a842fe4456b2bcd1b6b2346",
+//       "vendor": "6a2d2d82f7bb131d0982379d",
+//       "services": [
+//         { "_id": "...", "serviceName": "Community Health Survey", "category": "...", "basePrice": 5000, "duration": 480 }
+//       ],
+//       "status": "pending",
+//       "createdAt": "2026-08-18T10:11:48.086Z",
+//       "updatedAt": "2026-08-18T10:11:48.086Z",
+//       "__v": 0
+//     }
+//   ]
+// }
 
-const { width } = Dimensions.get('window');
+export type ServiceRequestStatus = 'pending' | 'approved' | 'rejected';
 
-const SERVICE_TYPES: NonNullable<Service['serviceType']>[] = ['At Home', 'At Clinic', 'Both'];
-
-// ── New Service Form ──────────────────────────────────────────────────────────
-
-interface ServiceForm {
+// Services embedded in a request come back un-populated — `category` is just
+// the category's ObjectId string here, not the full category document.
+export interface ServiceRequestServiceItem {
+    _id: string;
     serviceName: string;
-    description: string;
-    category: ServiceCategory | null;
-    basePrice: string;
-    duration: string;
-    serviceType: Service['serviceType'] | '';
-    requirements: string;
+    category: string;
+    basePrice: number;
+    duration?: number;
 }
 
-const FORM_DEFAULT: ServiceForm = {
-    serviceName: '',
-    description: '',
-    category: null,
-    basePrice: '',
-    duration: '',
-    serviceType: '',
-    requirements: '',
-};
-
-const validateServiceForm = (form: ServiceForm): string | null => {
-    if (!form.serviceName.trim()) return 'Service name is required.';
-    if (!form.category) return 'Please select a category.';
-    if (!form.description.trim()) return 'Description is required.';
-    if (!form.basePrice.trim()) return 'Base price is required.';
-    const price = parseFloat(form.basePrice);
-    if (isNaN(price) || price <= 0) return 'Enter a valid base price.';
-    if (form.duration && isNaN(parseInt(form.duration, 10))) return 'Duration must be a number.';
-    return null;
-};
-
-// Fields other than `category` are still plain strings, so the modal keeps a
-// generic string setter for those and a dedicated setter for category.
-type StringField = Exclude<keyof ServiceForm, 'category'>;
-
-// ── Add Service Modal ─────────────────────────────────────────────────────────
-
-interface AddServiceModalProps {
-    visible: boolean;
-    submitting: boolean;
-    form: ServiceForm;
-    categories: ServiceCategory[];
-    categoriesLoading: boolean;
-    onChange: (field: StringField, value: string) => void;
-    onSelectCategory: (category: ServiceCategory) => void;
-    onSubmit: () => void;
-    onClose: () => void;
+export interface ServiceRequestItem {
+    _id: string;
+    vendor: string;
+    services: ServiceRequestServiceItem[];
+    status: ServiceRequestStatus;
+    createdAt: string;
+    updatedAt: string;
+    __v?: number;
 }
 
-const AddServiceModal = ({
-    visible,
-    submitting,
-    form,
-    categories,
-    categoriesLoading,
-    onChange,
-    onSelectCategory,
-    onSubmit,
-    onClose,
-}: AddServiceModalProps) => {
-    const [categoryOpen, setCategoryOpen] = useState(false);
+export interface ServiceRequestsResponse {
+    success: boolean;
+    count: number;
+    data: ServiceRequestItem[];
+}
 
-    return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={onClose}
-            statusBarTranslucent
-        >
-            <KeyboardAvoidingView
-                style={modal.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <TouchableOpacity style={modal.backdrop} activeOpacity={1} onPress={onClose} />
+// ── Top tabs ───────────────────────────────────────────────────────────────────
 
-                <View style={modal.sheet}>
-                    <View style={modal.handle} />
+type ScreenTab = 'services' | 'requests';
 
-                    {/* Title */}
-                    <View style={modal.titleRow}>
-                        <LinearGradient
-                            colors={[Colors.gradientStart, Colors.gradientMid]}
-                            style={modal.titleIconWrap}
-                        >
-                            <Ionicons name="medical" size={22} color="#fff" />
-                        </LinearGradient>
-                        <View>
-                            <Text style={modal.title}>Add New Service</Text>
-                            <Text style={modal.subtitle}>Fill in the service details below</Text>
-                        </View>
-                    </View>
-
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        {/* Service Name */}
-                        <Field label="Service Name" required>
-                            <ModalInput
-                                value={form.serviceName}
-                                onChangeText={v => onChange('serviceName', v)}
-                                placeholder="e.g. Home Blood Collection"
-                                editable={!submitting}
-                            />
-                        </Field>
-
-                        {/* Category picker */}
-                        <Field label="Category" required>
-                            <TouchableOpacity
-                                style={[modal.input, modal.pickerBtn]}
-                                onPress={() => setCategoryOpen(o => !o)}
-                                disabled={submitting || categoriesLoading}
-                                activeOpacity={0.8}
-                            >
-                                <Text
-                                    style={
-                                        form.category ? modal.pickerValue : modal.pickerPlaceholder
-                                    }
-                                >
-                                    {categoriesLoading
-                                        ? 'Loading categories…'
-                                        : form.category?.name || 'Select a category'}
-                                </Text>
-                                {categoriesLoading ? (
-                                    <ActivityIndicator size="small" color={Colors.textMuted} />
-                                ) : (
-                                    <Ionicons
-                                        name={categoryOpen ? 'chevron-up' : 'chevron-down'}
-                                        size={16}
-                                        color={Colors.textMuted}
-                                    />
-                                )}
-                            </TouchableOpacity>
-                            {categoryOpen && !categoriesLoading && (
-                                <View style={modal.categoryList}>
-                                    {categories.length === 0 ? (
-                                        <View style={modal.categoryEmpty}>
-                                            <Text style={modal.categoryEmptyText}>
-                                                No categories available.
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <ScrollView
-                                            style={{ maxHeight: 200 }}
-                                            nestedScrollEnabled
-                                            showsVerticalScrollIndicator={false}
-                                        >
-                                            {categories.map(cat => {
-                                                const active = form.category?._id === cat._id;
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={cat._id}
-                                                        style={[
-                                                            modal.categoryItem,
-                                                            active && modal.categoryItemActive,
-                                                        ]}
-                                                        onPress={() => {
-                                                            onSelectCategory(cat);
-                                                            setCategoryOpen(false);
-                                                        }}
-                                                        activeOpacity={0.75}
-                                                    >
-                                                        <Ionicons
-                                                            name={
-                                                                active
-                                                                    ? 'checkmark-circle'
-                                                                    : 'medical-outline'
-                                                            }
-                                                            size={18}
-                                                            color={
-                                                                active
-                                                                    ? Colors.gradientStart
-                                                                    : Colors.textMuted
-                                                            }
-                                                        />
-                                                        <Text
-                                                            style={[
-                                                                modal.categoryItemText,
-                                                                active &&
-                                                                    modal.categoryItemTextActive,
-                                                            ]}
-                                                        >
-                                                            {cat.name}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-                                        </ScrollView>
-                                    )}
-                                </View>
-                            )}
-                        </Field>
-
-                        {/* Description */}
-                        <Field label="Description" required>
-                            <ModalInput
-                                value={form.description}
-                                onChangeText={v => onChange('description', v)}
-                                placeholder="Brief description of the service"
-                                multiline
-                                numberOfLines={3}
-                                editable={!submitting}
-                            />
-                        </Field>
-
-                        {/* Price + Duration row */}
-                        <View style={modal.twoCol}>
-                            <View style={{ flex: 1 }}>
-                                <Field label="Base Price (₹)" required>
-                                    <ModalInput
-                                        value={form.basePrice}
-                                        onChangeText={v =>
-                                            onChange('basePrice', v.replace(/[^0-9.]/g, ''))
-                                        }
-                                        placeholder="0.00"
-                                        keyboardType="decimal-pad"
-                                        editable={!submitting}
-                                    />
-                                </Field>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Field label="Duration (min)">
-                                    <ModalInput
-                                        value={form.duration}
-                                        onChangeText={v =>
-                                            onChange('duration', v.replace(/[^0-9]/g, ''))
-                                        }
-                                        placeholder="e.g. 30"
-                                        keyboardType="number-pad"
-                                        editable={!submitting}
-                                    />
-                                </Field>
-                            </View>
-                        </View>
-
-                        {/* Service Type */}
-                        <Field label="Service Type">
-                            <View style={modal.typeRow}>
-                                {SERVICE_TYPES.map(t => (
-                                    <TouchableOpacity
-                                        key={t}
-                                        style={[
-                                            modal.typeChip,
-                                            form.serviceType === t && modal.typeChipActive,
-                                        ]}
-                                        onPress={() =>
-                                            onChange('serviceType', form.serviceType === t ? '' : t)
-                                        }
-                                        disabled={submitting}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text
-                                            style={[
-                                                modal.typeText,
-                                                form.serviceType === t && modal.typeTextActive,
-                                            ]}
-                                        >
-                                            {t}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </Field>
-
-                        {/* Requirements */}
-                        <Field label="Requirements / Notes">
-                            <ModalInput
-                                value={form.requirements}
-                                onChangeText={v => onChange('requirements', v)}
-                                placeholder="Any special requirements for this service"
-                                multiline
-                                numberOfLines={2}
-                                editable={!submitting}
-                            />
-                        </Field>
-
-                        {/* Buttons */}
-                        <View style={modal.btnRow}>
-                            <TouchableOpacity
-                                style={modal.cancelBtn}
-                                onPress={onClose}
-                                disabled={submitting}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={modal.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[modal.submitBtn, submitting && { opacity: 0.7 }]}
-                                onPress={onSubmit}
-                                disabled={submitting}
-                                activeOpacity={0.85}
-                            >
-                                <LinearGradient
-                                    colors={[
-                                        Colors.gradientStart,
-                                        Colors.gradientMid,
-                                        Colors.gradientEnd,
-                                    ]}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={modal.submitGradient}
-                                >
-                                    {submitting ? (
-                                        <ActivityIndicator color="#fff" size="small" />
-                                    ) : (
-                                        <Text style={modal.submitText}>Add Service</Text>
-                                    )}
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={{ height: Platform.OS === 'ios' ? 20 : 8 }} />
-                    </ScrollView>
-                </View>
-            </KeyboardAvoidingView>
-        </Modal>
-    );
+const REQUEST_STATUS_CONFIG: Record<
+    ServiceRequestStatus,
+    { label: string; color: string; bg: string; icon: string }
+> = {
+    pending: { label: 'Pending', color: '#C07800', bg: '#FFF8E6', icon: 'time-outline' },
+    approved: {
+        label: 'Approved',
+        color: '#00A07A',
+        bg: '#E6FFF5',
+        icon: 'checkmark-circle-outline',
+    },
+    rejected: { label: 'Rejected', color: '#CC2200', bg: '#FFF1F0', icon: 'close-circle-outline' },
 };
 
-// ── Small helpers for modal ───────────────────────────────────────────────────
+const formatDate = (date?: string) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+};
 
-const Field = ({
-    label,
-    required,
-    children,
-}: {
-    label: string;
-    required?: boolean;
-    children: React.ReactNode;
-}) => (
-    <View style={modal.field}>
-        <Text style={modal.fieldLabel}>
-            {label}
-            {required && <Text style={{ color: '#EF4444' }}> *</Text>}
-        </Text>
-        {children}
-    </View>
-);
-
-const ModalInput = (props: React.ComponentProps<typeof TextInput>) => (
-    <TextInput
-        style={[modal.input, props.multiline && modal.inputMulti]}
-        placeholderTextColor="#B0BEC5"
-        textAlignVertical={props.multiline ? 'top' : 'center'}
-        {...props}
-    />
-);
-
-const modal = StyleSheet.create({
-    overlay: { flex: 1, justifyContent: 'flex-end' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-    sheet: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        padding: 22,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 22,
-        maxHeight: '92%',
-    },
-    handle: {
-        width: 40,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#DDE3EA',
-        alignSelf: 'center',
-        marginBottom: 18,
-    },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-    titleIconWrap: {
-        width: 50,
-        height: 50,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: { fontSize: 17, fontWeight: '800', color: Colors.textDark, letterSpacing: -0.2 },
-    subtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-    field: { marginBottom: 14 },
-    fieldLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: Colors.textDark,
-        marginBottom: 6,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    input: {
-        borderWidth: 1.5,
-        borderColor: '#E0E8EF',
-        borderRadius: 14,
-        paddingHorizontal: 14,
-        paddingVertical: 13,
-        fontSize: 14,
-        color: Colors.textDark,
-        fontWeight: '500',
-        backgroundColor: '#F8FCFF',
-    },
-    inputMulti: { minHeight: 70, paddingTop: 12 },
-    pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    pickerValue: { fontSize: 14, color: Colors.textDark, fontWeight: '500', flex: 1 },
-    pickerPlaceholder: { fontSize: 14, color: '#B0BEC5', flex: 1 },
-    categoryList: {
-        borderWidth: 1.5,
-        borderColor: '#E0E8EF',
-        borderRadius: 14,
-        marginTop: 6,
-        backgroundColor: '#fff',
-        overflow: 'hidden',
-    },
-    categoryEmpty: { paddingHorizontal: 14, paddingVertical: 14 },
-    categoryEmptyText: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
-    categoryItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F4F8',
-    },
-    categoryItemActive: { backgroundColor: Colors.gradientStart + '15' },
-    categoryItemText: { fontSize: 13, fontWeight: '600', color: Colors.textDark },
-    categoryItemTextActive: { color: Colors.gradientStart },
-    twoCol: { flexDirection: 'row', gap: 12 },
-    typeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-    typeChip: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: '#D8E8EE',
-        backgroundColor: '#F8FCFF',
-    },
-    typeChipActive: { backgroundColor: Colors.gradientStart, borderColor: Colors.gradientStart },
-    typeText: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
-    typeTextActive: { color: '#fff' },
-    btnRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
-    cancelBtn: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: '#DDE3EA',
-        borderRadius: 14,
-        paddingVertical: 14,
-        backgroundColor: '#F8FCFF',
-    },
-    cancelText: { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
-    submitBtn: { flex: 2, borderRadius: 14, overflow: 'hidden' },
-    submitGradient: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-    submitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-});
-
-// ── Service Card ──────────────────────────────────────────────────────────────
+// ── My Services card ────────────────────────────────────────────────────────
 
 const ServiceCard = ({
     service,
@@ -505,7 +110,7 @@ const ServiceCard = ({
 }) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handlePress = () => {
+    const handleTogglePress = () => {
         Animated.sequence([
             Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
             Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
@@ -617,7 +222,7 @@ const ServiceCard = ({
                         active ? styles.deactivateBtn : styles.activateBtn,
                         processing && styles.toggleBtnDisabled,
                     ]}
-                    onPress={handlePress}
+                    onPress={handleTogglePress}
                     disabled={processing}
                     activeOpacity={0.85}
                 >
@@ -646,30 +251,89 @@ const ServiceCard = ({
     );
 };
 
+// ── Service Request card ──────────────────────────────────────────────────────
+
+const RequestCard = ({ request }: { request: ServiceRequestItem }) => {
+    const cfg = REQUEST_STATUS_CONFIG[request.status] ?? REQUEST_STATUS_CONFIG.pending;
+    const totalValue = request.services.reduce((sum, s) => sum + (s.basePrice ?? 0), 0);
+
+    return (
+        <View style={styles.requestCard}>
+            {/* Header */}
+            <View style={styles.requestHeader}>
+                <View style={styles.requestHeaderLeft}>
+                    <Ionicons name="document-text-outline" size={15} color={Colors.textMuted} />
+                    <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
+                </View>
+                <View style={[styles.requestStatusPill, { backgroundColor: cfg.bg }]}>
+                    <Ionicons name={cfg.icon as any} size={12} color={cfg.color} />
+                    <Text style={[styles.requestStatusText, { color: cfg.color }]}>
+                        {cfg.label}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Requested services */}
+            <View style={styles.requestServicesList}>
+                {request.services.map((s, idx) => (
+                    <View
+                        key={s._id ?? idx}
+                        style={[
+                            styles.requestServiceRow,
+                            idx !== request.services.length - 1 && styles.requestServiceRowDivider,
+                        ]}
+                    >
+                        <View style={styles.requestServiceIconWrap}>
+                            <Ionicons name="medical" size={14} color={Colors.gradientMid} />
+                        </View>
+                        <Text style={styles.requestServiceName} numberOfLines={1}>
+                            {s.serviceName}
+                        </Text>
+                        <Text style={styles.requestServicePrice}>
+                            ₹{s.basePrice?.toLocaleString('en-IN')}
+                        </Text>
+                    </View>
+                ))}
+            </View>
+
+            {/* Footer summary */}
+            <View style={styles.requestFooter}>
+                <Text style={styles.requestFooterText}>
+                    {request.services.length} service{request.services.length > 1 ? 's' : ''}{' '}
+                    requested
+                </Text>
+                <Text style={styles.requestFooterTotal}>
+                    Total: ₹{totalValue.toLocaleString('en-IN')}
+                </Text>
+            </View>
+        </View>
+    );
+};
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
 const VendorServicesScreen = ({
     navigation,
 }: NativeBottomTabScreenProps<VendorTabParamList, 'Services'>) => {
     const alert = useAlert();
+
+    const [activeTab, setActiveTab] = useState<ScreenTab>('services');
+
     const [services, setServices] = useState<ServiceWithId[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [servicesLoading, setServicesLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
-    // Categories now come from the backend (they're full documents with
-    // their own _id), so they're fetched rather than hardcoded.
-    const [categories, setCategories] = useState<ServiceCategory[]>([]);
-    const [categoriesLoading, setCategoriesLoading] = useState(true);
+    const [requests, setRequests] = useState<ServiceRequestItem[]>([]);
+    const [requestsLoading, setRequestsLoading] = useState(true);
+    const [requestsLoaded, setRequestsLoaded] = useState(false);
 
-    // Add service modal
-    const [modalVisible, setModalVisible] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [form, setForm] = useState<ServiceForm>(FORM_DEFAULT);
+    const [requestModalVisible, setRequestModalVisible] = useState(false);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
+    // ── Fetch: My Services ────────────────────────────────────────────────────
 
     const fetchServices = async (silent = false) => {
-        if (!silent) setLoading(true);
+        if (!silent) setServicesLoading(true);
         try {
             const response = await serviceAPI.vendorServices();
             setServices((response.data?.data ?? []) as ServiceWithId[]);
@@ -677,32 +341,41 @@ const VendorServicesScreen = ({
             console.warn('Unable to load vendor services', error);
             alert.error('Error', 'Unable to load services. Pull down to retry.');
         } finally {
-            setLoading(false);
+            setServicesLoading(false);
         }
     };
 
-    const fetchCategories = async () => {
-        setCategoriesLoading(true);
+    // ── Fetch: Service Requests ───────────────────────────────────────────────
+
+    const fetchPendingRequest = async (silent = false) => {
+        if (!silent) setRequestsLoading(true);
         try {
-            // NOTE: rename this to match your actual endpoint, e.g.
-            // categoryAPI.list() — swap in whatever serviceAPI exposes.
-            const response = await serviceAPI.getCategories();
-            console.log('categories data: ', response);
-            setCategories((response.data?.data ?? []) as ServiceCategory[]);
+            const response = await serviceAPI.myRequests();
+            debugger
+            const payload = response.data as ServiceRequestsResponse;
+            setRequests(payload?.data ?? []);
         } catch (error) {
-            console.warn('Unable to load service categories', error);
-            alert.error('Error', 'Unable to load categories.');
+            console.error('failed to fetch pending requests : ', error);
+            alert.error('Error', 'Unable to load your service requests.');
         } finally {
-            setCategoriesLoading(false);
+            setRequestsLoading(false);
+            setRequestsLoaded(true);
         }
     };
 
     useEffect(() => {
         fetchServices();
-        fetchCategories();
     }, []);
 
-    // ── Toggle ────────────────────────────────────────────────────────────────
+    // Lazy-load requests the first time that tab is opened.
+    useEffect(() => {
+        if (activeTab === 'requests' && !requestsLoaded) {
+            fetchPendingRequest();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
+
+    // ── Activate / Deactivate ────────────────────────────────────────────────
 
     const handleToggle = async (serviceId: string, currentStatus?: boolean) => {
         setProcessingId(serviceId);
@@ -720,95 +393,43 @@ const VendorServicesScreen = ({
         }
     };
 
-    // ── Add Service ───────────────────────────────────────────────────────────
+    // ── Request modal open/close ─────────────────────────────────────────────
 
-    const handleFormChange = (field: StringField, value: string) => {
-        setForm(prev => ({ ...prev, [field]: value }));
+    const openRequestModal = () => setRequestModalVisible(true);
+
+    const closeRequestModal = () => {
+        setRequestModalVisible(false);
+        // A newly submitted request affects both tabs — pending grant list and
+        // (once approved) the services list.
+        fetchServices(true);
+        fetchPendingRequest(true);
     };
 
-    const handleSelectCategory = (category: ServiceCategory) => {
-        setForm(prev => ({ ...prev, category }));
-    };
+    // ── Pull to refresh — refreshes whichever tab is active ──────────────────
 
-    const handleAddService = async () => {
-        const error = validateServiceForm(form);
-        if (error) {
-            alert.error('Validation', error);
-            return;
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        if (activeTab === 'services') {
+            await fetchServices(true);
+        } else {
+            await fetchPendingRequest(true);
         }
-
-        setSubmitting(true);
-        try {
-            const payload: Partial<Service> = {
-                serviceName: form.serviceName.trim(),
-                category: form.category as ServiceCategory,
-                description: form.description.trim(),
-                basePrice: parseFloat(form.basePrice),
-                duration: form.duration ? parseInt(form.duration, 10) : undefined,
-                serviceType: (form.serviceType as Service['serviceType']) || undefined,
-                requirements: form.requirements.trim() || undefined,
-                isActive: true,
-            };
-
-            const response = await serviceAPI.createService(payload);
-
-            if (response?.data?.success) {
-                setModalVisible(false);
-                setForm(FORM_DEFAULT);
-                alert.success(
-                    'Service Added',
-                    `"${payload.serviceName}" has been added successfully.`,
-                );
-                await fetchServices(true);
-            } else {
-                alert.error('Failed', response?.data?.message || 'Unable to add service.');
-            }
-        } catch (error: any) {
-            console.error('Error adding service:', error);
-            alert.error(
-                'Failed',
-                error?.response?.data?.message || error?.message || 'Unable to add service.',
-            );
-        } finally {
-            setSubmitting(false);
-        }
+        setRefreshing(false);
     };
 
-    const openModal = () => {
-        setForm(FORM_DEFAULT);
-        setModalVisible(true);
-    };
-
-    // ── Active / Inactive counts ──────────────────────────────────────────────
+    // ── Counts ────────────────────────────────────────────────────────────────
 
     const activeCount = services.filter(s => s.isActive).length;
     const inactiveCount = services.length - activeCount;
+    const pendingRequestCount = requests.filter(r => r.status === 'pending').length;
 
-    // ── Loading ───────────────────────────────────────────────────────────────
-
-    if (loading) {
-        return (
-            <View style={[styles.root, styles.centered]}>
-                <ActivityIndicator size="large" color={Colors.gradientStart} />
-                <Text style={styles.loadingText}>Loading services...</Text>
-            </View>
-        );
-    }
+    const isInitialLoading =
+        activeTab === 'services' ? servicesLoading : requestsLoading && !requestsLoaded;
 
     return (
         <View style={styles.root}>
-            {/* ── Add Service Modal ── */}
-            <AddServiceModal
-                visible={modalVisible}
-                submitting={submitting}
-                form={form}
-                categories={categories}
-                categoriesLoading={categoriesLoading}
-                onChange={handleFormChange}
-                onSelectCategory={handleSelectCategory}
-                onSubmit={handleAddService}
-                onClose={() => !submitting && setModalVisible(false)}
-            />
+            {/* ── Request Services Modal ── */}
+            <AddServiceModal visible={requestModalVisible} onClose={closeRequestModal} />
 
             {/* ── Header ── */}
             <LinearGradient
@@ -828,52 +449,174 @@ const VendorServicesScreen = ({
                     </View>
                     <TouchableOpacity
                         style={styles.addBtn}
-                        onPress={openModal}
+                        onPress={openRequestModal}
                         activeOpacity={0.85}
                     >
                         <Ionicons name="add" size={18} color="#fff" />
-                        <Text style={styles.addBtnText}>Add</Text>
+                        <Text style={styles.addBtnText}>Request</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* ── Top tabs ── */}
+                <View style={styles.tabBar}>
+                    <TouchableOpacity
+                        style={[styles.tabBtn, activeTab === 'services' && styles.tabBtnActive]}
+                        onPress={() => setActiveTab('services')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons
+                            name="briefcase-outline"
+                            size={15}
+                            color={activeTab === 'services' ? Colors.gradientStart : '#fff'}
+                        />
+                        <Text
+                            style={[
+                                styles.tabBtnText,
+                                activeTab === 'services' && styles.tabBtnTextActive,
+                            ]}
+                        >
+                            My Services
+                        </Text>
+                        {services.length > 0 && (
+                            <View
+                                style={[
+                                    styles.tabCountBadge,
+                                    activeTab === 'services' && styles.tabCountBadgeActive,
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.tabCountText,
+                                        activeTab === 'services' && styles.tabCountTextActive,
+                                    ]}
+                                >
+                                    {services.length}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.tabBtn, activeTab === 'requests' && styles.tabBtnActive]}
+                        onPress={() => setActiveTab('requests')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons
+                            name="hourglass-outline"
+                            size={15}
+                            color={activeTab === 'requests' ? Colors.gradientStart : '#fff'}
+                        />
+                        <Text
+                            style={[
+                                styles.tabBtnText,
+                                activeTab === 'requests' && styles.tabBtnTextActive,
+                            ]}
+                        >
+                            Service Requests
+                        </Text>
+                        {pendingRequestCount > 0 && (
+                            <View
+                                style={[
+                                    styles.tabCountBadge,
+                                    activeTab === 'requests' && styles.tabCountBadgeActive,
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.tabCountText,
+                                        activeTab === 'requests' && styles.tabCountTextActive,
+                                    ]}
+                                >
+                                    {pendingRequestCount}
+                                </Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
 
             {/* ── Content ── */}
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {services.length === 0 ? (
-                    <View style={styles.emptyCard}>
-                        <Ionicons
-                            name="medkit-outline"
-                            size={48}
-                            color={Colors.gradientStart}
-                            style={{ marginBottom: 14 }}
+            {isInitialLoading ? (
+                <View style={[styles.centered, { flex: 1 }]}>
+                    <ActivityIndicator size="large" color={Colors.gradientStart} />
+                    <Text style={styles.loadingText}>
+                        {activeTab === 'services' ? 'Loading services...' : 'Loading requests...'}
+                    </Text>
+                </View>
+            ) : (
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            tintColor={Colors.gradientStart}
+                            colors={[Colors.gradientStart]}
                         />
-                        <Text style={styles.emptyTitle}>No Services Yet</Text>
-                        <Text style={styles.emptyText}>
-                            Tap the <Text style={{ fontWeight: '800' }}>+ Add</Text> button above to
-                            create your first service.
-                        </Text>
-                    </View>
-                ) : (
-                    services.map(service => (
-                        <ServiceCard
-                            key={service._id}
-                            service={service}
-                            processing={processingId === service._id}
-                            onToggle={() => handleToggle(service._id, service.isActive)}
-                        />
-                    ))
-                )}
-
-                {/* Refresh button */}
-                <TouchableOpacity
-                    style={styles.refreshBtn}
-                    onPress={() => fetchServices()}
-                    activeOpacity={0.85}
+                    }
                 >
-                    <Ionicons name="refresh" size={16} color={Colors.gradientStart} />
-                    <Text style={styles.refreshText}>Refresh</Text>
-                </TouchableOpacity>
-            </ScrollView>
+                    {activeTab === 'services' ? (
+                        services.length === 0 ? (
+                            <View style={styles.emptyCard}>
+                                <Ionicons
+                                    name="medkit-outline"
+                                    size={48}
+                                    color={Colors.gradientStart}
+                                    style={{ marginBottom: 14 }}
+                                />
+                                <Text style={styles.emptyTitle}>No Services Yet</Text>
+                                <Text style={styles.emptyText}>
+                                    Tap the <Text style={{ fontWeight: '800' }}>+ Request</Text>{' '}
+                                    button above to browse the catalog and request services to
+                                    offer.
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.emptyCta}
+                                    onPress={openRequestModal}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="add-circle" size={16} color="#fff" />
+                                    <Text style={styles.emptyCtaText}>Request Services</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            services.map(service => (
+                                <ServiceCard
+                                    key={service._id}
+                                    service={service}
+                                    processing={processingId === service._id}
+                                    onToggle={() => handleToggle(service._id, service.isActive)}
+                                />
+                            ))
+                        )
+                    ) : requests.length === 0 ? (
+                        <View style={styles.emptyCard}>
+                            <Ionicons
+                                name="hourglass-outline"
+                                size={48}
+                                color={Colors.gradientStart}
+                                style={{ marginBottom: 14 }}
+                            />
+                            <Text style={styles.emptyTitle}>No Requests Yet</Text>
+                            <Text style={styles.emptyText}>
+                                Services you request will show up here while they&apos;re waiting
+                                for approval.
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.emptyCta}
+                                onPress={openRequestModal}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="add-circle" size={16} color="#fff" />
+                                <Text style={styles.emptyCtaText}>Request Services</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        requests.map(request => <RequestCard key={request._id} request={request} />)
+                    )}
+                </ScrollView>
+            )}
         </View>
     );
 };
@@ -882,13 +625,13 @@ const VendorServicesScreen = ({
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F2F7FA' },
-    centered: { justifyContent: 'center', alignItems: 'center', flex: 1 },
+    centered: { justifyContent: 'center', alignItems: 'center' },
     loadingText: { marginTop: 12, fontSize: 14, fontWeight: '600', color: Colors.textMuted },
 
     // Header
     header: {
         paddingTop: 24,
-        paddingBottom: 22,
+        paddingBottom: 16,
         paddingHorizontal: 20,
         borderBottomLeftRadius: 26,
         borderBottomRightRadius: 26,
@@ -903,7 +646,12 @@ const styles = StyleSheet.create({
         borderRadius: 75,
         backgroundColor: 'rgba(255,255,255,0.09)',
     },
-    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
     headerTitle: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
     headerSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 4, fontWeight: '500' },
     addBtn: {
@@ -918,6 +666,40 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.3)',
     },
     addBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+
+    // Top tabs
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255,255,255,0.16)',
+        borderRadius: 14,
+        padding: 4,
+        gap: 4,
+    },
+    tabBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: 11,
+    },
+    tabBtnActive: { backgroundColor: '#fff' },
+    tabBtnText: { fontSize: 12.5, fontWeight: '800', color: '#fff' },
+    tabBtnTextActive: { color: Colors.gradientStart },
+    tabCountBadge: {
+        marginLeft: 2,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        borderRadius: 999,
+        minWidth: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    tabCountBadgeActive: { backgroundColor: Colors.gradientStart + '22' },
+    tabCountText: { fontSize: 10, fontWeight: '800', color: '#fff' },
+    tabCountTextActive: { color: Colors.gradientStart },
 
     // Content
     content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 100 },
@@ -1000,7 +782,7 @@ const styles = StyleSheet.create({
     },
     reqText: { flex: 1, fontSize: 12, color: '#7A5000', fontWeight: '500', lineHeight: 18 },
 
-    // Toggle
+    // Footer — Activate/Deactivate only (no edit — vendors can't change service definitions)
     cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
     toggleBtn: {
         flexDirection: 'row',
@@ -1017,6 +799,72 @@ const styles = StyleSheet.create({
     toggleBtnDisabled: { opacity: 0.6 },
     toggleText: { fontSize: 13, fontWeight: '800' },
 
+    // Request card
+    requestCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 14,
+        shadowColor: '#004466',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    requestHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    requestHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    requestDate: { fontSize: 12.5, fontWeight: '600', color: Colors.textMuted },
+    requestStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+    },
+    requestStatusText: { fontSize: 11, fontWeight: '800' },
+    requestServicesList: {
+        borderTopWidth: 1,
+        borderTopColor: '#F0F4F8',
+        paddingTop: 4,
+    },
+    requestServiceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 10,
+    },
+    requestServiceRowDivider: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F4F8',
+    },
+    requestServiceIconWrap: {
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.gradientMid + '15',
+    },
+    requestServiceName: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.textDark },
+    requestServicePrice: { fontSize: 13, fontWeight: '800', color: Colors.textDark },
+    requestFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F4F8',
+    },
+    requestFooterText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
+    requestFooterTotal: { fontSize: 13, fontWeight: '800', color: Colors.gradientMid },
+
     // Empty state
     emptyCard: {
         backgroundColor: '#fff',
@@ -1026,26 +874,24 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     emptyTitle: { fontSize: 17, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
-    emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
-
-    // Refresh
-    refreshBtn: {
+    emptyText: {
+        color: Colors.textMuted,
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 21,
+        marginBottom: 16,
+    },
+    emptyCta: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        paddingVertical: 13,
-        borderWidth: 1,
-        borderColor: '#D8E8EE',
-        shadowColor: '#004466',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        backgroundColor: Colors.gradientStart,
+        borderRadius: 14,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
     },
-    refreshText: { color: Colors.gradientStart, fontWeight: '800', fontSize: 13 },
+    emptyCtaText: { color: '#fff', fontWeight: '800', fontSize: 13 },
 });
 
 export default VendorServicesScreen;
+            

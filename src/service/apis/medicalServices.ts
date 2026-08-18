@@ -11,4 +11,6 @@ export const serviceAPI = {
     deleteService: (serviceId:string) => privateClient.delete(`/services/${serviceId}`),
     toggleServiceStatus: (serviceId:string) => privateClient.put(`/services/${serviceId}/toggle-status`),
     getCategories: () => publicClient.get('/categories'),
+    vendorServiceRequest: (services: string[]) => privateClient.post('/vendor-service-requests/create', {services}),
+    myRequests: () => privateClient.get('/vendor-service-requests/my-requests'),
 }

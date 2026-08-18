@@ -1,5 +1,4 @@
 import { Colors, Fonts, Spacing } from '@/theme/colors';
-import { Booking, BookingStatus } from '@/types/Booking';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { bookingAPI } from '@/service/apis/bookingService';
 import { useAlert } from '@/context/AlertContext';
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Booking, BookingStatus, PaymentStatus } from '../types/Booking';
 
 type BookingDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'VendorBookingDetail'>;
 
@@ -55,6 +55,21 @@ const STATUS_CONFIG: Record<
     },
 };
 
+const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; color: string }> = {
+    pending: { label: 'Pending', color: '#E6A817' },
+    paid: { label: 'Paid', color: '#5EA300' },
+    failed: { label: 'Failed', color: '#E05555' },
+};
+
+const REQUESTED_ITEM_STATUS_CONFIG: Record<
+    'pending' | 'brought' | 'unavailable',
+    { label: string; color: string }
+> = {
+    pending: { label: 'Pending', color: '#E6A817' },
+    brought: { label: 'Brought', color: '#5EA300' },
+    unavailable: { label: 'Unavailable', color: '#E05555' },
+};
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 const formatDate = (date?: Date | string) => {
     if (!date) return '—';
@@ -68,6 +83,11 @@ const formatDate = (date?: Date | string) => {
 };
 
 const formatAmount = (n?: number | null) => (n != null ? `₹${n.toLocaleString('en-IN')}` : '—');
+
+const formatPaymentMethod = (method?: string | null) => {
+    if (!method) return '—';
+    return method === 'razorpay' ? 'Online (Razorpay)' : 'Cash';
+};
 
 // ─── Small reusable pieces ──────────────────────────────────────────────────────
 const SectionCard = ({
@@ -127,6 +147,9 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
 
     const status = booking.bookingStatus ?? 'pending';
     const statusCfg = STATUS_CONFIG[status];
+    const paymentStatusCfg = booking.paymentStatus
+        ? PAYMENT_STATUS_CONFIG[booking.paymentStatus]
+        : null;
 
     const handleAccept = async () => {
         if (!booking._id) return;
@@ -146,6 +169,7 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
 
     const totalServices = booking.selectedServices?.length ?? 0;
     const couponDiscount = booking.appliedCoupon?.discountAmount ?? 0;
+    const displayId = booking.bookingId || booking._id?.slice(-8).toUpperCase();
 
     return (
         <View style={styles.root}>
@@ -166,7 +190,7 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                     <View style={styles.headerCenter}>
                         <Text style={styles.headerTitle}>Booking Detail</Text>
                         <Text style={styles.headerSub} numberOfLines={1}>
-                            #{booking._id?.slice(-8).toUpperCase()}
+                            #{displayId}
                         </Text>
                     </View>
                     {/* Status badge */}
@@ -218,6 +242,12 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                             <Row label="Alt. Mobile" value={booking.alternateMobile} />
                         </>
                     )}
+                    {booking.familyMemberId && (
+                        <>
+                            <Divider />
+                            <Row label="Booked For" value="Family Member" />
+                        </>
+                    )}
                 </SectionCard>
 
                 {/* ── Location & Schedule ── */}
@@ -247,6 +277,25 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                                 />
                             </>
                         )}
+
+                    {/* Navigate to map */}
+                    {booking._id && (
+                        <TouchableOpacity
+                            style={styles.mapBtn}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                navigation.navigate('BookingMap', { bookingId: booking._id! })
+                            }
+                        >
+                            <Ionicons name="map-outline" size={16} color={Colors.gradientStart} />
+                            <Text style={styles.mapBtnText}>View Route on Map</Text>
+                            <Ionicons
+                                name="chevron-forward"
+                                size={16}
+                                color={Colors.gradientStart}
+                            />
+                        </TouchableOpacity>
+                    )}
                 </SectionCard>
 
                 {/* ── Services ── */}
@@ -270,6 +319,56 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                     ))}
                 </SectionCard>
 
+                {/* ── Requested Items ── */}
+                {booking.requestedItems && booking.requestedItems.length > 0 && (
+                    <SectionCard title="Requested Items" icon="bag-outline">
+                        {booking.requestedItems.map((item, idx) => {
+                            const itemStatus = item.status ?? 'pending';
+                            const itemCfg = REQUESTED_ITEM_STATUS_CONFIG[itemStatus];
+                            return (
+                                <View key={idx}>
+                                    {idx > 0 && <Divider />}
+                                    <View style={styles.serviceRow}>
+                                        <View style={styles.serviceLeft}>
+                                            <View style={styles.serviceDot} />
+                                            <Text style={styles.serviceName}>{item.itemName}</Text>
+                                            {(item.quantity ?? 1) > 1 && (
+                                                <View style={styles.qtyBadge}>
+                                                    <Text style={styles.qtyText}>
+                                                        ×{item.quantity}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <View style={styles.itemRight}>
+                                            {item.price != null && (
+                                                <Text style={styles.servicePrice}>
+                                                    {formatAmount(item.price)}
+                                                </Text>
+                                            )}
+                                            <View
+                                                style={[
+                                                    styles.itemStatusPill,
+                                                    { backgroundColor: `${itemCfg.color}1F` },
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.itemStatusText,
+                                                        { color: itemCfg.color },
+                                                    ]}
+                                                >
+                                                    {itemCfg.label}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </SectionCard>
+                )}
+
                 {/* ── Pricing ── */}
                 <SectionCard title="Pricing" icon="receipt-outline">
                     <Row label="Subtotal" value={formatAmount(booking.subtotal)} />
@@ -284,6 +383,15 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                             />
                         </>
                     )}
+                    {!!booking.additionalAmount && (
+                        <>
+                            <Divider />
+                            <Row
+                                label="Additional Amount"
+                                value={formatAmount(booking.additionalAmount)}
+                            />
+                        </>
+                    )}
                     <Divider />
                     <Row label="Grand Total" value={formatAmount(booking.grandTotal)} highlight />
                     {booking.finalAmount != null && (
@@ -294,6 +402,40 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                                 value={formatAmount(booking.finalAmount)}
                                 highlight
                             />
+                        </>
+                    )}
+                </SectionCard>
+
+                {/* ── Payment ── */}
+                <SectionCard title="Payment" icon="card-outline">
+                    <Row label="Method" value={formatPaymentMethod(booking.paymentMethod)} />
+                    <Divider />
+                    <View style={styles.row}>
+                        <Text style={styles.rowLabel}>Status</Text>
+                        {paymentStatusCfg ? (
+                            <View
+                                style={[
+                                    styles.itemStatusPill,
+                                    { backgroundColor: `${paymentStatusCfg.color}1F` },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.itemStatusText,
+                                        { color: paymentStatusCfg.color },
+                                    ]}
+                                >
+                                    {paymentStatusCfg.label}
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.rowValue}>—</Text>
+                        )}
+                    </View>
+                    {booking.paymentMethod === 'razorpay' && booking.razorpayPaymentId && (
+                        <>
+                            <Divider />
+                            <Row label="Payment ID" value={booking.razorpayPaymentId} />
                         </>
                     )}
                 </SectionCard>
@@ -346,6 +488,20 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                     </SectionCard>
                 )}
 
+                {/* ── Prescription Summary ── */}
+                {booking.prescriptionSummary && (
+                    <SectionCard title="Prescription Summary" icon="clipboard-outline">
+                        <Text style={styles.noteText}>{booking.prescriptionSummary}</Text>
+                    </SectionCard>
+                )}
+
+                {/* ── Additional Requirements ── */}
+                {booking.additionalRequirements && (
+                    <SectionCard title="Additional Requirements" icon="information-circle-outline">
+                        <Text style={styles.noteText}>{booking.additionalRequirements}</Text>
+                    </SectionCard>
+                )}
+
                 {/* ── Notes ── */}
                 {booking.notes && booking.notes.length > 0 && (
                     <SectionCard title="Notes" icon="document-text-outline">
@@ -356,6 +512,28 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                                 {note.addedAt && (
                                     <Text style={styles.noteTime}>{formatDate(note.addedAt)}</Text>
                                 )}
+                            </View>
+                        ))}
+                    </SectionCard>
+                )}
+
+                {/* ── Runtime Notes ── */}
+                {booking.runtimeNotes && booking.runtimeNotes.length > 0 && (
+                    <SectionCard title="Runtime Notes" icon="chatbox-ellipses-outline">
+                        {booking.runtimeNotes.map((note, idx) => (
+                            <View key={idx}>
+                                {idx > 0 && <Divider />}
+                                <Text style={styles.noteText}>{note.text}</Text>
+                                <View style={styles.runtimeNoteMeta}>
+                                    {note.addedBy && (
+                                        <View style={styles.addedByPill}>
+                                            <Text style={styles.addedByText}>{note.addedBy}</Text>
+                                        </View>
+                                    )}
+                                    {note.addedAt && (
+                                        <Text style={styles.noteTime}>{formatDate(note.addedAt)}</Text>
+                                    )}
+                                </View>
                             </View>
                         ))}
                     </SectionCard>
@@ -415,7 +593,7 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        paddingTop: 52,
+        paddingTop: 26,
         paddingBottom: 0,
         paddingHorizontal: Spacing.xl,
         borderBottomLeftRadius: 28,
@@ -533,7 +711,7 @@ const styles = StyleSheet.create({
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         paddingVertical: 10,
         gap: Spacing.md,
     },
@@ -603,6 +781,21 @@ const styles = StyleSheet.create({
         color: Colors.textDark,
     },
 
+    // Requested items / payment status pill
+    itemRight: {
+        alignItems: 'flex-end',
+        gap: 4,
+    },
+    itemStatusPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    itemStatusText: {
+        fontSize: Fonts.sizes.xs,
+        fontWeight: '700',
+    },
+
     // Notes
     noteText: {
         fontSize: Fonts.sizes.sm,
@@ -614,6 +807,23 @@ const styles = StyleSheet.create({
         fontSize: Fonts.sizes.xs,
         color: Colors.textMuted,
         marginBottom: 6,
+    },
+    runtimeNoteMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: 6,
+    },
+    addedByPill: {
+        backgroundColor: 'rgba(0,180,232,0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    addedByText: {
+        fontSize: Fonts.sizes.xs,
+        fontWeight: '700',
+        color: Colors.gradientEnd,
     },
 
     // CTA
@@ -660,6 +870,26 @@ const styles = StyleSheet.create({
     },
     acceptedBannerText: {
         fontSize: Fonts.sizes.md,
+        fontWeight: '700',
+        color: Colors.gradientStart,
+    },
+
+    mapBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.xs,
+        paddingVertical: 12,
+        paddingHorizontal: Spacing.md,
+        backgroundColor: 'rgba(0,212,160,0.08)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,212,160,0.2)',
+    },
+    mapBtnText: {
+        flex: 1,
+        fontSize: Fonts.sizes.sm,
         fontWeight: '700',
         color: Colors.gradientStart,
     },

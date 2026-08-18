@@ -10,7 +10,7 @@ import {
     Modal,
     StatusBar,
     RefreshControl,
-    Linking
+    Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
@@ -23,6 +23,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { User } from '../types/User';
 import { userApi } from '@/service/apis/userService';
 import { useAlert } from '@/context/AlertContext';
+import { LogoutModal } from '../model/LogoutModal';
 
 type ProfileProps = NativeBottomTabScreenProps<UserTabParamList, 'Profile'>;
 
@@ -83,13 +84,13 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
 
     const handleRefresh = () => {
         fetchProfile();
-    }
+    };
     const handleLogout = async () => {
         setLogoutModalVisible(false);
         await removeAuth();
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>().reset({
             index: 0,
-            routes: [{ name: 'Login' }],
+            routes: [{ name: 'EmailLogin' }],
         });
     };
 
@@ -131,7 +132,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
         navigation
             .getParent<NativeStackNavigationProp<RootStackParamList>>()
             ?.navigate('EditProfile', { userData: user });
-    }
+    };
 
     const openWebsite = async (url: string) => {
         try {
@@ -177,10 +178,7 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl
-                        refreshing={isRefreshing}
-                        onRefresh={handleRefresh}
-                    />
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
                 }
             >
                 {/* ── Avatar Card ── */}
@@ -263,8 +261,8 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
 
                 {/* ── Medical Information ── */}
                 {user?.allergies?.length ||
-                    user?.chronicDiseases?.length ||
-                    user?.currentMedications?.length ? (
+                user?.chronicDiseases?.length ||
+                user?.currentMedications?.length ? (
                     <>
                         <SectionHeader title="MEDICAL INFORMATION" />
                         <View style={styles.menuCard}>
@@ -338,8 +336,8 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                                         sublabel={
                                             user.insuranceExpiryDate instanceof Date
                                                 ? user.insuranceExpiryDate.toLocaleDateString(
-                                                    'en-IN',
-                                                )
+                                                      'en-IN',
+                                                  )
                                                 : String(user.insuranceExpiryDate)
                                         }
                                     />
@@ -388,47 +386,41 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 <View style={styles.menuCard}>
                     <MenuRow icon="edit" label="Edit Profile" onPress={handelEdit} />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="lock" label="Change Password" onPress={() => { }} />
+                    <MenuRow icon="lock" label="Change Password" onPress={() => {}} />
                     <View style={styles.rowDivider} />
-                    {/* <MenuRow icon="folder-shared" label="Medical Records" onPress={() => { }} />
-                    <View style={styles.rowDivider} />
-                    <MenuRow icon="credit-card" label="Insurance & Billing" onPress={() => { }} /> */}
                 </View>
-
-                {/* ── Preferences ── */}
-                {/* <SectionHeader title="PREFERENCES" />
-                <View style={styles.menuCard}>
-                    <MenuRow
-                        icon="language"
-                        label="Preferred Language"
-                        sublabel={user.preferredLanguage ?? 'Not set'}
-                    />
-                    <View style={styles.rowDivider} />
-                    <MenuRow
-                        icon="notifications"
-                        label="Push Notifications"
-                        rightElement={
-                            <Switch
-                                value={notificationsEnabled}
-                                onValueChange={setNotificationsEnabled}
-                                trackColor={{ false: '#D0D8DC', true: Colors.gradientStart }}
-                                thumbColor={Colors.white}
-                            />
-                        }
-                    />
-                </View> */}
 
                 {/* ── Support ── */}
                 <SectionHeader title="SUPPORT" />
                 <View style={styles.menuCard}>
-                    <MenuRow icon="help-outline" label="Help & FAQ" onPress={() => openWebsite('https://www.prlthealthcare.com/')} />
+                    <MenuRow
+                        icon="help-outline"
+                        label="Help & FAQ"
+                        onPress={() => openWebsite('https://www.prlthealthcare.com/')}
+                    />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="feedback" label="Send Feedback" onPress={() => openWebsite('https://www.prlthealthcare.com/')} />
+                    <MenuRow
+                        icon="feedback"
+                        label="Send Feedback"
+                        onPress={() => openWebsite('https://www.prlthealthcare.com/')}
+                    />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="privacy-tip" label="Privacy Policy" onPress={() => openWebsite('https://www.prlthealthcare.com/privacy')} />
+                    <MenuRow
+                        icon="privacy-tip"
+                        label="Privacy Policy"
+                        onPress={() => openWebsite('https://www.prlthealthcare.com/privacy')}
+                    />
                     <View style={styles.rowDivider} />
-                    <MenuRow icon="description" label="Terms of Service" onPress={() => openWebsite('https://www.prlthealthcare.com/terms')} />
-                    <MenuRow icon="info" label="About" onPress={() => openWebsite('https://www.prlthealthcare.com/about')} />
+                    <MenuRow
+                        icon="description"
+                        label="Terms of Service"
+                        onPress={() => openWebsite('https://www.prlthealthcare.com/terms')}
+                    />
+                    <MenuRow
+                        icon="info"
+                        label="About"
+                        onPress={() => openWebsite('https://www.prlthealthcare.com/about')}
+                    />
                 </View>
 
                 {/* ── Danger Zone ── */}
@@ -444,40 +436,11 @@ const ProfileScreen = ({ navigation }: ProfileProps) => {
                 <View style={{ height: 40, marginBottom: 28 }}></View>
             </ScrollView>
 
-            {/* ── Logout Confirmation Modal ── */}
-            <Modal
-                transparent
-                animationType="fade"
+            <LogoutModal
                 visible={logoutModalVisible}
-                onRequestClose={() => setLogoutModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
-                        <View style={styles.modalIconWrap}>
-                            <Icon name="logout" size={32} color="#E53935" />
-                        </View>
-                        <Text style={styles.modalTitle}>Log Out?</Text>
-                        <Text style={styles.modalBody}>
-                            You'll need to sign in again to access your health records and
-                            appointments.
-                        </Text>
-                        <TouchableOpacity
-                            style={styles.modalLogoutBtn}
-                            onPress={handleLogout}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.modalLogoutText}>Yes, Log Me Out</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.modalCancelBtn}
-                            onPress={() => setLogoutModalVisible(false)}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.modalCancelText}>Stay Signed In</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+                onClose={() => setLogoutModalVisible(false)}
+                logout={handleLogout}
+            />
         </View>
     );
 };
@@ -632,61 +595,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.4,
         lineHeight: 16,
     },
-
-    // ── Modal ──
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,30,50,0.45)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-    },
-    modalCard: {
-        width: '100%',
-        backgroundColor: Colors.white,
-        borderRadius: 24,
-        padding: 28,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.18,
-        shadowRadius: 20,
-        elevation: 12,
-    },
-    modalIconWrap: {
-        width: 68,
-        height: 68,
-        borderRadius: 34,
-        backgroundColor: '#FDECEA',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    modalTitle: { fontSize: 22, fontWeight: '800', color: Colors.textDark, marginBottom: 10 },
-    modalBody: {
-        fontSize: 14,
-        color: Colors.textMuted,
-        textAlign: 'center',
-        lineHeight: 21,
-        marginBottom: 24,
-    },
-    modalLogoutBtn: {
-        width: '100%',
-        backgroundColor: '#E53935',
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    modalLogoutText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
-    modalCancelBtn: {
-        width: '100%',
-        backgroundColor: '#F0F5F8',
-        borderRadius: 14,
-        paddingVertical: 14,
-        alignItems: 'center',
-    },
-    modalCancelText: { color: Colors.textMedium, fontWeight: '600', fontSize: 15 },
 });
 
 export default ProfileScreen;

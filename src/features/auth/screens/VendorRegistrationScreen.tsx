@@ -142,7 +142,7 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
         formData.append('bio', form.bio.trim());
         formData.append('specialization', form.specialization.trim());
         formData.append('experience', form.experience.trim());
-        formData.append('serviceAreas', form.serviceAreas.trim());
+        formData.append('serviceAreas', form.serviceAreas.join(', '));
 
         form.services.forEach(service => {
             formData.append('services', service);
@@ -253,7 +253,6 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
                 </View>
             </LinearGradient>
             {/* ── Step indicator ── */}
-            // ── Step indicator ──
             <View style={styles.stepBar}>
                 {STEPS.map((s, i) => {
                     const done = i < step;

@@ -30,7 +30,7 @@ export type VendorForm = {
     city: string;
     state: string;
     pincode: string;
-    serviceAreas: string;
+    serviceAreas: string[];
         services: string[];
     // Step 3
     specialization: string;
@@ -58,7 +58,7 @@ export const INITIAL_FORM: VendorForm = {
     city: '',
     state: '',
     pincode: '',
-    serviceAreas: '',
+    serviceAreas: [],
     services: [],
     specialization: '',
     experience: '',

@@ -1,30 +1,43 @@
 export interface Vendor {
     _id?: string;
+    vendorId?: string;
+
     // Basic Information
     name: string;
     email: string;
     password: string;
     phone: string;
     alternatePhone?: string;
+
     gender?: 'Male' | 'Female' | 'Other';
+
+    role?: 'vendor';
 
     // Business Information
     businessName: string;
-    businessType: 'Individual' | 'Clinic' | 'Hospital' | 'Laboratory' | 'Pharmacy' | 'Other';
+
+    businessType:
+    | 'Individual'
+    | 'Clinic'
+    | 'Hospital'
+    | 'Laboratory'
+    | 'Pharmacy'
+    | 'Other';
+
     registrationNumber?: string;
     gstNumber?: string;
 
-    services?: {
-        _id: string;
-        serviceName: string;
-        category: string;
-        basePrice: number;
-        duration: number;
-    }[];
+    /**
+     * Mongoose stores ObjectId references.
+     * When populated, this can contain service details.
+     */
+    services?: string[] | VendorService[];
 
     // Professional Details
     qualifications?: Qualification[];
+
     experience?: number;
+
     specialization?: string;
 
     // Location Details
@@ -32,10 +45,11 @@ export interface Vendor {
     city: string;
     state: string;
     pincode: string;
+
     serviceAreas?: string[];
 
     // Documents
-    documents?: Documents;
+    documents?: VendorDocuments;
 
     // Availability
     availability?: Availability;
@@ -46,7 +60,13 @@ export interface Vendor {
     // Status and Verification
     isVerified?: boolean;
     isActive?: boolean;
-    verificationStatus?: 'pending' | 'verified' | 'rejected';
+    isPhoneVerified?: boolean;
+
+    verificationStatus?:
+    | 'pending'
+    | 'verified'
+    | 'rejected';
+
     verificationDate?: Date;
 
     // Ratings and Reviews
@@ -55,6 +75,7 @@ export interface Vendor {
 
     // Profile
     profileImage?: string | null;
+
     bio?: string;
 
     // Bank Details
@@ -65,7 +86,23 @@ export interface Vendor {
     updatedAt?: Date;
 }
 
-// Sub-interfaces
+
+// ============================================
+// Service
+// ============================================
+
+export interface VendorService {
+    _id: string;
+    serviceName: string;
+    category: string;
+    basePrice: number;
+    duration: number;
+}
+
+
+// ============================================
+// Qualification
+// ============================================
 
 export interface Qualification {
     degree?: string;
@@ -73,17 +110,36 @@ export interface Qualification {
     year?: number;
 }
 
-export interface Documents {
+
+// ============================================
+// Documents
+// ============================================
+
+export interface VendorDocuments {
     identityProof?: DocumentFile;
     qualificationCertificate?: DocumentFile;
     businessLicense?: DocumentFile;
     insuranceCertificate?: DocumentFile;
+    policeVerification?: DocumentFile;
 }
+
 
 export interface DocumentFile {
     type?: string;
     url?: string;
+
+    status?:
+    | 'pending'
+    | 'approved'
+    | 'rejected';
+
+    rejectionReason?: string;
 }
+
+
+// ============================================
+// Availability
+// ============================================
 
 export interface Availability {
     days?: (
@@ -95,20 +151,33 @@ export interface Availability {
         | 'Saturday'
         | 'Sunday'
     )[];
+
     timeSlots?: TimeSlot[];
+
     emergencyAvailable?: boolean;
 }
+
 
 export interface TimeSlot {
     from?: string;
     to?: string;
 }
 
+
+// ============================================
+// Pricing
+// ============================================
+
 export interface Pricing {
     consultationFee?: number;
     homeVisitFee?: number;
     emergencyFee?: number;
 }
+
+
+// ============================================
+// Bank Details
+// ============================================
 
 export interface BankDetails {
     accountHolderName?: string;

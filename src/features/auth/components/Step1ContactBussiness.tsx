@@ -4,6 +4,9 @@ import { Colors } from '../../../theme/colors';
 import { VendorForm, BUSINESS_TYPES } from '../types/VendorRegistration';
 import { FieldInput } from '../../../components/FieldInput';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAlert } from '@/context/AlertContext';
+import { OtpService } from '@/service/apis/otpService';
+import OtpVerificationModal from '../models/OtpVerificationModal';
 
 type Props = {
     form: VendorForm;
@@ -64,9 +67,13 @@ const FieldError = ({ message }: { message?: string }) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 const StepContactBusiness = ({ form, updateField }: Props) => {
+    const alert = useAlert();
     const [errors, setErrors] = useState<FieldErrors>({});
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    // ── Phone verification state ─────────────────────────────────────────────
+    const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
+    const [otpModalVisible, setOtpModalVisible] = useState(false);
 
     const setError = (key: keyof VendorForm, msg: string) =>
         setErrors(prev => ({ ...prev, [key]: msg }));
@@ -94,33 +101,29 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
         }
     };
 
-    const validateField = (key: keyof VendorForm) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        switch (key) {
-            case 'name':
-                if (!form.name.trim()) setError('name', 'Contact name is required.');
-                break;
-            case 'email':
-                if (!emailRegex.test(form.email.trim()))
-                    setError('email', 'Enter a valid email address.');
-                break;
-            case 'phone':
-                if (form.phone.replace(/[^0-9]/g, '').length !== 10)
-                    setError('phone', 'Enter a valid 10-digit phone number.');
-                break;
-            case 'password':
-                if (form.password.length < 6)
-                    setError('password', 'Password must be at least 6 characters.');
-                break;
-            case 'confirmPassword':
-                if (form.confirmPassword !== form.password)
-                    setError('confirmPassword', 'Passwords do not match.');
-                break;
-            case 'businessName':
-                if (!form.businessName.trim())
-                    setError('businessName', 'Business name is required.');
-                break;
+    // ── OTP modal callbacks ──────────────────────────────────────────────────
+    const sendOtpRequest = async (phone: string): Promise<boolean> => {
+        try {
+            const response = await OtpService.sendOtp(phone);
+            return !!response.data?.success;
+        } catch (error) {
+            return false;
         }
+    };
+
+    const verifyOtpRequest = async (phone: string, otp: string): Promise<boolean> => {
+        try {
+            const response = await OtpService.verifyOtp({ phone, otp });
+            return !!response.data?.success;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    const handleOtpVerified = () => {
+        setIsPhoneVerified(true);
+        setOtpModalVisible(false);
+        alert.success('Phone Verified', 'Your mobile number has been verified.');
     };
 
     // ── Eye toggle icon helpers ────────────────────────────────────────────────
@@ -138,6 +141,7 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
         </TouchableOpacity>
     );
 
+    const canOpenOtpModal = form.phone.length === 10;
     return (
         <View>
             {/* ── Contact Details ── */}
@@ -178,6 +182,33 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                         keyboardType="phone-pad"
                         maxLength={10}
                         required
+                        rightIcon={
+                            isPhoneVerified ? (
+                                <TouchableOpacity
+                                    onPress={() => setIsPhoneVerified(false)}
+                                    activeOpacity={0.7}
+                                    style={styles.verifiedBadge}
+                                >
+                                    <Icon name="verified" size={13} color="#1B8E5A" />
+                                    <Text style={styles.verifiedBadgeText}>Verified</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={() => setOtpModalVisible(true)}
+                                    disabled={!canOpenOtpModal}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.verifyLink,
+                                            !canOpenOtpModal && styles.verifyLinkDisabled,
+                                        ]}
+                                    >
+                                        Verify
+                                    </Text>
+                                </TouchableOpacity>
+                            )
+                        }
                     />
                     <FieldError message={errors.phone} />
                 </View>
@@ -203,10 +234,6 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                 rightIcon={
                     <EyeIcon visible={showPassword} onToggle={() => setShowPassword(v => !v)} />
                 }
-                // FieldInput already has secureTextEntry support via rightIcon;
-                // pass the prop through by extending FieldInput if needed,
-                // or wrap it — here we handle it via the existing rightIcon slot
-                // and a local secureTextEntry prop (add to FieldInput if not present):
                 secureTextEntry={!showPassword}
             />
             <PasswordStrength password={form.password} />
@@ -316,6 +343,17 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                     />
                 </View>
             </View>
+
+            {/* ── Reusable OTP verification modal ──────────────────────────── */}
+            <OtpVerificationModal
+                visible={otpModalVisible}
+                destination={form.phone}
+                subjectLabel="mobile number"
+                onClose={() => setOtpModalVisible(false)}
+                onVerified={handleOtpVerified}
+                onSendOtp={sendOtpRequest}
+                onVerifyOtp={verifyOtpRequest}
+            />
         </View>
     );
 };
@@ -355,8 +393,8 @@ const styles = StyleSheet.create({
         color: Colors.textDark,
     },
     row: {
-        flexDirection: 'row',
-        gap: 10,
+        flexDirection: 'column',
+        gap: 2,
     },
     rowItem: {
         flex: 1,
@@ -407,6 +445,30 @@ const styles = StyleSheet.create({
     },
     chipTextActive: {
         color: Colors.white,
+    },
+
+    // ── Phone verification ────────────────────────────────────────────────
+    verifyLink: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.gradientStart,
+    },
+    verifyLinkDisabled: {
+        color: Colors.textMuted,
+    },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#E6F7EE',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+    },
+    verifiedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#1B8E5A',
     },
 });
 
