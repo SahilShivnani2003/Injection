@@ -11,4 +11,6 @@ export interface RegisterForm {
     role: 'user';
     city: string;     
     state: string;
+    longitude: Number;
+    latitude: Number;
 }

@@ -7,6 +7,7 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    KeyboardAvoidingView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -22,7 +23,7 @@ import { RegisterForm } from '../types/RegisterForm';
 import { useAuthStore } from '@/store/useAuthStore';
 import { OtpService } from '@/service/apis/otpService';
 import { getCurrentCoordinates, LocationPermissionDeniedError } from '@/utils/deviceLocation';
-import { coordinatesToAddress } from '@/utils/geocoding';
+import { addressToCoordinates, coordinatesToAddress } from '@/utils/geocoding';
 import { getCitiesByState, getStates } from '@/utils/location';
 import { DropdownSelect } from '@/components/DropdownSelect';
 
@@ -104,6 +105,8 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
         role: 'user',
         city: '', // new
         state: '',
+        latitude: 0,
+        longitude: 0,
     });
     const [agreed, setAgreed] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -171,6 +174,12 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
         setLocating(true);
         try {
             const coords = await getCurrentCoordinates();
+            if (!coords) {
+                alert.error('Location Error', 'Could not determine your co-ordinates.');
+                return;
+            }
+
+            setForm({ ...form, latitude: coords?.latitude, longitude: coords?.longitude });
             const geocoded = await coordinatesToAddress(coords);
 
             if (!geocoded) {
@@ -326,6 +335,20 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
     const handleRegister = async () => {
         if (!validate()) return;
 
+        if (form.latitude == 0 && form.longitude == 0) {
+            const addressToConvert = `${form.address}, ${form.city}, ${form.state}, ${form.pincode}`;
+            const coords = await addressToCoordinates(addressToConvert);
+
+            if (!coords) {
+                console.error('Coords not found');
+            }
+
+            setForm({
+                ...form,
+                longitude: coords?.coordinates?.longitude ?? 0,
+                latitude: coords?.coordinates?.latitude ?? 0,
+            });
+        }
         setLoading(true);
         try {
             const data: RegisterForm = {
@@ -341,23 +364,27 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                 role: form.role,
                 city: form.city, // new
                 state: form.state,
+                longitude: form.longitude,
+                latitude: form.latitude,
             };
             const response = await userApi.register(data);
 
             if (response.data.success) {
-                setAuth(response.data?.user, 'patient', response.data?.token);
+                setAuth(response.data?.data?.user, 'patient', response.data?.data?.token);
                 alert.success(
                     'Registration Successful',
-                    'Your account has been created. Please login.',
+                    'Your account has been created',
                 );
                 navigation.navigate('UserTab', { screen: 'Dashboard' });
             } else {
                 alert.error('Registration Failed', 'Unable to create account. Please try again.');
             }
-        } catch (error) {
+        } catch (error: any) {
+            console.error('failed to register : ', error);
             alert.error(
                 'Registration Failed',
-                'An error occurred while creating your account. Please try again.',
+                error?.message ||
+                    'An error occurred while creating your account. Please try again.',
             );
         } finally {
             setLoading(false);
@@ -399,314 +426,329 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                 </View>
             </LinearGradient>
 
-            <ScrollView
-                contentContainerStyle={styles.content}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                {/* ── Personal Information ─────────────────────────────────── */}
-                <SectionCard icon="badge" title="Personal Information">
-                    <FieldInput
-                        label="Full Name"
-                        value={form.name}
-                        onChangeText={value => handleChange('name', value)}
-                        placeholder="Enter your full name"
-                        required
-                    />
-                    <FieldError message={errors.name} />
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* ── Personal Information ─────────────────────────────────── */}
+                    <SectionCard icon="badge" title="Personal Information">
+                        <FieldInput
+                            label="Full Name"
+                            value={form.name}
+                            onChangeText={value => handleChange('name', value)}
+                            placeholder="Enter your full name"
+                            required
+                        />
+                        <FieldError message={errors.name} />
 
-                    <FieldInput
-                        label="Email Address"
-                        value={form.email}
-                        onChangeText={value => handleChange('email', value)}
-                        placeholder="Enter your email"
-                        keyboardType="email-address"
-                        required
-                    />
-                    <FieldError message={errors.email} />
+                        <FieldInput
+                            label="Email Address"
+                            value={form.email}
+                            onChangeText={value => handleChange('email', value)}
+                            placeholder="Enter your email"
+                            keyboardType="email-address"
+                            required
+                        />
+                        <FieldError message={errors.email} />
 
-                    {/* ── Mobile Number + OTP verification ─────────────────── */}
-                    <FieldInput
-                        label="Mobile Number"
-                        value={form.phone}
-                        onChangeText={handlePhoneChange}
-                        placeholder="10-digit mobile number"
-                        keyboardType="phone-pad"
-                        maxLength={10}
-                        required
-                        editable={!isPhoneVerified}
-                        rightIcon={
-                            isPhoneVerified ? (
-                                <TouchableOpacity
-                                    onPress={() => setIsPhoneVerified(false)}
-                                    activeOpacity={0.7}
-                                    style={styles.verifiedBadge}
-                                >
-                                    <Icon name="verified" size={13} color="#1B8E5A" />
-                                    <Text style={styles.verifiedBadgeText}>Verified</Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    onPress={() => setOtpModalVisible(true)}
-                                    disabled={!canOpenOtpModal}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.verifyLink,
-                                            !canOpenOtpModal && styles.verifyLinkDisabled,
-                                        ]}
+                        {/* ── Mobile Number + OTP verification ─────────────────── */}
+                        <FieldInput
+                            label="Mobile Number"
+                            value={form.phone}
+                            onChangeText={handlePhoneChange}
+                            placeholder="10-digit mobile number"
+                            keyboardType="phone-pad"
+                            maxLength={10}
+                            required
+                            editable={!isPhoneVerified}
+                            rightIcon={
+                                isPhoneVerified ? (
+                                    <TouchableOpacity
+                                        onPress={() => setIsPhoneVerified(false)}
+                                        activeOpacity={0.7}
+                                        style={styles.verifiedBadge}
                                     >
-                                        Verify
-                                    </Text>
-                                </TouchableOpacity>
-                            )
-                        }
-                    />
-                    <FieldError message={errors.phone} />
-
-                    {/* ── Gender ─────────────────────────────────────────────── */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.fieldLabel}>
-                            Gender<Text style={styles.required}> *</Text>
-                        </Text>
-                        <View style={styles.genderRow}>
-                            {GENDER_DATA.map(gender => (
-                                <TouchableOpacity
-                                    key={gender.key}
-                                    style={[
-                                        styles.genderOption,
-                                        form.gender === gender.key && styles.genderOptionActive,
-                                    ]}
-                                    onPress={() => setForm({ ...form, gender: gender.key })}
-                                    activeOpacity={0.7}
-                                >
-                                    <Icon
-                                        name={gender.icon}
-                                        size={22}
-                                        color={
-                                            form.gender === gender.key
-                                                ? Colors.gradientStart
-                                                : Colors.textMuted
-                                        }
-                                        style={styles.genderIcon}
-                                    />
-                                    <Text
-                                        style={[
-                                            styles.genderLabel,
-                                            form.gender === gender.key && styles.genderLabelActive,
-                                        ]}
+                                        <Icon name="verified" size={13} color="#1B8E5A" />
+                                        <Text style={styles.verifiedBadgeText}>Verified</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity
+                                        onPress={() => setOtpModalVisible(true)}
+                                        disabled={!canOpenOtpModal}
+                                        activeOpacity={0.7}
                                     >
-                                        {gender.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+                                        <Text
+                                            style={[
+                                                styles.verifyLink,
+                                                !canOpenOtpModal && styles.verifyLinkDisabled,
+                                            ]}
+                                        >
+                                            Verify
+                                        </Text>
+                                    </TouchableOpacity>
+                                )
+                            }
+                        />
+                        <FieldError message={errors.phone} />
 
-                    {/* ── Address ───────────────────────────────────────────── */}
-                    <View style={styles.addressHeaderRow}>
-                        <TouchableOpacity
-                            style={[styles.locationBtn, locating && styles.locationBtnDisabled]}
-                            onPress={handleUseCurrentLocation}
-                            activeOpacity={0.75}
-                            disabled={locating}
-                        >
-                            {locating ? (
-                                <ActivityIndicator size="small" color={Colors.gradientStart} />
-                            ) : (
-                                <Icon name="my-location" size={14} color={Colors.gradientStart} />
-                            )}
-                            <Text style={styles.locationBtnText}>
-                                {locating ? 'Locating...' : 'Use current location'}
+                        {/* ── Gender ─────────────────────────────────────────────── */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.fieldLabel}>
+                                Gender<Text style={styles.required}> *</Text>
                             </Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <FieldInput
-                        label="Address"
-                        value={form.address}
-                        onChangeText={value => handleChange('address', value)}
-                        placeholder="Enter your full address"
-                        required
-                        multiline
-                    />
-                    <FieldError message={errors.address} />
-
-                    <DropdownSelect
-                        label="State"
-                        placeholder="Select state"
-                        value={form.state}
-                        onChange={handleStateChange}
-                        onSearch={searchStates}
-                        searchable
-                        required
-                        emptyText="No matching states."
-                        errorText={errors.state}
-                    />
-
-                    <DropdownSelect
-                        label="City"
-                        placeholder="Select city"
-                        value={form.city}
-                        onChange={v => {
-                            setForm(prev => ({ ...prev, city: v }));
-                            clearError('city');
-                        }}
-                        onSearch={searchCities}
-                        searchable
-                        required
-                        disabled={!form.state}
-                        disabledHint="Select a state first"
-                        emptyText="No matching cities."
-                        errorText={errors.city}
-                    />
-
-                    {/* ── Age + Pincode in one row to reduce scrolling ─────── */}
-                    <View style={styles.rowGroup}>
-                        <View style={styles.halfGroup}>
-                            <FieldInput
-                                label="Age"
-                                value={form.age > 0 ? form.age.toString() : ''}
-                                onChangeText={value => {
-                                    const num = value.replace(/[^0-9]/g, '');
-                                    setForm(prev => ({
-                                        ...prev,
-                                        age: num ? parseInt(num, 10) : 0,
-                                    }));
-                                    if (num) clearError('age');
-                                }}
-                                placeholder="Age"
-                                keyboardType="numeric"
-                                maxLength={3}
-                                required
-                            />
-                            <FieldError message={errors.age} />
+                            <View style={styles.genderRow}>
+                                {GENDER_DATA.map(gender => (
+                                    <TouchableOpacity
+                                        key={gender.key}
+                                        style={[
+                                            styles.genderOption,
+                                            form.gender === gender.key && styles.genderOptionActive,
+                                        ]}
+                                        onPress={() => setForm({ ...form, gender: gender.key })}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Icon
+                                            name={gender.icon}
+                                            size={22}
+                                            color={
+                                                form.gender === gender.key
+                                                    ? Colors.gradientStart
+                                                    : Colors.textMuted
+                                            }
+                                            style={styles.genderIcon}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.genderLabel,
+                                                form.gender === gender.key &&
+                                                    styles.genderLabelActive,
+                                            ]}
+                                        >
+                                            {gender.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
 
-                        <View style={styles.halfGroup}>
-                            <FieldInput
-                                label="Pincode"
-                                value={form.pincode}
-                                onChangeText={value =>
-                                    handleChange('pincode', value.replace(/[^0-9]/g, ''))
-                                }
-                                placeholder="6-digit"
-                                keyboardType="numeric"
-                                maxLength={6}
-                                required
-                            />
-                            <FieldError message={errors.pincode} />
-                        </View>
-                    </View>
-                </SectionCard>
-
-                {/* ── Account Security ─────────────────────────────────────── */}
-                <SectionCard icon="lock" title="Account Security">
-                    <FieldInput
-                        label="Password"
-                        value={form.password}
-                        onChangeText={value => handleChange('password', value)}
-                        placeholder="Min 6 chars"
-                        required
-                        rightIcon={
-                            <EyeIcon
-                                visible={showPassword}
-                                onToggle={() => setShowPassword(v => !v)}
-                            />
-                        }
-                        secureTextEntry={!showPassword}
-                    />
-                    <FieldError message={errors.password} />
-
-                    <FieldInput
-                        label="Confirm Password"
-                        value={form.confirmPassword}
-                        onChangeText={value => handleChange('confirmPassword', value)}
-                        placeholder="Repeat password"
-                        required
-                        rightIcon={
-                            <EyeIcon
-                                visible={showConfirmPassword}
-                                onToggle={() => setShowConfirmPassword(v => !v)}
-                            />
-                        }
-                        secureTextEntry={!showConfirmPassword}
-                    />
-                    {form.confirmPassword.length > 0 && (
-                        <View style={styles.matchRow}>
-                            <Icon
-                                name={
-                                    form.confirmPassword === form.password
-                                        ? 'check-circle'
-                                        : 'cancel'
-                                }
-                                size={14}
-                                color={
-                                    form.confirmPassword === form.password ? '#43A047' : '#E53935'
-                                }
-                            />
-                            <Text
-                                style={[
-                                    styles.matchText,
-                                    {
-                                        color:
-                                            form.confirmPassword === form.password
-                                                ? '#43A047'
-                                                : '#E53935',
-                                    },
-                                ]}
+                        {/* ── Address ───────────────────────────────────────────── */}
+                        <View style={styles.addressHeaderRow}>
+                            <TouchableOpacity
+                                style={[styles.locationBtn, locating && styles.locationBtnDisabled]}
+                                onPress={handleUseCurrentLocation}
+                                activeOpacity={0.75}
+                                disabled={locating}
                             >
-                                {form.confirmPassword === form.password
-                                    ? 'Passwords match'
-                                    : 'Passwords do not match'}
-                            </Text>
+                                {locating ? (
+                                    <ActivityIndicator size="small" color={Colors.gradientStart} />
+                                ) : (
+                                    <Icon
+                                        name="my-location"
+                                        size={14}
+                                        color={Colors.gradientStart}
+                                    />
+                                )}
+                                <Text style={styles.locationBtnText}>
+                                    {locating ? 'Locating...' : 'Use current location'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-                    )}
-                    <FieldError message={errors.confirmPassword} />
-                </SectionCard>
 
-                {/* ── Terms and Conditions ─────────────────────────────────── */}
-                <TouchableOpacity
-                    style={styles.checkboxRow}
-                    onPress={() => setAgreed(!agreed)}
-                    activeOpacity={0.7}
-                >
-                    <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-                        {agreed && <Icon name="check" size={13} color={Colors.white} />}
-                    </View>
-                    <Text style={styles.checkboxText}>
-                        I agree to the <Text style={styles.linkText}>Terms & Conditions</Text> and{' '}
-                        <Text style={styles.linkText}>Privacy Policy</Text>
-                    </Text>
-                </TouchableOpacity>
+                        <FieldInput
+                            label="Address"
+                            value={form.address}
+                            onChangeText={value => handleChange('address', value)}
+                            placeholder="Enter your full address"
+                            required
+                            multiline
+                        />
+                        <FieldError message={errors.address} />
 
-                {/* ── Register Button ──────────────────────────────────────── */}
-                <TouchableOpacity
-                    style={[styles.registerBtn, (loading || !agreed) && styles.registerBtnDisabled]}
-                    onPress={handleRegister}
-                    disabled={loading || !agreed}
-                    activeOpacity={0.8}
-                >
-                    {loading ? (
-                        <Loader type="dots" size="small" color={Colors.white} />
-                    ) : (
-                        <Text style={styles.registerBtnText}>Create Account</Text>
-                    )}
-                </TouchableOpacity>
+                        <DropdownSelect
+                            label="State"
+                            placeholder="Select state"
+                            value={form.state}
+                            onChange={handleStateChange}
+                            onSearch={searchStates}
+                            searchable
+                            required
+                            emptyText="No matching states."
+                            errorText={errors.state}
+                        />
 
-                {/* ── Login Link ───────────────────────────────────────────── */}
-                <TouchableOpacity
-                    style={styles.loginLink}
-                    onPress={() => navigation.navigate('Login')}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.loginText}>
-                        Already have an account?{' '}
-                        <Text style={styles.loginLinkText}>Login here</Text>
-                    </Text>
-                </TouchableOpacity>
-            </ScrollView>
+                        <DropdownSelect
+                            label="City"
+                            placeholder="Select city"
+                            value={form.city}
+                            onChange={v => {
+                                setForm(prev => ({ ...prev, city: v }));
+                                clearError('city');
+                            }}
+                            onSearch={searchCities}
+                            searchable
+                            required
+                            disabled={!form.state}
+                            disabledHint="Select a state first"
+                            emptyText="No matching cities."
+                            errorText={errors.city}
+                        />
+
+                        {/* ── Age + Pincode in one row to reduce scrolling ─────── */}
+                        <View style={styles.rowGroup}>
+                            <View style={styles.halfGroup}>
+                                <FieldInput
+                                    label="Age"
+                                    value={form.age > 0 ? form.age.toString() : ''}
+                                    onChangeText={value => {
+                                        const num = value.replace(/[^0-9]/g, '');
+                                        setForm(prev => ({
+                                            ...prev,
+                                            age: num ? parseInt(num, 10) : 0,
+                                        }));
+                                        if (num) clearError('age');
+                                    }}
+                                    placeholder="Age"
+                                    keyboardType="numeric"
+                                    maxLength={3}
+                                    required
+                                />
+                                <FieldError message={errors.age} />
+                            </View>
+
+                            <View style={styles.halfGroup}>
+                                <FieldInput
+                                    label="Pincode"
+                                    value={form.pincode}
+                                    onChangeText={value =>
+                                        handleChange('pincode', value.replace(/[^0-9]/g, ''))
+                                    }
+                                    placeholder="6-digit"
+                                    keyboardType="numeric"
+                                    maxLength={6}
+                                    required
+                                />
+                                <FieldError message={errors.pincode} />
+                            </View>
+                        </View>
+                    </SectionCard>
+
+                    {/* ── Account Security ─────────────────────────────────────── */}
+                    <SectionCard icon="lock" title="Account Security">
+                        <FieldInput
+                            label="Password"
+                            value={form.password}
+                            onChangeText={value => handleChange('password', value)}
+                            placeholder="Min 6 chars"
+                            required
+                            rightIcon={
+                                <EyeIcon
+                                    visible={showPassword}
+                                    onToggle={() => setShowPassword(v => !v)}
+                                />
+                            }
+                            secureTextEntry={!showPassword}
+                        />
+                        <FieldError message={errors.password} />
+
+                        <FieldInput
+                            label="Confirm Password"
+                            value={form.confirmPassword}
+                            onChangeText={value => handleChange('confirmPassword', value)}
+                            placeholder="Repeat password"
+                            required
+                            rightIcon={
+                                <EyeIcon
+                                    visible={showConfirmPassword}
+                                    onToggle={() => setShowConfirmPassword(v => !v)}
+                                />
+                            }
+                            secureTextEntry={!showConfirmPassword}
+                        />
+                        {form.confirmPassword.length > 0 && (
+                            <View style={styles.matchRow}>
+                                <Icon
+                                    name={
+                                        form.confirmPassword === form.password
+                                            ? 'check-circle'
+                                            : 'cancel'
+                                    }
+                                    size={14}
+                                    color={
+                                        form.confirmPassword === form.password
+                                            ? '#43A047'
+                                            : '#E53935'
+                                    }
+                                />
+                                <Text
+                                    style={[
+                                        styles.matchText,
+                                        {
+                                            color:
+                                                form.confirmPassword === form.password
+                                                    ? '#43A047'
+                                                    : '#E53935',
+                                        },
+                                    ]}
+                                >
+                                    {form.confirmPassword === form.password
+                                        ? 'Passwords match'
+                                        : 'Passwords do not match'}
+                                </Text>
+                            </View>
+                        )}
+                        <FieldError message={errors.confirmPassword} />
+                    </SectionCard>
+
+                    {/* ── Terms and Conditions ─────────────────────────────────── */}
+                    <TouchableOpacity
+                        style={styles.checkboxRow}
+                        onPress={() => setAgreed(!agreed)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+                            {agreed && <Icon name="check" size={13} color={Colors.white} />}
+                        </View>
+                        <Text style={styles.checkboxText}>
+                            I agree to the <Text style={styles.linkText}>Terms & Conditions</Text>{' '}
+                            and <Text style={styles.linkText}>Privacy Policy</Text>
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* ── Register Button ──────────────────────────────────────── */}
+                    <TouchableOpacity
+                        style={[
+                            styles.registerBtn,
+                            (loading || !agreed) && styles.registerBtnDisabled,
+                        ]}
+                        onPress={handleRegister}
+                        disabled={loading || !agreed}
+                        activeOpacity={0.8}
+                    >
+                        {loading ? (
+                            <Loader type="dots" size="small" color={Colors.white} />
+                        ) : (
+                            <Text style={styles.registerBtnText}>Create Account</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* ── Login Link ───────────────────────────────────────────── */}
+                    <TouchableOpacity
+                        style={styles.loginLink}
+                        onPress={() => navigation.navigate('Login')}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.loginText}>
+                            Already have an account?{' '}
+                            <Text style={styles.loginLinkText}>Login here</Text>
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* ── Reusable OTP verification modal ──────────────────────────── */}
             <OtpVerificationModal

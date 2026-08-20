@@ -28,6 +28,7 @@ import {
     INITIAL_DOCUMENTS,
 } from '../types/VendorRegistration';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { addressToCoordinates } from '@/utils/geocoding';
 
 type VendorRegisterProps = NativeStackScreenProps<RootStackParamList, 'VendorRegister'>;
 
@@ -47,7 +48,7 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
     const scrollRef = useRef<ScrollView>(null);
 
     // ── Field updater ──────────────────────────────────────────────────────────
-    const updateField = (key: keyof VendorForm, value: string | string[]) => {
+    const updateField = (key: keyof VendorForm, value: string | string[] | number) => {
         setForm(prev => ({ ...prev, [key]: value }));
     };
 
@@ -124,6 +125,23 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
     const handleSubmit = async () => {
         if (!validateStep(step)) return;
 
+        if (form.latitude == 0 && form.longitude == 0) {
+            const addressToConvert = `${form.address}, ${form.city}, ${form.state}, ${form.pincode}`;
+            const coords = await addressToCoordinates(addressToConvert);
+
+            if (!coords) {
+                console.error('Coords not found');
+            }
+
+            
+            setForm({
+                ...form,
+                longitude: coords?.coordinates?.longitude ?? 0,
+                latitude: coords?.coordinates?.latitude ?? 0,
+            });
+            
+        }
+
         const formData = new FormData();
 
         formData.append('name', form.name.trim());
@@ -138,6 +156,8 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
         formData.append('address', form.address.trim());
         formData.append('city', form.city.trim());
         formData.append('state', form.state.trim());
+        formData.append('longitude', form.longitude);
+        formData.append('latitude', form.latitude);
         formData.append('pincode', form.pincode.trim());
         formData.append('bio', form.bio.trim());
         formData.append('specialization', form.specialization.trim());
@@ -163,6 +183,8 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
             }
         });
 
+        
+        
         setLoading(true);
         try {
             const response = await vendorAPI.registerVendor(formData);

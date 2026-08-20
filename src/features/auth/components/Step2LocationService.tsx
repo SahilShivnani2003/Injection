@@ -14,7 +14,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type Props = {
     form: VendorForm;
-    updateField: (key: keyof VendorForm, value: string | string[]) => void;
+    updateField: (key: keyof VendorForm, value: string | string[] | number) => void;
 };
 
 const StepLocationServices = ({ form, updateField }: Props) => {
@@ -52,7 +52,13 @@ const StepLocationServices = ({ form, updateField }: Props) => {
         setLocating(true);
         try {
             const coords = await getCurrentCoordinates();
-            debugger
+            if(!coords){
+                alert.error('Locatio Error', "Could not determine your co-oridnated. Please enter it manually.")
+                return;
+            }
+            updateField('longitude', coords.longitude);
+            updateField('latitude', coords.latitude);
+
             const geocoded = await coordinatesToAddress(coords);
 
             if (!geocoded) {
