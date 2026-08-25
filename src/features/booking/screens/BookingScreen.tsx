@@ -186,7 +186,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
 
     /* ── Step validation ── */
     const warn = (msg: string): false => {
-        Alert.alert('Required', msg);
+        alert.error('Required', msg);
         return false;
     };
 

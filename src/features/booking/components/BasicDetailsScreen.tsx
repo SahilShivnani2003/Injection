@@ -1,13 +1,14 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors } from '../../../theme/colors';
 import { FieldInput } from '../../../components/FieldInput';
 import { DropdownSelect } from '../../../components/DropdownSelect'; // adjust path if different
 import { BookingFormData } from '../screens/BookingScreen';
-import { getStates, getCitiesByState } from '@/utils/location'; 
+import { getStates, getCitiesByState } from '@/utils/location';
 import { getCurrentCoordinates, LocationPermissionDeniedError } from '@/utils/deviceLocation'; // adjust path
-import { coordinatesToAddress } from '../../../utils/geocoding'; // adjust path
+import { coordinatesToAddress, addressToCoordinates } from '../../../utils/geocoding'; // adjust path
+import { useAlert } from '@/context/AlertContext';
 
 const SEX_OPTIONS = ['Male', 'Female', 'Other'];
 
@@ -36,6 +37,9 @@ interface BasicDetailsScreenProps {
      */
     onChange: (field: keyof BookingFormData, value: string) => void;
 }
+
+const ADDRESS_GEOCODE_DEBOUNCE_MS = 900;
+const MIN_ADDRESS_LENGTH_FOR_GEOCODE = 8; // avoid firing on "12 M" etc.
 
 /* ─────────────────────── Sex selector ─────────────────────── */
 
@@ -80,8 +84,15 @@ const SectionLabel: React.FC<{ title: string }> = ({ title }) => (
 /* ─────────────────────── Main Screen ─────────────────────── */
 
 const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, onChange }) => {
+    const alert = useAlert();
     const [locating, setLocating] = useState(false);
     const [locationError, setLocationError] = useState<string | null>(null);
+
+    // Manual-address → coordinates geocoding state
+    const [addressGeocoding, setAddressGeocoding] = useState(false);
+    const [addressGeocodeError, setAddressGeocodeError] = useState<string | null>(null);
+    const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastGeocodedAddress = useRef<string>('');
 
     const handlePatientName = useCallback((v: string) => onChange('patientName', v), [onChange]);
     const handleAge = useCallback(
@@ -89,7 +100,7 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
         [onChange],
     );
     const handleSex = useCallback((v: string) => onChange('sex', v), [onChange]);
-    const handleAddress = useCallback((v: string) => onChange('address', v), [onChange]);
+
     const handlePincode = useCallback(
         (v: string) => onChange('pincode', v.replace(/[^0-9]/g, '')),
         [onChange],
@@ -104,8 +115,6 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
     const handleStateChange = useCallback(
         (v: string) => {
             onChange('state', v);
-            // Reset city whenever the state changes, since the old city
-            // may not belong to the newly selected state.
             onChange('city', '');
         },
         [onChange],
@@ -127,12 +136,92 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
         [basicDetails.state],
     );
 
+    // ── Manual address entry → forward geocode → fill state/city/pincode/coords ──
+    const runAddressGeocode = useCallback(
+        async (address: string) => {
+            if (address.trim().length < MIN_ADDRESS_LENGTH_FOR_GEOCODE) return;
+
+            setAddressGeocoding(true);
+            setAddressGeocodeError(null);
+            try {
+                const geocoded = await addressToCoordinates(address);
+                if (geocoded) {
+                    // Don't clobber what the user typed in the free-text field;
+                    // just fill in the structured fields we derived from it.
+                    onChange('pincode', geocoded.pincode || '');
+                    onChange('state', geocoded.state || '');
+                    onChange('city', geocoded.city || '');
+                    onChange(
+                        'currentLocation',
+                        `${geocoded.coordinates.latitude},${geocoded.coordinates.longitude}`,
+                    );
+                    lastGeocodedAddress.current = address;                    
+                } else {
+                    setAddressGeocodeError(
+                        'Could not locate that address. Please check state/city/pin code manually.',
+                    );
+                }
+            } catch (err) {
+                setAddressGeocodeError(
+                    'Could not verify that address right now. Please check state/city/pin code manually.',
+                );
+
+                if (err instanceof LocationPermissionDeniedError) {
+                    alert.error(
+                        'Permission Denied',
+                        'Location access is needed to auto-fill your address. You can still enter it manually.',
+                    );
+                } else {
+                    console.error('Error getting current location:', err);
+                    alert.error('Location Error', 'Unable to fetch your current location.');
+                }
+            } finally {
+                setAddressGeocoding(false);
+            }
+        },
+        [onChange],
+    );
+
+    const handleAddress = useCallback(
+        (v: string) => {
+            onChange('address', v);
+            setAddressGeocodeError(null);
+
+            if (geocodeTimer.current) {
+                clearTimeout(geocodeTimer.current);
+                geocodeTimer.current = null;
+            }
+
+            if (v.trim().length < MIN_ADDRESS_LENGTH_FOR_GEOCODE) return;
+
+            // FieldInput doesn't forward onBlur, so debounced onChangeText
+            // is the only trigger point available here.
+            geocodeTimer.current = setTimeout(() => {
+                runAddressGeocode(v);
+            }, ADDRESS_GEOCODE_DEBOUNCE_MS);
+        },
+        [onChange, runAddressGeocode],
+    );
+
+    useEffect(() => {
+        return () => {
+            if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+        };
+    }, []);
+
     // ── Use current location ──
     const handleUseCurrentLocation = useCallback(async () => {
         setLocating(true);
         setLocationError(null);
         try {
             const coords = await getCurrentCoordinates();
+            debugger;
             const geocoded = await coordinatesToAddress(coords);
             if (geocoded) {
                 onChange('address', geocoded.addressLine || geocoded.formattedAddress);
@@ -141,8 +230,9 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
                 onChange('city', geocoded.city);
                 onChange(
                     'currentLocation',
-                    `${coords.longitude ?? coords.latitude}`, // keep if you store lat/lng string elsewhere
+                    `${geocoded.coordinates.latitude},${geocoded.coordinates.longitude}`,
                 );
+                lastGeocodedAddress.current = geocoded.addressLine || geocoded.formattedAddress;
             } else {
                 setLocationError('Could not detect your address. Please enter it manually.');
             }
@@ -215,6 +305,13 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
                 multiline
                 placeholder="House no., street, locality"
             />
+            {addressGeocoding && (
+                <View style={styles.inlineStatusRow}>
+                    <ActivityIndicator size="small" color={Colors.gradientStart} />
+                    <Text style={styles.inlineStatusText}>Locating address...</Text>
+                </View>
+            )}
+            {!!addressGeocodeError && <Text style={styles.errorText}>{addressGeocodeError}</Text>}
 
             <DropdownSelect
                 label="State"
@@ -347,6 +444,18 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 12,
         marginTop: -8,
+    },
+    inlineStatusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+        marginTop: -8,
+    },
+    inlineStatusText: {
+        fontSize: 11,
+        color: Colors.textMuted,
+        fontWeight: '500',
     },
 });
 
