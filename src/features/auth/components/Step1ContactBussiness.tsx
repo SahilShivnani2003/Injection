@@ -5,7 +5,7 @@ import { VendorForm, BUSINESS_TYPES } from '../types/VendorRegistration';
 import { FieldInput } from '../../../components/FieldInput';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAlert } from '@/context/AlertContext';
-import { OtpService } from '@/service/apis/otpService';
+import { ISendOtp, OtpService } from '@/service/apis/otpService';
 import OtpVerificationModal from '../models/OtpVerificationModal';
 
 type Props = {
@@ -104,7 +104,12 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
     // ── OTP modal callbacks ──────────────────────────────────────────────────
     const sendOtpRequest = async (phone: string): Promise<boolean> => {
         try {
-            const response = await OtpService.sendOtp(phone);
+            const data: ISendOtp = {
+                phone: phone,
+                type: 'vendor',
+                isForgotPassword: false,
+            };
+            const response = await OtpService.sendOtp(data);
             return !!response.data?.success;
         } catch (error) {
             return false;

@@ -253,6 +253,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             style={styles.forgotPassword}
                             activeOpacity={0.7}
                             disabled={isLoading}
+                            onPress={()=> navigation.navigate('forgotPassword')}
                         >
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>

@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    ActivityIndicator,
+    Image,
+    Alert,
+    Platform,
+} from 'react-native';
+import { launchImageLibrary, launchCamera, Asset } from 'react-native-image-picker';
 import { pick, types } from '@react-native-documents/picker';
 import { FieldInput } from '../../../components/FieldInput';
 import { Colors } from '../../../theme/colors';
@@ -23,7 +32,7 @@ const DOCUMENT_FIELDS: { field: DocumentField; label: string; icon: string }[] =
     { field: 'qualificationCertificate', label: 'Qualification', icon: 'school' },
     { field: 'businessLicense', label: 'Business License', icon: 'store' },
     { field: 'insuranceCertificate', label: 'Insurance Cert', icon: 'health-and-safety' },
-    { field: 'policeVerification', label: 'Police Verification', icon: 'verified-user' }
+    { field: 'policeVerification', label: 'Police Verification', icon: 'verified-user' },
 ];
 
 // ── Section header (matches StepContactBusiness style) ────────────────────────
@@ -106,20 +115,50 @@ const StepBankDocuments = ({
         }
     };
 
-    // ── Profile image picker ───────────────────────────────────────────────────
-    const handleSelectProfileImage = async () => {
+    // ── Shared: convert a picker asset into our upload file shape ───────────────
+    const assetToFile = (asset: Asset, fallbackName: string) => ({
+        uri: asset.uri ?? '',
+        name: asset.fileName ?? fallbackName,
+        type: asset.type ?? 'image/jpeg',
+    });
+
+    // ── Profile image: camera ────────────────────────────────────────────────
+    const captureProfilePhoto = async () => {
+        try {
+            const result = await launchCamera({
+                mediaType: 'photo',
+                quality: 0.7,
+                saveToPhotos: true,
+            });
+            if (result.didCancel) return;
+            if (result.errorCode) {
+                onImageError(
+                    result.errorCode === 'camera_unavailable'
+                        ? 'Camera is not available on this device.'
+                        : 'Unable to access the camera.',
+                );
+                return;
+            }
+            if (!result.assets?.[0]) return;
+
+            const file = assetToFile(result.assets[0], 'profile.jpg');
+            setUploadingField('profile');
+            await handleUpload(file, true);
+        } catch {
+            onImageError('Unable to open the camera.');
+        } finally {
+            setUploadingField(null);
+        }
+    };
+
+    // ── Profile image: gallery ───────────────────────────────────────────────
+    const pickProfileFromLibrary = async () => {
         try {
             const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
             if (result.didCancel) return;
             if (!result.assets?.[0]) return;
 
-            const asset = result.assets[0];
-            const file = {
-                uri: asset.uri ?? '',
-                name: asset.fileName ?? 'profile.jpg',
-                type: asset.type ?? 'image/jpeg',
-            };
-
+            const file = assetToFile(result.assets[0], 'profile.jpg');
             setUploadingField('profile');
             await handleUpload(file, true);
         } catch {
@@ -129,8 +168,51 @@ const StepBankDocuments = ({
         }
     };
 
-    // ── Document picker ────────────────────────────────────────────────────────
-    const handlePickDocument = async (field: DocumentField) => {
+    // ── Profile image: entry point — choose source ───────────────────────────
+    const handleSelectProfileImage = () => {
+        Alert.alert(
+            'Profile Image',
+            'Choose a source',
+            [
+                { text: 'Take Photo', onPress: captureProfilePhoto },
+                { text: 'Choose from Library', onPress: pickProfileFromLibrary },
+                { text: 'Cancel', style: 'cancel' },
+            ],
+            { cancelable: true },
+        );
+    };
+
+    // ── Document: camera ─────────────────────────────────────────────────────
+    const captureDocumentPhoto = async (field: DocumentField) => {
+        try {
+            const result = await launchCamera({
+                mediaType: 'photo',
+                quality: 0.8,
+                saveToPhotos: true,
+            });
+            if (result.didCancel) return;
+            if (result.errorCode) {
+                onImageError(
+                    result.errorCode === 'camera_unavailable'
+                        ? 'Camera is not available on this device.'
+                        : 'Unable to access the camera.',
+                );
+                return;
+            }
+            if (!result.assets?.[0]) return;
+
+            const file = assetToFile(result.assets[0], `${field}.jpg`);
+            setUploadingField(field);
+            await handleUpload(file, false, field);
+        } catch {
+            onImageError('Unable to open the camera.');
+        } finally {
+            setUploadingField(null);
+        }
+    };
+
+    // ── Document: file/gallery picker ────────────────────────────────────────
+    const pickDocumentFile = async (field: DocumentField) => {
         try {
             const [result] = await pick({
                 type: [types.pdf, types.doc, types.docx, types.images],
@@ -151,6 +233,20 @@ const StepBankDocuments = ({
         } finally {
             setUploadingField(null);
         }
+    };
+
+    // ── Document: entry point — choose source ────────────────────────────────
+    const handlePickDocument = (field: DocumentField) => {
+        Alert.alert(
+            'Upload Document',
+            'Choose a source',
+            [
+                { text: 'Take Photo', onPress: () => captureDocumentPhoto(field) },
+                { text: 'Choose File', onPress: () => pickDocumentFile(field) },
+                { text: 'Cancel', style: 'cancel' },
+            ],
+            { cancelable: true },
+        );
     };
 
     // ── Remove helpers ─────────────────────────────────────────────────────────
@@ -218,7 +314,7 @@ const StepBankDocuments = ({
                         {profileImage ? 'Profile image uploaded' : 'Select profile image'}
                     </Text>
                     <Text style={styles.imageSubLabel}>
-                        {profileImage ? 'Tap to change photo' : 'JPG or PNG, max 5MB'}
+                        {profileImage ? 'Tap to change photo' : 'Camera or gallery, max 5MB'}
                     </Text>
                 </View>
 
@@ -238,7 +334,9 @@ const StepBankDocuments = ({
 
             {/* ── Verification Documents ── */}
             <SectionHeader icon="folder-open" title="Verification Documents" />
-            <Text style={styles.hint}>Upload PDF, DOC, or image files for each document.</Text>
+            <Text style={styles.hint}>
+                Take a photo or upload a PDF/DOC/image for each document.
+            </Text>
 
             {DOCUMENT_FIELDS.map(item => {
                 const url = documents[item.field];

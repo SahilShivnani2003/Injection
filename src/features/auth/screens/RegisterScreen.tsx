@@ -21,7 +21,7 @@ import { Colors } from '@/theme/colors';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { RegisterForm } from '../types/RegisterForm';
 import { useAuthStore } from '@/store/useAuthStore';
-import { OtpService } from '@/service/apis/otpService';
+import { ISendOtp, OtpService } from '@/service/apis/otpService';
 import { getCurrentCoordinates, LocationPermissionDeniedError } from '@/utils/deviceLocation';
 import { addressToCoordinates, coordinatesToAddress } from '@/utils/geocoding';
 import { getCitiesByState, getStates } from '@/utils/location';
@@ -244,7 +244,12 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
     // ── OTP modal callbacks ──────────────────────────────────────────────────
     const sendOtpRequest = async (phone: string): Promise<boolean> => {
         try {
-            const response = await OtpService.sendOtp(phone);
+            const data: ISendOtp= {
+                phone: phone,
+                type: 'user',
+                isForgotPassword: false
+            }
+            const response = await OtpService.sendOtp(data);
             return !!response.data?.success;
         } catch (error) {
             return false;

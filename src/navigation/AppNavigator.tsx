@@ -18,6 +18,7 @@ import { NotificationScreen } from '@/features/notification/screen/NotificationS
 import { UserProfileEditScreen } from '@/features/profile/screens/UserProfileEditScreen';
 import { BookingMapScreen } from '@/features/booking/screens/BookingMapScreen';
 import { VendorBookingDetailScreen } from '@/features/booking/screens/VendorBookinDetailScreen';
+import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreeen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -39,6 +40,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="Login" component={LoginScreen} />
                     <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
                     <Stack.Screen name="Register" component={RegisterScreen} />
+                    <Stack.Screen name="forgotPassword" component={ForgotPasswordScreen}/>
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
                     <Stack.Screen name="VendorRegister" component={VendorRegisterScreen} />
                     <Stack.Screen name="VendorTab" component={VendorTabNavigation} />

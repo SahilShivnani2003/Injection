@@ -177,7 +177,10 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     };
 
     useEffect(() => {
-         fetchDashboardData();
+        setTimeout(() => {
+             fetchDashboardData();
+        }, 1000);
+        
     }, []);
 
     const onRefresh = async() => {

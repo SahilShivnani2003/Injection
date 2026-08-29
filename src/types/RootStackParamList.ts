@@ -8,6 +8,7 @@ export type RootStackParamList = {
     Login: undefined;
     EmailLogin: undefined;
     Register: undefined;
+    forgotPassword: undefined;
     BasicDetails: undefined;
     UploadPrescription: undefined;
     Requirements: undefined;

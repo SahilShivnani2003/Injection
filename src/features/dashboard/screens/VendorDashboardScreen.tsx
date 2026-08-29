@@ -93,7 +93,9 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
     }, []);
 
     useEffect(() => {
-        fetchMetrics();
+        setTimeout(() => {
+            fetchMetrics();
+        }, 1000);
     }, [fetchMetrics]);
 
     const onRefresh = useCallback(() => {
@@ -370,7 +372,7 @@ const styles = StyleSheet.create({
     headerRight: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: 6
+        gap: 6,
     },
     greeting: {
         color: Colors.white,
