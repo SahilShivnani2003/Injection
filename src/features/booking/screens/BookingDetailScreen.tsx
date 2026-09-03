@@ -24,6 +24,8 @@ import { Booking, BookingStatus, PaymentStatus } from '../types/Booking';
 import { useAlert } from '@/context/AlertContext';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { TimeDropdown, Calendar } from '../components/SlotBookingScreen';
+import { cancelBooking } from '@/service/apis/bookingService';
 
 const { width } = Dimensions.get('window');
 
@@ -297,6 +299,36 @@ const formatPaymentMethod = (method?: string | null) => {
 
 // ─── Reschedule Modal ─────────────────────────────────────────────────────────
 
+const STATIC_TIMES: string[] = [
+    '9:00',
+    '10:00',
+    '11:00',
+    '12:00',
+    '13:00',
+    '14:00',
+    '15:00',
+    '16:00',
+    '17:00',
+];
+
+const MONTH_NAMES = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+];
+
+const toDateKey = (y: number, m: number, d: number) =>
+    `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
 interface RescheduleModalProps {
     visible: boolean;
     loading: boolean;
@@ -313,61 +345,100 @@ const RescheduleModal = ({
     onChange,
     onConfirm,
     onClose,
-}: RescheduleModalProps) => (
-    <Modal
-        visible={visible}
-        transparent
-        animationType="slide"
-        onRequestClose={onClose}
-        statusBarTranslucent
-    >
-        <KeyboardAvoidingView
-            style={modalStyles.overlay}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+}: RescheduleModalProps) => {
+    const [showCalendar, setShowCalendar] = useState(false);
+    const today = new Date();
+    const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+    const formatDisplayDate = (key: string) => {
+        const [y, m, d] = key.split('-').map(Number);
+        return `${d} ${MONTH_NAMES[m - 1]} ${y}`;
+    };
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <TouchableOpacity style={modalStyles.backdrop} activeOpacity={1} onPress={onClose} />
+            <KeyboardAvoidingView
+                style={modalStyles.overlay}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <TouchableOpacity style={modalStyles.backdrop} activeOpacity={1} onPress={onClose} />
 
-            <View style={modalStyles.sheet}>
-                {/* Handle */}
-                <View style={modalStyles.handle} />
+                <View style={modalStyles.sheet}>
+                    {/* Handle */}
+                    <View style={modalStyles.handle} />
 
-                {/* Title */}
-                <View style={modalStyles.titleRow}>
-                    <View style={modalStyles.titleIcon}>
-                        <Text style={{ fontSize: 20 }}>📅</Text>
+                    {/* Title */}
+                    <View style={modalStyles.titleRow}>
+                        <View style={modalStyles.titleIcon}>
+                            <Ionicons name="calendar-outline" color={Colors.accentDark} size={24} />
+                        </View>
+                        <View>
+                            <Text style={modalStyles.title}>Reschedule Booking</Text>
+                            <Text style={modalStyles.subtitle}>
+                                Choose a new date, time &amp; reason
+                            </Text>
+                        </View>
                     </View>
-                    <View>
-                        <Text style={modalStyles.title}>Reschedule Booking</Text>
-                        <Text style={modalStyles.subtitle}>
-                            Choose a new date, time &amp; reason
-                        </Text>
-                    </View>
-                </View>
 
-                {/* Date Field */}
-                <View style={modalStyles.fieldGroup}>
-                    <Text style={modalStyles.fieldLabel}>New Date</Text>
-                    <View style={modalStyles.inputWrapper}>
-                        <Text style={modalStyles.inputIcon}>📆</Text>
-                        <TextInput
-                            style={modalStyles.input}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor="#B0BEC5"
-                            value={form.newDate}
-                            onChangeText={v => onChange('newDate', v)}
-                            keyboardType="numbers-and-punctuation"
-                            maxLength={10}
-                            editable={!loading}
-                        />
-                    </View>
-                </View>
+                    {/* Date Field */}
+                    <View style={modalStyles.fieldGroup}>
+                        <Text style={modalStyles.fieldLabel}>New Date</Text>
+                        <View>
 
-                {/* Time Field */}
-                <View style={modalStyles.fieldGroup}>
-                    <Text style={modalStyles.fieldLabel}>Preferred Time</Text>
-                    <View style={modalStyles.inputWrapper}>
-                        <Text style={modalStyles.inputIcon}>🕐</Text>
-                        <TextInput
+                            <TouchableOpacity
+                                style={modalStyles.inputWrapper}
+                                onPress={() => setShowCalendar(true)}
+                                disabled={loading}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="calendar-clear-outline" color={Colors.gradientStart} size={16} />
+
+                                <Text style={modalStyles.input}>
+                                    {form.newDate
+                                        ? formatDisplayDate(form.newDate)
+                                        : 'Select date'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* <Text style={modalStyles.inputIcon}>📆</Text>
+                            <Text style={modalStyles.input}>{formatDisplayDate(form.newDate) || ''}</Text> */}
+                            {showCalendar && (<Calendar
+                                selectedDate={form.newDate}
+                                minDateKey={todayKey}
+                                onSelectDate={date => {
+                                    onChange('newDate', date);
+                                    setShowCalendar(false);
+                                }}
+                            />)}
+                            {/* <TextInput
+                                style={modalStyles.input}
+                                placeholder="YYYY-MM-DD"
+                                placeholderTextColor="#B0BEC5"
+                                value={form.newDate}
+                                onChangeText={v => onChange('newDate', v)}
+                                keyboardType="numbers-and-punctuation"
+                                maxLength={10}
+                                editable={!loading}
+                            /> */}
+                        </View>
+                    </View>
+
+                    {/* Time Field */}
+                    <View style={modalStyles.fieldGroup}>
+                        <Text style={modalStyles.fieldLabel}>Preferred Time</Text>
+                        <View >
+                            {/* <Text style={modalStyles.inputIcon}>🕐</Text> */}
+                            <TimeDropdown
+                                times={STATIC_TIMES}
+                                selected={form.newTime}
+                                onSelect={v => onChange('newTime', v)}
+                            />
+                            {/* <TextInput
                             style={modalStyles.input}
                             placeholder="HH:MM  (24-hr format, e.g. 09:30)"
                             placeholderTextColor="#B0BEC5"
@@ -376,67 +447,68 @@ const RescheduleModal = ({
                             keyboardType="numbers-and-punctuation"
                             maxLength={5}
                             editable={!loading}
-                        />
+                        /> */}
+                        </View>
                     </View>
-                </View>
 
-                {/* Reason Field */}
-                <View style={modalStyles.fieldGroup}>
-                    <Text style={modalStyles.fieldLabel}>Reason for Rescheduling</Text>
-                    <View style={[modalStyles.inputWrapper, modalStyles.textAreaWrapper]}>
-                        <TextInput
-                            style={[modalStyles.input, modalStyles.textArea]}
-                            placeholder="e.g. Patient unavailable, need to change time slot..."
-                            placeholderTextColor="#B0BEC5"
-                            value={form.reason}
-                            onChangeText={v => onChange('reason', v)}
-                            multiline
-                            numberOfLines={3}
-                            textAlignVertical="top"
-                            editable={!loading}
-                        />
+                    {/* Reason Field */}
+                    <View style={modalStyles.fieldGroup}>
+                        <Text style={modalStyles.fieldLabel}>Reason for Rescheduling</Text>
+                        <View style={[modalStyles.inputWrapper, modalStyles.textAreaWrapper]}>
+                            <TextInput
+                                style={[modalStyles.input, modalStyles.textArea]}
+                                placeholder="e.g. Patient unavailable, need to change time slot..."
+                                placeholderTextColor="#B0BEC5"
+                                value={form.reason}
+                                onChangeText={v => onChange('reason', v)}
+                                multiline
+                                numberOfLines={3}
+                                textAlignVertical="top"
+                                editable={!loading}
+                            />
+                        </View>
                     </View>
-                </View>
 
-                {/* Buttons */}
-                <View style={modalStyles.buttonRow}>
-                    <TouchableOpacity
-                        style={modalStyles.cancelBtn}
-                        onPress={onClose}
-                        disabled={loading}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={modalStyles.cancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[modalStyles.confirmBtn, loading && { opacity: 0.7 }]}
-                        onPress={onConfirm}
-                        disabled={loading}
-                        activeOpacity={0.8}
-                    >
-                        <LinearGradient
-                            colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={modalStyles.confirmGradient}
+                    {/* Buttons */}
+                    <View style={modalStyles.buttonRow}>
+                        <TouchableOpacity
+                            style={modalStyles.cancelBtn}
+                            onPress={onClose}
+                            disabled={loading}
+                            activeOpacity={0.8}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" size="small" />
-                            ) : (
-                                <Text style={modalStyles.confirmBtnText}>Confirm Reschedule</Text>
-                            )}
-                        </LinearGradient>
-                    </TouchableOpacity>
+                            <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[modalStyles.confirmBtn, loading && { opacity: 0.7 }]}
+                            onPress={onConfirm}
+                            disabled={loading}
+                            activeOpacity={0.8}
+                        >
+                            <LinearGradient
+                                colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={modalStyles.confirmGradient}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={modalStyles.confirmBtnText}>Confirm Reschedule</Text>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
-        </KeyboardAvoidingView>
-    </Modal>
-);
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+};
 
 const modalStyles = StyleSheet.create({
     overlay: { flex: 1, justifyContent: 'flex-end' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+    backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
     sheet: {
         backgroundColor: '#fff',
         borderTopLeftRadius: 28,
@@ -550,9 +622,11 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     // ── Cancel ─────────────────────────────────────────────────────────────────
 
     const handleCancelBooking = async () => {
+        debugger
         try {
-            const response = await bookingAPI.CancelBooking(bookingId);
-            if (response.data?.success) {
+            // const response = await bookingAPI.CancelBooking(bookingId);
+            const response = await cancelBooking(bookingId);
+            if (response?.success) {
                 // Optimistically update local state
                 setBooking(prev =>
                     prev ? { ...prev, bookingStatus: 'cancelled', cancelledAt: new Date() } : prev,
@@ -1001,11 +1075,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 label="Booked For"
                                 value={
                                     booking.familyMemberId.name
-                                        ? `${booking.familyMemberId.name}${
-                                              booking.familyMemberId.relation
-                                                  ? ` (${booking.familyMemberId.relation})`
-                                                  : ''
-                                          }`
+                                        ? `${booking.familyMemberId.name}${booking.familyMemberId.relation
+                                            ? ` (${booking.familyMemberId.relation})`
+                                            : ''
+                                        }`
                                         : 'Family Member'
                                 }
                                 accent

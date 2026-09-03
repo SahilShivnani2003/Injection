@@ -67,7 +67,7 @@ const STAFF_OPTIONS: { id: StaffPreference; icon: string }[] = [
 
 /* ─────────────────────── Calendar ─────────────────────── */
 
-const Calendar: React.FC<{
+export const Calendar: React.FC<{
     selectedDate: string | null;
     onSelectDate: (d: string) => void;
     minDateKey: string;
@@ -193,10 +193,11 @@ const calStyles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    grid: { flexDirection: 'row', flexWrap: 'wrap' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
     cell: {
         width: `${100 / 7}%` as any,
-        aspectRatio: 1,
+        height: 30,
+        // aspectRatio: 1,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 100,
@@ -212,7 +213,7 @@ const calStyles = StyleSheet.create({
 
 /* ─────────────────────── Time Dropdown ─────────────────────── */
 
-const TimeDropdown: React.FC<{
+export const TimeDropdown: React.FC<{
     times: string[];
     selected: string | null;
     onSelect: (t: string) => void;
@@ -378,7 +379,7 @@ const SlotBookingScreen: React.FC<SlotBookingScreenProps> = ({
                 <Text style={styles.sectionTitle}>Select Preferred Date</Text>
                 {selectedDate && (
                     <View style={{ flexDirection: 'row' }}>
-                        <MaterialCommunityIcons name='calendar-month-outline' size={23} style={{ color: Colors.gradientEnd,}} />
+                        <MaterialCommunityIcons name='calendar-month-outline' size={23} style={{ color: Colors.gradientEnd, }} />
                         <Text style={styles.selectedBadge}>{formatDisplayDate(selectedDate)}</Text>
                     </View>
                 )}

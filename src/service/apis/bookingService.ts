@@ -8,7 +8,7 @@ export const bookingAPI = {
   vendorBookings: () => privateClient.get('/bookings/vendor/me'),
   availableBookings: () => privateClient.get('/bookings/available'),
   getBookingDetails: (bookingId: string) => privateClient.get(`/bookings/${bookingId}`),
-  CancelBooking: (data: any) => privateClient.put(`/bookings/${data.bookingId}/cancel`, data),
+  // CancelBooking: (bookingId: string) => privateClient.put(`/bookings/${bookingId}/cancel`, bookingId),
 
   // Booking status operations
   vendorAcceptBooking: (data: any) => privateClient.post(`/bookings/${data.bookingId}/accept`, data),
@@ -27,3 +27,15 @@ export const bookingAPI = {
   acceptUserBooking: (bookingId: string) => privateClient.put(`/user-bookings/accept/${bookingId}`),
   readNotification: (notificatonId: string) => privateClient.put(`/user-bookings/notifications/${notificatonId}/read`),
 };
+
+export const cancelBooking = async (bookingId: string) => {
+  try {
+    debugger
+    const response = await privateClient.put(`/bookings/${bookingId}/cancel`, { bookingId });
+    console.log('canceled:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error canceling booking...:', error);
+    throw error;
+  }
+}

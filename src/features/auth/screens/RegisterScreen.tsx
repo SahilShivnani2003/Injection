@@ -171,6 +171,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
 
     // ── Use current location ──────────────────────────────────────────────────
     const handleUseCurrentLocation = async () => {
+        debugger
         setLocating(true);
         try {
             const coords = await getCurrentCoordinates();
@@ -178,6 +179,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                 alert.error('Location Error', 'Could not determine your co-ordinates.');
                 return;
             }
+            console.log('coords:', coords);
 
             setForm({ ...form, latitude: coords?.latitude, longitude: coords?.longitude });
             const geocoded = await coordinatesToAddress(coords);
@@ -189,6 +191,7 @@ const RegisterScreen = ({ navigation }: RegisterProps) => {
                 );
                 return;
             }
+            console.log('geocoded:', geocoded);
 
             if (geocoded.addressLine) {
                 setForm(prev => ({ ...prev, address: geocoded.addressLine }));
@@ -837,7 +840,7 @@ const styles = StyleSheet.create({
     content: {
         paddingHorizontal: 20,
         paddingTop: 20,
-        paddingBottom: 40,
+        paddingBottom: 130,
     },
 
     // ── Section cards ──────────────────────────────────────────────────────
