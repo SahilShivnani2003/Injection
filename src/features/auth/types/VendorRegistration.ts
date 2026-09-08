@@ -36,7 +36,7 @@ export type VendorForm = {
     services: string[];
     // Step 3
     specialization: string;
-    experience: string;
+    experience: number;
     bio: string;
     // Step 4
     bankName: string;
@@ -66,7 +66,7 @@ export const INITIAL_FORM: VendorForm = {
     serviceAreas: [],
     services: [],
     specialization: '',
-    experience: '',
+    experience: 0,
     bio: '',
     bankName: '',
     accountNumber: '',

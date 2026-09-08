@@ -74,15 +74,15 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
             ]);
             setBookings(
                 bookingResponse.data?.data ??
-                    bookingResponse.data?.bookings ??
-                    bookingResponse.data ??
-                    [],
+                bookingResponse.data?.bookings ??
+                bookingResponse.data ??
+                [],
             );
             setServices(
                 serviceResponse.data?.data ??
-                    serviceResponse.data?.services ??
-                    serviceResponse.data ??
-                    [],
+                serviceResponse.data?.services ??
+                serviceResponse.data ??
+                [],
             );
         } catch (error) {
             console.warn('Unable to load vendor dashboard metrics', error);
@@ -172,10 +172,10 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
                     <View style={styles.headerRight}>
                         <TouchableOpacity
                             style={styles.headerAction}
-                            onPress={() => navigation.navigate('Profile')}
+                            onPress={() => rootNav.navigate('IdCard')}
                             hitSlop={{ top: 8, bottom: 8 }}
                         >
-                            <Ionicons name="person-circle" size={40} color={Colors.white} />
+                            <Ionicons name="id-card-outline" size={40} color={Colors.white} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.headerAction}
@@ -292,8 +292,7 @@ const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
                         recentBookings.map(booking => {
                             const bookingKey =
                                 booking._id ??
-                                `${booking.patientName}-${
-                                    booking.preferredTimeSlot
+                                `${booking.patientName}-${booking.preferredTimeSlot
                                 }-${Math.random()}`;
                             const color = statusColor(booking.bookingStatus);
                             const amount = booking.grandTotal ?? booking.subtotal;

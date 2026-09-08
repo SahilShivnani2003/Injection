@@ -7,12 +7,12 @@ export const vendorAPI = {
         }),
     loginVendor: (data: any) => publicClient.post('/vendors/login', data),
     fetchProfile: (id: any) => privateClient.get(`/vendors/${id}`),
-    updateProfile: (data: any) => publicClient.put('/vendors/profile', data),
+    updateProfile: (data: any) => privateClient.put('/vendors/profile', { data }),
     uploadImage: (data: any) => publicClient.post('/vendors/upload', data, {
         headers: {
             'Content-Type': 'multipart/form-data'
         }
     }),
-    
-    vendorIdCard: (_id: string) => publicClient.get(`/vendors/${_id}/id-card`)
+
+    vendorIdCard: (_id: string) => privateClient.get(`/vendors/${_id}/id-card`)
 }

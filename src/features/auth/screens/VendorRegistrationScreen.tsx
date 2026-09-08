@@ -70,7 +70,7 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
                 alert.error('Validation', 'Enter a valid 10-digit phone number.');
                 return false;
             }
-            if (form.password.length < 6) {
+            if (form?.password?.length < 6) {
                 alert.error('Validation', 'Password must be at least 6 characters.');
                 return false;
             }
@@ -100,16 +100,19 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
         }
 
         // Steps 2 (Professional) and 3 (Bank & Docs) are optional — no hard blocks.
-        // if (!form.profileImage) {
-        //     alert.error('Validation', 'Profile pic is required.');
-        //     return false;
-        // }
+        if (s === 3) {
+            if (!profileImage) {
+                alert.error('Validation', 'Profile pic is required.');
+                return false;
+            }
+        }
 
         return true;
     };
 
     // ── Navigation ─────────────────────────────────────────────────────────────
     const goNext = () => {
+        console.log('vendor data:', vendorData);
         if (!validateStep(step)) return;
         if (step < TOTAL_STEPS - 1) {
             setStep(s => s + 1);
@@ -129,10 +132,6 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
     // ── Submit ─────────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!validateStep(step)) return;
-        if (profileImage === '') {
-            alert.error('Validation', 'Profile pic is required.');
-            return;
-        }
 
         if (form.latitude == 0 && form.longitude == 0) {
             const addressToConvert = `${form.address}, ${form.city}, ${form.state}, ${form.pincode}`;
@@ -167,20 +166,20 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
         formData.append('state', form.state.trim());
         formData.append('longitude', form.longitude);
         formData.append('latitude', form.latitude);
-        formData.append('pincode', form.pincode.trim());
-        formData.append('bio', form.bio.trim());
-        formData.append('specialization', form.specialization.trim());
-        formData.append('experience', form.experience.trim());
+        formData.append('pincode', form?.pincode?.trim());
+        formData.append('bio', form?.bio?.trim() || '');
+        formData.append('specialization', form?.specialization?.trim() || '');
+        formData.append('experience', form?.experience || 0);
         formData.append('serviceAreas', form.serviceAreas.join(', '));
 
         form.services.forEach(service => {
             formData.append('services', service);
         });
 
-        formData.append('bankDetails[bankName]', form.bankName.trim());
-        formData.append('bankDetails[accountNumber]', form.accountNumber.trim());
-        formData.append('bankDetails[ifscCode]', form.ifscCode.trim());
-        formData.append('bankDetails[branch]', form.branch.trim());
+        formData.append('bankDetails[bankName]', form?.bankName?.trim() ?? '');
+        formData.append('bankDetails[accountNumber]', form?.accountNumber?.trim() ?? '');
+        formData.append('bankDetails[ifscCode]', form?.ifscCode?.trim() ?? '');
+        formData.append('bankDetails[branch]', form?.branch?.trim() ?? '');
 
         if (profileImage) {
             formData.append('profileImage', profileImage);
@@ -209,6 +208,7 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
                         response?.data?.message || 'Unable to update vendor.',
                     );
                 }
+                console.log('edit vendor profile', formData);
                 navigation.goBack();
             } else {
                 const response = await vendorAPI.registerVendor(formData);

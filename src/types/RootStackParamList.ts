@@ -44,4 +44,5 @@ export type RootStackParamList = {
     BookingMap: {
         bookingId: string;
     }
+    IdCard: undefined;
 };

@@ -19,6 +19,7 @@ import { UserProfileEditScreen } from '@/features/profile/screens/UserProfileEdi
 import { BookingMapScreen } from '@/features/booking/screens/BookingMapScreen';
 import { VendorBookingDetailScreen } from '@/features/booking/screens/VendorBookinDetailScreen';
 import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreeen';
+import VendorIdCardScreen from '@/features/vendorIdCard/screens/VendorIdCard';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -54,6 +55,7 @@ export default function AppNavigator() {
                         name="VendorBookingDetail"
                         component={VendorBookingDetailScreen}
                     />
+                    <Stack.Screen name='IdCard' component={VendorIdCardScreen} />
                 </Stack.Navigator>
             </NavigationContainer>
         </AlertProvider>
