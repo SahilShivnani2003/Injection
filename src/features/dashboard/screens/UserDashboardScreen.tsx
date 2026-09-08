@@ -102,8 +102,8 @@ const MetricCard = ({ card, delay }: { card: MetricCardConfig; delay: number }) 
         card.iconLib === 'MaterialCommunityIcons'
             ? MaterialCommunityIcons
             : card.iconLib === 'FontAwesome5'
-            ? FontAwesome5
-            : Ionicons;
+                ? FontAwesome5
+                : Ionicons;
 
     return (
         <Animated.View
@@ -163,7 +163,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
 
     const fetchDashboardData = async () => {
         try {
-           setLoading(true);
+            setLoading(true);
             const response = await dashboardService.dashboardStats();
             if (response?.data?.success) {
                 setDashboardData(response.data.data as DashboardData);
@@ -172,18 +172,18 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
             console.error('Error fetching dashboard data:', error);
         } finally {
             setLoading(false);
-            
+
         }
     };
 
     useEffect(() => {
         setTimeout(() => {
-             fetchDashboardData();
+            fetchDashboardData();
         }, 1000);
-        
+
     }, []);
 
-    const onRefresh = async() => {
+    const onRefresh = async () => {
         setRefreshing(true);
         await fetchDashboardData();
         setRefreshing(false);
@@ -415,8 +415,8 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                 <Text style={styles.avatarText}>{getUserInitials()}</Text>
                             </View>
                         </View>
-                    </View>                    
-                    
+                    </View>
+
                 </Animated.View>
             </LinearGradient>
 
@@ -463,7 +463,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                         <TouchableOpacity
                             style={[styles.quickActionBtn, { flex: 1.6 }]}
                             activeOpacity={0.8}
-                            onPress={() => rootNav().navigate('Booking')}
+                            onPress={() => rootNav().navigate('Booking', { isEdit: false })}
                         >
                             <LinearGradient
                                 colors={[
@@ -661,8 +661,8 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                         item.iconLib === 'MaterialCommunityIcons'
                                             ? MaterialCommunityIcons
                                             : item.iconLib === 'FontAwesome5'
-                                            ? FontAwesome5
-                                            : Ionicons;
+                                                ? FontAwesome5
+                                                : Ionicons;
 
                                     return (
                                         <View
@@ -670,7 +670,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                                             style={[
                                                 styles.activityItem,
                                                 idx < activityFeed.length - 1 &&
-                                                    styles.activityItemBorder,
+                                                styles.activityItemBorder,
                                             ]}
                                         >
                                             <View
@@ -716,7 +716,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
                             </Text>
                             <TouchableOpacity
                                 style={styles.emptyButton}
-                                onPress={() => rootNav().navigate('Booking')}
+                                onPress={() => rootNav().navigate('Booking', { isEdit: false })}
                             >
                                 <Text style={styles.emptyButtonText}>Book Now</Text>
                             </TouchableOpacity>

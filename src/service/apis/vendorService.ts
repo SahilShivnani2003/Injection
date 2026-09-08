@@ -12,5 +12,7 @@ export const vendorAPI = {
         headers: {
             'Content-Type': 'multipart/form-data'
         }
-    })
+    }),
+    
+    vendorIdCard: (_id: string) => publicClient.get(`/vendors/${_id}/id-card`)
 }

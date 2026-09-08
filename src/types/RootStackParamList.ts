@@ -2,6 +2,7 @@ import { NavigatorScreenParams } from "@react-navigation/native";
 import { UserTabParamList } from "./UserTabParamList";
 import { VendorTabParamList } from "./VendorTabParamList";
 import { Booking } from "@/features/booking/types/Booking";
+import { Vendor } from "@/features/profile/types/Vendor";
 
 export type RootStackParamList = {
     Splash: undefined;
@@ -19,19 +20,25 @@ export type RootStackParamList = {
     OrderTracking: undefined;
     LabPartner: undefined;
     StaffPanel: undefined;
-    VendorRegister: undefined;
+    VendorRegister: {
+        isEdit: boolean;
+        vendorData?: any;
+    };
     VendorTab: NavigatorScreenParams<VendorTabParamList>;
     UserTab: NavigatorScreenParams<UserTabParamList>;
-    Booking: undefined;
+    Booking: {
+        isEdit: boolean;
+        booking?: any;
+    };
     BookingDetail: {
         bookingId: string;
     };
     Notification: undefined;
-    VendorBookingDetail:{
+    VendorBookingDetail: {
         booking: Booking;
         notificationId: string
     }
-    EditProfile:{
+    EditProfile: {
         userData: any
     },
     BookingMap: {

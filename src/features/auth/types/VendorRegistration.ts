@@ -43,6 +43,7 @@ export type VendorForm = {
     accountNumber: string;
     ifscCode: string;
     branch: string;
+    profileImage: string;
 };
 
 export const INITIAL_FORM: VendorForm = {
@@ -60,7 +61,7 @@ export const INITIAL_FORM: VendorForm = {
     city: '',
     state: '',
     pincode: '',
-    latitude:0,
+    latitude: 0,
     longitude: 0,
     serviceAreas: [],
     services: [],
@@ -71,6 +72,7 @@ export const INITIAL_FORM: VendorForm = {
     accountNumber: '',
     ifscCode: '',
     branch: '',
+    profileImage: ''
 };
 
 export const INITIAL_DOCUMENTS: Record<DocumentField, string | null> = {

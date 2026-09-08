@@ -84,7 +84,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                     ? await userApi.login({ email: trimmedEmail, password })
                     : await vendorAPI.loginVendor({ email: trimmedEmail, password });
 
-            if (response.data?.success) {              
+            if (response.data?.success) {
 
                 setAuth(
                     userType === 'Vendor' ? response.data.data?.vendor : response.data.data.user,
@@ -93,7 +93,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                 );
 
                 alert.success('Login Successful', 'Welcome back!');
-                
+
                 if (userType === 'Vendor') {
                     navigation.replace('VendorTab', { screen: 'Dashboard' });
                 } else {
@@ -118,9 +118,9 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
         label: string;
         icon: string;
     }[] = [
-        { key: 'patient', label: 'Patient', icon: 'person' },
-        { key: 'Vendor', label: 'Vendor', icon: 'medical-services' },
-    ];
+            { key: 'patient', label: 'Patient', icon: 'person' },
+            { key: 'Vendor', label: 'Vendor', icon: 'medical-services' },
+        ];
 
     return (
         <View style={styles.root}>
@@ -253,7 +253,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             style={styles.forgotPassword}
                             activeOpacity={0.7}
                             disabled={isLoading}
-                            onPress={()=> navigation.navigate('forgotPassword')}
+                            onPress={() => navigation.navigate('forgotPassword')}
                         >
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                         </TouchableOpacity>
@@ -297,7 +297,7 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
                             style={styles.registerLink}
                             onPress={() => {
                                 if (userType === 'Vendor') {
-                                    navigation.navigate('VendorRegister');
+                                    navigation.navigate('VendorRegister', { isEdit: false });
                                 } else {
                                     navigation.navigate('Register');
                                 }

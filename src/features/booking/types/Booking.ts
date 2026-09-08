@@ -22,7 +22,7 @@ export type StaffPreference =
     | 'Male Staff'
     | 'Female Staff';
 
-export type PrescriptionType = 'form' | 'image';
+export type PrescriptionType = 'form' | 'image' | 'document';
 
 export type ReportType =
     | 'lab'

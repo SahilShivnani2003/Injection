@@ -30,6 +30,7 @@ import { ComplimentaryService, Gender, SelectedService, StaffPreference } from '
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { Booking } from '../types/Booking';
 import { useAlert } from '@/context/AlertContext';
+import { updateBooking } from '@/service/apis/bookingService';
 
 const RADIUS = 32;
 const { width, height } = Dimensions.get('window');
@@ -48,11 +49,12 @@ export interface BookingFormData {
     age: string;
     sex: string;
     address: string;
-    city:string;
-    state:string;
+    city: string;
+    state: string;
     pincode: string;
     currentLocation: string;
     phoneNumber: string;
+    alternateMobile?: string;
     email: string;
     // Step 2 — Service Selection
     selectedServices: SelectedService[];
@@ -123,7 +125,8 @@ const FORM_DEFAULTS = (user: any): BookingFormData => ({
 
 type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
-const BookingScreen = ({ navigation }: BookingScreenProps) => {
+const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
+    const { isEdit, booking } = route.params;
     const alert = useAlert();
     const { user } = useAuthStore();
     const [currentStep, setCurrentStep] = useState<IStepType>(steps[0]);
@@ -131,7 +134,7 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
     const total = steps.length;
 
     // ── Single consolidated form state ──────────────────────────────────────
-    const [formData, setFormData] = useState<BookingFormData>(() => FORM_DEFAULTS(user));
+    const [formData, setFormData] = useState<BookingFormData>(() => booking ? booking : FORM_DEFAULTS(user));
 
     /**
      * Type-safe partial updater for any BookingFormData fields.
@@ -200,11 +203,11 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                     return warn('Age must be between 1 and 150.');
                 if (!formData.sex) return warn('Please select sex.');
                 if (!formData.address.trim()) return warn('Please enter address.');
-                if (formData.pincode.length !== 6)
+                if (formData?.pincode?.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
                 if (!formData.currentLocation.trim()) return warn('Please enter current location.');
-                if (!formData.phoneNumber.trim()) return warn('Please enter phone number.');
-                if (formData.phoneNumber.length < 10)
+                if (!formData?.phoneNumber?.trim()) return warn('Please enter phone number.');
+                if (formData?.phoneNumber?.length < 10)
                     return warn('Please enter a valid 10-digit phone number.');
                 if (!formData.email.trim()) return warn('Please enter email address.');
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
@@ -268,46 +271,93 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                 return;
             }
 
-            const payload: Booking = {
-                patientName: formData.patientName.trim(),
-                age: parseInt(formData.age, 10),
-                sex: gender,
-                address: formData.address.trim(),
-                pincode: formData.pincode.trim(),
-                currentLocation: formData.currentLocation.trim() || formData.address.trim(),
-                alternateMobile: formData.phoneNumber.trim() || undefined,
-                email: formData.email.trim(),
-                selectedServices: formData.selectedServices,
-                additionalRequirements: formData.additionalRequirements.trim() || undefined,
-                prescriptions: [],
-                hasInsurance: formData.hasInsurance,
-                insurancePolicyNumber: formData.hasInsurance
-                    ? formData.insurancePolicyNumber
-                    : undefined,
-                subtotal,
-                gstAmount,
-                grandTotal,
-                freeComplimentaryService: formData.freeComplimentaryService,
-                preferredTimeSlot,
-                staffPreference: formData.staffPreference,
-                serviceLocation: formData.address.trim(),
-                estimatedDuration: 45,
-                userId: user?._id ?? '',
-                vendorId: null,
-                bookingStatus: 'pending',
-                reportUrl: null,
-            };
 
-            const response = await bookingAPI.userCreateBooking(payload);
 
-            if (response?.data?.success || response?.data?._id || response?.status === 201) {
+            if (isEdit) {
+                const upDatedBooking: Booking = {
+                    _id: booking?._id,
+                    patientName: formData.patientName.trim(),
+                    age: parseInt(formData.age, 10),
+                    sex: gender,
+                    address: formData.address.trim(),
+                    pincode: formData.pincode.trim(),
+                    currentLocation: formData.currentLocation.trim() || formData.address.trim(),
+                    alternateMobile: formData.phoneNumber.trim() || undefined,
+                    email: formData.email.trim(),
+                    selectedServices: formData.selectedServices,
+                    additionalRequirements: formData.additionalRequirements?.trim() || undefined,
+                    prescriptions: formData.uploadedFile ? [{ type: formData.uploadedFile?.type ?? 'image', imageUrl: formData.uploadedFile?.uri ?? '' }] : [],
+                    hasInsurance: formData.hasInsurance,
+                    insurancePolicyNumber: formData.hasInsurance
+                        ? formData.insurancePolicyNumber
+                        : undefined,
+                    subtotal,
+                    gstAmount,
+                    grandTotal,
+                    freeComplimentaryService: formData.freeComplimentaryService,
+                    preferredTimeSlot: formData.selectedDate && formData.selectedTime ? `${formData.selectedDate} ${formData.selectedTime}` : '',
+                    staffPreference: formData.staffPreference,
+                    serviceLocation: formData.address?.trim(),
+                    estimatedDuration: 45,
+                    userId: user?._id ?? '',
+                    vendorId: null,
+                    bookingStatus: booking?.bookingStatus ?? 'pending',
+                    reportUrl: null,
+                };
+                console.log('updated booking:', upDatedBooking);
+                const response = await updateBooking(upDatedBooking);
 
-                alert.success('Booking Confirmed!  ',
-                    `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
-                navigation.goBack();
+                if (response?.success || response?.data?._id || response?.status === 200) {
+
+                    alert.success('Booking Confirmed!  ',
+                        `Your appointment on ${preferredTimeSlot} has been updated successfully.`)
+                    navigation.goBack();
+                } else {
+                    alert.error('Failed',
+                        response?.data?.message || 'Unable to update booking. Please try again.')
+                }
             } else {
-                alert.error('Failed',
-                    response?.data?.message || 'Unable to create booking. Please try again.')
+                const payload: Booking = {
+                    patientName: formData.patientName.trim(),
+                    age: parseInt(formData.age, 10),
+                    sex: gender,
+                    address: formData.address.trim(),
+                    pincode: formData.pincode.trim(),
+                    currentLocation: formData.currentLocation.trim() || formData.address.trim(),
+                    alternateMobile: formData.phoneNumber.trim() || undefined,
+                    email: formData.email.trim(),
+                    selectedServices: formData.selectedServices,
+                    additionalRequirements: formData.additionalRequirements?.trim() || undefined,
+                    prescriptions: formData.uploadedFile ? [{ type: formData.uploadedFile?.type ?? 'image', imageUrl: formData.uploadedFile?.uri ?? '' }] : [],
+                    hasInsurance: formData.hasInsurance,
+                    insurancePolicyNumber: formData.hasInsurance
+                        ? formData.insurancePolicyNumber
+                        : undefined,
+                    subtotal,
+                    gstAmount,
+                    grandTotal,
+                    freeComplimentaryService: formData.freeComplimentaryService,
+                    preferredTimeSlot,
+                    staffPreference: formData.staffPreference,
+                    serviceLocation: formData.address?.trim(),
+                    estimatedDuration: 45,
+                    userId: user?._id ?? '',
+                    vendorId: null,
+                    bookingStatus: 'pending',
+                    reportUrl: null,
+                };
+
+                const response = await bookingAPI.userCreateBooking(payload);
+
+                if (response?.data?.success || response?.data?._id || response?.status === 201) {
+
+                    alert.success('Booking Confirmed!  ',
+                        `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
+                    navigation.goBack();
+                } else {
+                    alert.error('Failed',
+                        response?.data?.message || 'Unable to create booking. Please try again.')
+                }
             }
         } catch (error: any) {
             console.error('Booking error:', error);
@@ -332,14 +382,14 @@ const BookingScreen = ({ navigation }: BookingScreenProps) => {
                     <BasicDetailsScreen
                         basicDetails={{
                             patientName: formData.patientName,
-                            age: formData.age,
+                            age: formData.age || formData.age.toString(),
                             sex: formData.sex,
                             address: formData.address,
                             city: formData.city,
                             state: formData.state,
                             pincode: formData.pincode,
                             currentLocation: formData.currentLocation,
-                            phoneNumber: formData.phoneNumber,
+                            phoneNumber: formData.phoneNumber || formData.alternateMobile || '',
                             email: formData.email,
                         }}
                         /**

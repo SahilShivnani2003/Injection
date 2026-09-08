@@ -374,7 +374,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
     }, [hasInsurance]);
 
     const handleFetchPolicy = async () => {
-        if (!insurancePolicyNumber.trim()) return;
+        if (!insurancePolicyNumber?.trim()) return;
         try {
             setFetchingPolicy(true);
             // Simulate API call - replace with actual insurance API
@@ -494,14 +494,14 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                     <TouchableOpacity
                         style={[styles.fetchBtn, policyFetched && styles.fetchBtnDone]}
                         activeOpacity={0.82}
-                        disabled={!insurancePolicyNumber.trim() || fetchingPolicy}
+                        disabled={!insurancePolicyNumber?.trim() || fetchingPolicy}
                         onPress={handleFetchPolicy}
                     >
                         <LinearGradient
                             colors={
                                 policyFetched
                                     ? [Colors.accent, Colors.accentDark]
-                                    : insurancePolicyNumber.trim()
+                                    : insurancePolicyNumber?.trim()
                                         ? [Colors.gradientStart, Colors.gradientEnd]
                                         : ['#C8DCE4', '#B8CCCC']
                             }

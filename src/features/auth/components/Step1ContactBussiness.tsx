@@ -260,7 +260,7 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                 secureTextEntry={!showConfirmPassword}
             />
             {/* Live match indicator */}
-            {form.confirmPassword.length > 0 && (
+            {form?.confirmPassword?.length > 0 && (
                 <View style={styles.matchRow}>
                     <Icon
                         name={form.confirmPassword === form.password ? 'check-circle' : 'cancel'}

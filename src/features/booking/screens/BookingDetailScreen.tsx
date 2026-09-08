@@ -875,6 +875,11 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 {displayBookingId} · Created {formatDate(booking.createdAt)}
                             </Text>
                         </View>
+                        {booking.bookingStatus === 'pending' ? (
+                            <TouchableOpacity onPress={() => navigation.navigate('Booking', { isEdit: true, booking: booking })}>
+                                <Ionicons name='create-outline' size={25} color={Colors.white} />
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
 
                     {/* Patient pill */}

@@ -1,4 +1,5 @@
 import { privateClient, publicClient } from "../apiClient";
+import { Booking } from "@/features/booking/types/Booking";
 
 export const bookingAPI = {
   // Booking CRUD operations
@@ -36,6 +37,18 @@ export const cancelBooking = async (bookingId: string) => {
     return response.data;
   } catch (error) {
     console.error('Error canceling booking...:', error);
+    throw error;
+  }
+}
+
+export const updateBooking = async (booking: Booking) => {
+  try {
+    console.log('booking:', booking);
+    const response = await privateClient.put(`/bookings/bookingUpdateByUser/${booking._id}`, booking);
+    console.log('Booking updated:', response);
+    return response.data;
+  } catch (error) {
+    console.log('Error in updating booking:', error);
     throw error;
   }
 }

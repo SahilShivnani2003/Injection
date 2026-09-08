@@ -34,13 +34,14 @@ type VendorRegisterProps = NativeStackScreenProps<RootStackParamList, 'VendorReg
 
 const TOTAL_STEPS = STEPS.length; // 4
 
-const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
+const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) => {
+    const { isEdit, vendorData } = route.params;
     const { setAuth } = useAuthStore();
     const alert = useAlert();
 
     const [step, setStep] = useState(0); // 0-indexed
     const [loading, setLoading] = useState(false);
-    const [form, setForm] = useState<VendorForm>(INITIAL_FORM);
+    const [form, setForm] = useState<VendorForm>(vendorData ? vendorData : INITIAL_FORM);
     const [profileImage, setProfileImage] = useState<string | null>(null);
     const [documents, setDocuments] =
         useState<Record<DocumentField, string | null>>(INITIAL_DOCUMENTS);
@@ -99,6 +100,10 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
         }
 
         // Steps 2 (Professional) and 3 (Bank & Docs) are optional — no hard blocks.
+        // if (!form.profileImage) {
+        //     alert.error('Validation', 'Profile pic is required.');
+        //     return false;
+        // }
 
         return true;
     };
@@ -124,6 +129,10 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
     // ── Submit ─────────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!validateStep(step)) return;
+        if (profileImage === '') {
+            alert.error('Validation', 'Profile pic is required.');
+            return;
+        }
 
         if (form.latitude == 0 && form.longitude == 0) {
             const addressToConvert = `${form.address}, ${form.city}, ${form.state}, ${form.pincode}`;
@@ -133,13 +142,13 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
                 console.error('Coords not found');
             }
 
-            
+
             setForm({
                 ...form,
                 longitude: coords?.coordinates?.longitude ?? 0,
                 latitude: coords?.coordinates?.latitude ?? 0,
             });
-            
+
         }
 
         const formData = new FormData();
@@ -183,26 +192,42 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
             }
         });
 
-        
-        
+
+
         setLoading(true);
         try {
-            const response = await vendorAPI.registerVendor(formData);
-            if (response?.data?.success) {
-                alert.success(
-                    'Welcome Onboard!',
-                    response?.data?.message ||
-                        'Your vendor account has been created successfully. It will be activated after admin approval.',
-                );
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'EmailLogin' }],
-                });
+            if (isEdit) {
+                const response = await vendorAPI.updateProfile(formData);
+                if (response?.data?.success) {
+                    alert.success(
+                        response?.data?.message ||
+                        'Your vendor account has been updated successfully.',
+                    );
+                } else {
+                    alert.error(
+                        'Update Failed',
+                        response?.data?.message || 'Unable to update vendor.',
+                    );
+                }
+                navigation.goBack();
             } else {
-                alert.error(
-                    'Registration Failed',
-                    response?.data?.message || 'Unable to register vendor.',
-                );
+                const response = await vendorAPI.registerVendor(formData);
+                if (response?.data?.success) {
+                    alert.success(
+                        'Welcome Onboard!',
+                        response?.data?.message ||
+                        'Your vendor account has been created successfully. It will be activated after admin approval.',
+                    );
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'EmailLogin' }],
+                    });
+                } else {
+                    alert.error(
+                        'Registration Failed',
+                        response?.data?.message || 'Unable to register vendor.',
+                    );
+                }
             }
         } catch (error: any) {
             console.error('Vendor registration error:', error);
@@ -347,8 +372,8 @@ const VendorRegistrationScreen = ({ navigation }: VendorRegisterProps) => {
                             {loading
                                 ? 'Submitting...'
                                 : isLastStep
-                                ? 'Submit Registration'
-                                : `Next: ${STEPS[step + 1].label} →`}
+                                    ? 'Submit Registration'
+                                    : `Next: ${STEPS[step + 1].label} →`}
                         </Text>
                     </TouchableOpacity>
                 </View>

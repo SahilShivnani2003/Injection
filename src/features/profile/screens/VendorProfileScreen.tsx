@@ -409,9 +409,8 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                             <InfoRow
                                 icon="trophy-outline"
                                 label="Experience"
-                                value={`${vendor.experience} year${
-                                    vendor.experience === 1 ? '' : 's'
-                                }`}
+                                value={`${vendor.experience} year${vendor.experience === 1 ? '' : 's'
+                                    }`}
                             />
                         )}
                         {(vendor?.serviceAreas?.length ?? 0) > 0 && (
@@ -610,7 +609,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
                     {/* ── Actions ── */}
                     <TouchableOpacity
                         style={styles.editBtn}
-                        onPress={() => rootNav?.navigate('VendorRegister')}
+                        onPress={() => rootNav?.navigate('VendorRegister', { isEdit: true, vendorData: vendor })}
                         activeOpacity={0.85}
                     >
                         <LinearGradient
@@ -626,7 +625,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
                     <TouchableOpacity
                         style={styles.logoutBtn}
-                        onPress={()=> setLogoutModalVisible(true)}
+                        onPress={() => setLogoutModalVisible(true)}
                         activeOpacity={0.85}
                     >
                         <Ionicons name="log-out-outline" size={18} color="#CC1133" />
@@ -639,7 +638,7 @@ const VendorProfileScreen = ({ navigation }: VendorProfileProps) => {
 
             <LogoutModal
                 visible={logoutModalVisible}
-                onClose={()=>setLogoutModalVisible(false)}
+                onClose={() => setLogoutModalVisible(false)}
                 logout={handleLogOut}
             />
         </View>
