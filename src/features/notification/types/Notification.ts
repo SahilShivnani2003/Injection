@@ -1,8 +1,9 @@
 import { Booking } from "@/features/booking/types/Booking";
 
 export interface Notification {
+    _id: string;
     vendorId: string;
-    bookingId: string | Booking;
+    bookingId: Booking;
     message: string;
     type?: 'new_booking' | 'booking_update' | 'general';
     isRead?: boolean;

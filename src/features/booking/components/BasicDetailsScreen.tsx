@@ -35,7 +35,7 @@ interface BasicDetailsScreenProps {
      * This prevents the field-clearing bug caused by passing a function into
      * BookingScreen's setFormData spread.
      */
-    onChange: (field: keyof BookingFormData, value: string) => void;
+    onChange: (field: keyof BookingFormData, value: any) => void;
 }
 
 const ADDRESS_GEOCODE_DEBOUNCE_MS = 900;
@@ -155,7 +155,7 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
                         'currentLocation',
                         `${geocoded.coordinates.latitude},${geocoded.coordinates.longitude}`,
                     );
-                    lastGeocodedAddress.current = address;                    
+                    lastGeocodedAddress.current = address;
                 } else {
                     setAddressGeocodeError(
                         'Could not locate that address. Please check state/city/pin code manually.',
@@ -224,14 +224,16 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
             debugger;
             const geocoded = await coordinatesToAddress(coords);
             if (geocoded) {
-                onChange('address', geocoded.addressLine || geocoded.formattedAddress);
-                onChange('pincode', geocoded.pincode);
-                onChange('state', geocoded.state);
-                onChange('city', geocoded.city);
+                // onChange('address', geocoded.addressLine || geocoded.formattedAddress);
+                // onChange('pincode', geocoded.pincode);
+                // onChange('state', geocoded.state);
+                // onChange('city', geocoded.city);
                 onChange(
                     'currentLocation',
                     `${geocoded.coordinates.latitude},${geocoded.coordinates.longitude}`,
                 );
+                onChange('latitude', coords.latitude);
+                onChange('longitude', coords.longitude);
                 lastGeocodedAddress.current = geocoded.addressLine || geocoded.formattedAddress;
             } else {
                 setLocationError('Could not detect your address. Please enter it manually.');

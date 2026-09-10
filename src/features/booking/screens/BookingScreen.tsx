@@ -69,6 +69,8 @@ export interface BookingFormData {
     staffPreference: StaffPreference;
     // Step 6 — Complimentary
     freeComplimentaryService: ComplimentaryService;
+    latitude?: number;
+    longitude?: number;
 }
 
 /* ─────────────────────── Steps config ─────────────────────── */
@@ -119,6 +121,8 @@ const FORM_DEFAULTS = (user: any): BookingFormData => ({
     selectedTime: null,
     staffPreference: 'Any Available',
     freeComplimentaryService: 'None',
+    latitude: 0,
+    longitude: 0,
 });
 
 /* ─────────────────────── Component ─────────────────────── */
@@ -205,8 +209,8 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                 if (!formData.address.trim()) return warn('Please enter address.');
                 if (formData?.pincode?.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
-                if (!formData.currentLocation.trim()) return warn('Please enter current location.');
-                if (!formData?.phoneNumber?.trim()) return warn('Please enter phone number.');
+                if (!formData.currentLocation?.trim() || !formData.address?.trim()) return warn('Please enter current location.');
+                if (!formData?.phoneNumber?.trim() || !formData.alternateMobile?.trim()) return warn('Please enter phone number.');
                 if (formData?.phoneNumber?.length < 10)
                     return warn('Please enter a valid 10-digit phone number.');
                 if (!formData.email.trim()) return warn('Please enter email address.');
@@ -345,6 +349,9 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     vendorId: null,
                     bookingStatus: 'pending',
                     reportUrl: null,
+                    useCurrentLocation: formData.currentLocation ? true : false,
+                    latitude: formData.currentLocation ? formData.latitude?? 0 : 0,
+                    longitude: formData.currentLocation ? formData.longitude?? 0: 0
                 };
 
                 const response = await bookingAPI.userCreateBooking(payload);

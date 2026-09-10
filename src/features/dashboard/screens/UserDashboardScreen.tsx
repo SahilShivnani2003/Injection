@@ -23,6 +23,7 @@ import { UserTabParamList } from '@/types/UserTabParamList';
 import { Colors } from '@/theme/colors';
 import { RootStackParamList } from '@/types/RootStackParamList';
 import { Booking } from '@/features/booking/types/Booking';
+import { useVendorLocationTracking } from '@/utils/vendorLocationTracking';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -137,6 +138,7 @@ const MetricCard = ({ card, delay }: { card: MetricCardConfig; delay: number }) 
 
 const DashboardScreen = ({ navigation }: DashboardProps) => {
     const { user } = useAuthStore();
+    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); //current location
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);

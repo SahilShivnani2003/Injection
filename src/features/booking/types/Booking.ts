@@ -237,4 +237,7 @@ export interface Booking {
     // ============================================
     createdAt?: Date;
     updatedAt?: Date;
+    latitude?: number;
+    longitude?: number;
+    useCurrentLocation?: boolean;
 }

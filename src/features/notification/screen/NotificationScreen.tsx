@@ -71,7 +71,7 @@ const NotificationCard = ({ item, onAccept, onRead }: CardProps) => {
         <TouchableOpacity
             activeOpacity={0.85}
             style={[styles.card, unread && styles.cardUnread]}
-            onPress={() => !item.isRead && onRead(item.bookingId?._id)}
+            onPress={() => !item.isRead && onRead(item._id ?? item.bookingId?._id ?? '')}
         >
             {/* Unread indicator */}
             {unread && <View style={styles.unreadDot} />}
@@ -96,7 +96,7 @@ const NotificationCard = ({ item, onAccept, onRead }: CardProps) => {
                     <TouchableOpacity
                         style={styles.acceptBtn}
                         activeOpacity={0.8}
-                        onPress={() => onAccept(item.bookingId?._id)}
+                        onPress={() => onAccept(item.bookingId?._id ?? '')}
                     >
                         <LinearGradient
                             colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -178,8 +178,8 @@ export const NotificationScreen = ({ navigation }: NotificationScreenProps) => {
                 setNotifications(prev =>
                     prev
                         ? prev.map(n =>
-                              n.bookingId === bookingId ? { ...n, isAccepted: true } : n,
-                          )
+                            n.bookingId._id === bookingId ? { ...n, isAccepted: true } : n,
+                        )
                         : prev,
                 );
             }
@@ -196,8 +196,8 @@ export const NotificationScreen = ({ navigation }: NotificationScreenProps) => {
                 setNotifications(prev =>
                     prev
                         ? prev.map(n =>
-                              n.bookingId === notificationId ? { ...n, isRead: true } : n,
-                          )
+                            n.bookingId._id === notificationId ? { ...n, isRead: true } : n,
+                        )
                         : prev,
                 );
             }
@@ -251,7 +251,7 @@ export const NotificationScreen = ({ navigation }: NotificationScreenProps) => {
             ) : (
                 <FlatList
                     data={notifications ?? []}
-                    keyExtractor={(item, idx) => item.bookingId ?? String(idx)}
+                    keyExtractor={(item, idx) => item._id ?? item.bookingId ?? String(idx)}
                     contentContainerStyle={[
                         styles.listContent,
                         (!notifications || notifications.length === 0) && styles.listEmpty,

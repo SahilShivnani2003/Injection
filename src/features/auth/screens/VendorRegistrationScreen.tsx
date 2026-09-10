@@ -192,11 +192,38 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
         });
 
 
-
         setLoading(true);
         try {
             if (isEdit) {
-                const response = await vendorAPI.updateProfile(formData);
+                const payload = {
+                    name: form.name.trim(),
+                    phone: form.phone.trim(),
+                    alternatePhone: form.alternatePhone.trim(),
+                    businessName: form.businessName.trim(),
+                    businessType: form.businessType,
+                    registrationNumber: form.registrationNumber.trim(),
+                    gstNumber: form.gstNumber.trim(),
+                    address: form.address.trim(),
+                    city: form.city.trim(),
+                    state: form.state.trim(),
+                    longitude: form.longitude,
+                    latitude: form.latitude,
+                    pincode: form?.pincode?.trim(),
+                    bio: form?.bio?.trim() || '',
+                    specialization: form?.specialization?.trim() || '',
+                    experience: Number(form?.experience || 0),
+                    serviceAreas: form.serviceAreas, // keep as string[], don't join
+                    services: form.services.map(s => (typeof s === 'string' ? s : s._id)), // array of IDs
+                    bankDetails: {
+                        bankName: form?.bankName?.trim() ?? '',
+                        accountNumber: form?.accountNumber?.trim() ?? '',
+                        ifscCode: form?.ifscCode?.trim() ?? '',
+                        branch: form?.branch?.trim() ?? '',
+                    },
+                    ...(profileImage ? { profileImage } : {}), // already a hosted URL string
+                };
+                console.log('edited form data:', payload);
+                const response = await vendorAPI.updateProfile(payload);
                 if (response?.data?.success) {
                     alert.success(
                         response?.data?.message ||
@@ -208,7 +235,7 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
                         response?.data?.message || 'Unable to update vendor.',
                     );
                 }
-                console.log('edit vendor profile', formData);
+                console.log('edited vendor profile api', response.data);
                 navigation.goBack();
             } else {
                 const response = await vendorAPI.registerVendor(formData);

@@ -22,6 +22,7 @@ import { Booking } from '@/features/booking/types/Booking';
 import { Service } from '@/features/vendorService/types/Service';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/types/RootStackParamList';
+import { useVendorLocationTracking } from '@/utils/vendorLocationTracking';
 
 type VendorDashboardProps = NativeBottomTabScreenProps<VendorTabParamList, 'Dashboard'>;
 
@@ -59,6 +60,7 @@ const formatINR = (amount?: number): string =>
 
 const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
     const rootNav = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); // current location
     const { user } = useAuthStore();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [services, setServices] = useState<Service[]>([]);

@@ -20,14 +20,24 @@ import { BookingMapScreen } from '@/features/booking/screens/BookingMapScreen';
 import { VendorBookingDetailScreen } from '@/features/booking/screens/VendorBookinDetailScreen';
 import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreeen';
 import VendorIdCardScreen from '@/features/vendorIdCard/screens/VendorIdCard';
+import { useNavigationContainerRef } from '@react-navigation/native';
+import { useForegroundNotificationBanner } from '@/utils/foregroundNotification';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
     const isDarkMode = useColorScheme() === 'dark';
+
+    const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+    useForegroundNotificationBanner(data => {
+        // navigate wherever the tap should go
+        navigationRef.navigate('Notification');
+    });
+
     return (
         <AlertProvider>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
                 <Stack.Navigator
                     initialRouteName="Splash"
                     screenOptions={{
@@ -41,7 +51,7 @@ export default function AppNavigator() {
                     <Stack.Screen name="Login" component={LoginScreen} />
                     <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
                     <Stack.Screen name="Register" component={RegisterScreen} />
-                    <Stack.Screen name="forgotPassword" component={ForgotPasswordScreen}/>
+                    <Stack.Screen name="forgotPassword" component={ForgotPasswordScreen} />
                     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
                     <Stack.Screen name="VendorRegister" component={VendorRegisterScreen} />
                     <Stack.Screen name="VendorTab" component={VendorTabNavigation} />
