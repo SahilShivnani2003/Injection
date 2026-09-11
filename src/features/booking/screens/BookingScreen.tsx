@@ -111,6 +111,7 @@ const FORM_DEFAULTS = (user: any): BookingFormData => ({
     city: user?.city ?? '',
     currentLocation: '',
     phoneNumber: user?.phone ?? '',
+    alternateMobile: user?.phone ?? '',
     email: user?.email ?? '',
     selectedServices: [],
     additionalRequirements: '',
@@ -206,10 +207,10 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                 if (Number(formData.age) <= 0 || Number(formData.age) > 150)
                     return warn('Age must be between 1 and 150.');
                 if (!formData.sex) return warn('Please select sex.');
-                if (!formData.address.trim()) return warn('Please enter address.');
+                // if (!formData.address.trim()) return warn('Please enter address.');
                 if (formData?.pincode?.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
-                if (!formData.currentLocation?.trim() || !formData.address?.trim()) return warn('Please enter current location.');
+                if (!formData.currentLocation?.trim() && !formData.address?.trim()) return warn('Please enter address or use current location.');
                 if (!formData?.phoneNumber?.trim() || !formData.alternateMobile?.trim()) return warn('Please enter phone number.');
                 if (formData?.phoneNumber?.length < 10)
                     return warn('Please enter a valid 10-digit phone number.');
@@ -286,7 +287,7 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     address: formData.address.trim(),
                     pincode: formData.pincode.trim(),
                     currentLocation: formData.currentLocation.trim() || formData.address.trim(),
-                    alternateMobile: formData.phoneNumber.trim() || undefined,
+                    alternateMobile: formData.phoneNumber.trim() || formData.alternateMobile?.trim() || undefined,
                     email: formData.email.trim(),
                     selectedServices: formData.selectedServices,
                     additionalRequirements: formData.additionalRequirements?.trim() || undefined,
@@ -307,6 +308,9 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     vendorId: null,
                     bookingStatus: booking?.bookingStatus ?? 'pending',
                     reportUrl: null,
+                    useCurrentLocation: formData.currentLocation ? true : false,
+                    latitude: formData.currentLocation ? formData.latitude ?? 0 : 0,
+                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0
                 };
                 console.log('updated booking:', upDatedBooking);
                 const response = await updateBooking(upDatedBooking);
@@ -322,13 +326,13 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                 }
             } else {
                 const payload: Booking = {
-                    patientName: formData.patientName.trim(),
-                    age: parseInt(formData.age, 10),
-                    sex: gender,
-                    address: formData.address.trim(),
-                    pincode: formData.pincode.trim(),
+                    patientName: formData.patientName.trim() || user?.name || '',
+                    age: parseInt(formData.age, 10) || user?.age ? parseInt(user?.age, 10) : 0,
+                    sex: gender || user?.gender,
+                    address: formData.address.trim() || user?.address || '',
+                    pincode: formData.pincode.trim() || user?.pincode || '',
                     currentLocation: formData.currentLocation.trim() || formData.address.trim(),
-                    alternateMobile: formData.phoneNumber.trim() || undefined,
+                    alternateMobile: formData.phoneNumber.trim() || formData.alternateMobile?.trim() || undefined,
                     email: formData.email.trim(),
                     selectedServices: formData.selectedServices,
                     additionalRequirements: formData.additionalRequirements?.trim() || undefined,
@@ -350,8 +354,8 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     bookingStatus: 'pending',
                     reportUrl: null,
                     useCurrentLocation: formData.currentLocation ? true : false,
-                    latitude: formData.currentLocation ? formData.latitude?? 0 : 0,
-                    longitude: formData.currentLocation ? formData.longitude?? 0: 0
+                    latitude: formData.currentLocation ? formData.latitude ?? 0 : 0,
+                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0
                 };
 
                 const response = await bookingAPI.userCreateBooking(payload);

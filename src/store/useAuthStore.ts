@@ -6,6 +6,11 @@ import { create } from "zustand";
 import messaging from '@react-native-firebase/messaging';
 import { IRegisterDevice, registerDevice } from "@/features/notification/service/notification.service";
 import { DeviceConfig } from "@/config/deviceConfig";
+import { getApp } from '@react-native-firebase/app';
+import {
+    getMessaging,
+    getToken,
+} from '@react-native-firebase/messaging';
 
 type AuthState = {
     isAuthenticated: boolean;
@@ -43,19 +48,53 @@ export const useAuthStore = create<AuthState>((set) => ({
                 loggedInRole: role
             })
 
-            const hasPermission = await requestNotificationPermission();
+            // const hasPermission = await requestNotificationPermission();
 
-            if (hasPermission) {
-                const fcmToken = await messaging().getToken();
+            // if (hasPermission) {
+            //     const fcmToken = await messaging().getToken();
 
-                const registerDeviceData: IRegisterDevice = {
-                    token: fcmToken,
-                    deviceType: 'android',
-                    platform: 'app',
-                    appVersion: DeviceConfig.version,
+            //     const registerDeviceData: IRegisterDevice = {
+            //         token: fcmToken,
+            //         deviceType: 'android',
+            //         platform: 'app',
+            //         appVersion: DeviceConfig.version,
+            //     }
+
+            //     await registerDevice(registerDeviceData);
+            // }
+
+            try {
+                console.log('1. Requesting notification permission...');
+
+                const hasPermission = await requestNotificationPermission();
+
+                console.log('2. Permission result:', hasPermission);
+
+                if (hasPermission) {
+                    console.log('3. Getting FCM token...');
+
+                    const app = getApp();
+                    const messagingInstance = getMessaging(app);
+
+                    const fcmToken = await getToken(messagingInstance);
+
+                    console.log('4. FCM token:', fcmToken);
+
+                    const registerDeviceData: IRegisterDevice = {
+                        token: fcmToken,
+                        deviceType: 'android',
+                        platform: 'app',
+                        appVersion: DeviceConfig.version,
+                    };
+
+                    console.log('5. Registering device...');
+
+                    await registerDevice(registerDeviceData);
+
+                    console.log('6. Device registered successfully');
                 }
-
-                await registerDevice(registerDeviceData);
+            } catch (fcmError) {
+                console.error('FCM/DEVICE ERROR:', fcmError);
             }
 
         } catch (error: any) {

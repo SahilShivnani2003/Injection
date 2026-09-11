@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../features/auth/screens/LoginScreen';
@@ -20,8 +20,8 @@ import { BookingMapScreen } from '@/features/booking/screens/BookingMapScreen';
 import { VendorBookingDetailScreen } from '@/features/booking/screens/VendorBookinDetailScreen';
 import ForgotPasswordScreen from '@/features/auth/screens/ForgotPasswordScreeen';
 import VendorIdCardScreen from '@/features/vendorIdCard/screens/VendorIdCard';
-import { useNavigationContainerRef } from '@react-navigation/native';
 import { useForegroundNotificationBanner } from '@/utils/foregroundNotification';
+import { NotificationBannerHost } from '@/features/notification/screen/NotificationBanner';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -67,6 +67,7 @@ export default function AppNavigator() {
                     />
                     <Stack.Screen name='IdCard' component={VendorIdCardScreen} />
                 </Stack.Navigator>
+                <NotificationBannerHost />
             </NavigationContainer>
         </AlertProvider>
     );

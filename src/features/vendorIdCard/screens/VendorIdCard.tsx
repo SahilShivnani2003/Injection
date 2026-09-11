@@ -16,6 +16,7 @@ import { Colors, Spacing, Fonts } from '../../../theme/colors'; // adjust path t
 import { Vendor, VendorAvailability, VendorDocument, VendorDocuments, VendorSetting, VendorResponse } from '../types/vendor';
 import { vendorAPI } from '@/service/apis/vendorService';
 import { useAuthStore } from '@/store/useAuthStore';
+import { downloadVendorIdCardPdf } from '@/utils/downloadIdCard';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ const VendorIdCardScreen = ({ navigation }: VendorIdCardScreenProps) => {
       const [vendor, setVendor] = useState<Vendor>(defaultData);
       const [setting, setSetting] = useState<VendorSetting>(defaultsetting);
       const { user } = useAuthStore();
+      const [isDownloading, setIsDownloading] = useState(false);
 
       useEffect(() => {
             getVendorId();
@@ -111,7 +113,15 @@ const VendorIdCardScreen = ({ navigation }: VendorIdCardScreenProps) => {
             setSetting(data?.data?.setting);
       }
 
-      const onDownload = () => { }
+      const onDownload = async () => {
+            if (isDownloading) return;
+            setIsDownloading(true);
+            try {
+                  await downloadVendorIdCardPdf(vendor, setting);
+            } finally {
+                  setIsDownloading(false);
+            }
+      }
 
       return (
             <ScrollView

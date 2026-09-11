@@ -16,6 +16,7 @@ export function useForegroundNotificationBanner(
 ) {
       useEffect(() => {
             const unsubscribe = messaging().onMessage(async remoteMessage => {
+                  console.log('FCM foreground message:', remoteMessage);
                   NotificationBannerManager.show({
                         title: remoteMessage.notification?.title ?? 'New notification',
                         body: remoteMessage.notification?.body,
