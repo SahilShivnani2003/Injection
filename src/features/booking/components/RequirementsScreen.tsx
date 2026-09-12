@@ -19,6 +19,8 @@ import { Colors } from '../../../theme/colors';
 import { UploadedFile } from '../screens/BookingScreen';
 import { Service } from '@/features/vendorService/types/Service';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { prescriptionService } from '@/service/apis/prescriptionService';
+import { useAlert } from '@/context/AlertContext';
 
 const { width } = Dimensions.get('window');
 
@@ -342,6 +344,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
     insurancePolicyNumber,
     setInsurancePolicyNumber,
 }) => {
+    const alert = useAlert();
     const [otherFocused, setOtherFocused] = useState(false);
     const [showUploadSheet, setShowUploadSheet] = useState(false);
     const [policyFocused, setPolicyFocused] = useState(false);
@@ -351,6 +354,36 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
     const insProgress = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
     const insRotateAnim = useRef(new Animated.Value(hasInsurance ? 1 : 0)).current;
 
+    const handleUploadPrescriptionDetail = async (file: UploadedFile) => {
+        // Show the local file immediately for responsive UI
+        setUploadedFile(file);
+
+        try {
+            const formData = new FormData();
+            formData.append('image', {
+                uri: file.uri,
+                name: file.name,
+                type: file.type === 'image' ? 'image/jpeg' : 'application/octet-stream',
+            });
+            const response = await prescriptionService.upload(formData);
+
+            if (response.data?.success) {
+                alert.success('Upload Successed','Prescription uploaded successfully!');
+                // Replace local uri with the server-hosted url, keep name/type
+                setUploadedFile({
+                    ...file,
+                    uri: response.data?.data.url,
+                });
+            } else {
+                alert.error('Upload Failed', 'Could not upload prescription. Please try again.');
+                setUploadedFile(null);
+            }
+        } catch (error) {
+            console.error('Error uploading prescription:', error);
+            alert.error('Upload Error', 'Something went wrong while uploading. Please try again.');
+            setUploadedFile(null);
+        }
+    };
     useEffect(() => {
         const toValue = hasInsurance ? 1 : 0;
         Animated.parallel([
@@ -433,7 +466,7 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                     activeOpacity={0.8}
                 >
                     <View style={styles.uploadIconBox}>
-                        <Ionicons name='cloud-upload' style={styles.uploadIconText} />
+                        <Ionicons name="cloud-upload" style={styles.uploadIconText} />
                     </View>
                     <View style={styles.uploadTextBox}>
                         <Text style={styles.uploadTitle}>Upload Prescription</Text>
@@ -502,8 +535,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                                 policyFetched
                                     ? [Colors.accent, Colors.accentDark]
                                     : insurancePolicyNumber?.trim()
-                                        ? [Colors.gradientStart, Colors.gradientEnd]
-                                        : ['#C8DCE4', '#B8CCCC']
+                                    ? [Colors.gradientStart, Colors.gradientEnd]
+                                    : ['#C8DCE4', '#B8CCCC']
                             }
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
@@ -513,8 +546,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                                 {policyFetched
                                     ? '✓  Policy Verified'
                                     : fetchingPolicy
-                                        ? 'Verifying...'
-                                        : 'Fetch Policy Details'}
+                                    ? 'Verifying...'
+                                    : 'Fetch Policy Details'}
                             </Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -527,8 +560,8 @@ const RequirementsScreen: React.FC<RequirementsScreenProps> = ({
                 visible={showUploadSheet}
                 onClose={() => setShowUploadSheet(false)}
                 onFilePicked={file => {
-                    setUploadedFile(file);
                     setShowUploadSheet(false);
+                    handleUploadPrescriptionDetail(file);
                 }}
             />
         </View>
@@ -658,7 +691,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    uploadIconText: { fontSize: 20, color: Colors.gradientEnd},
+    uploadIconText: { fontSize: 20, color: Colors.gradientEnd },
     uploadTextBox: { flex: 1 },
     uploadTitle: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
     uploadSub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },

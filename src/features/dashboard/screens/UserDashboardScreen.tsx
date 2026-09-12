@@ -138,11 +138,10 @@ const MetricCard = ({ card, delay }: { card: MetricCardConfig; delay: number }) 
 
 const DashboardScreen = ({ navigation }: DashboardProps) => {
     const { user } = useAuthStore();
-    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); //current location
+    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); 
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
 
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;

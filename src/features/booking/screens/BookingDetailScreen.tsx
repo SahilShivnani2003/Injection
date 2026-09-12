@@ -27,6 +27,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { TimeDropdown, Calendar } from '../components/SlotBookingScreen';
 import { cancelBooking } from '@/service/apis/bookingService';
+import { LayoutAnimation, UIManager } from 'react-native';
+import { ImageZoomModal } from '../model/ImageZoomModel';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get('window');
 
@@ -265,7 +271,9 @@ const RequestedItemRow = ({
 }) => {
     const qty = item.quantity ?? 1;
     const statusCfg =
-        REQUESTED_ITEM_STATUS_CONFIG[(item.status as 'pending' | 'brought' | 'unavailable') ?? 'pending'];
+        REQUESTED_ITEM_STATUS_CONFIG[
+            (item.status as 'pending' | 'brought' | 'unavailable') ?? 'pending'
+        ];
     return (
         <View style={[srStyles.row, !isLast && srStyles.border]}>
             <View style={srStyles.dot} />
@@ -273,9 +281,13 @@ const RequestedItemRow = ({
                 {item.itemName}
                 {qty > 1 ? `  ×${qty}` : ''}
             </Text>
-            {item.price != null && <Text style={srStyles.price}>₹{item.price.toLocaleString()}</Text>}
+            {item.price != null && (
+                <Text style={srStyles.price}>₹{item.price.toLocaleString()}</Text>
+            )}
             <View style={[pillStyles.pill, { backgroundColor: statusCfg.bg, marginLeft: 8 }]}>
-                <Text style={[pillStyles.pillText, { color: statusCfg.text }]}>{statusCfg.label}</Text>
+                <Text style={[pillStyles.pillText, { color: statusCfg.text }]}>
+                    {statusCfg.label}
+                </Text>
             </View>
         </View>
     );
@@ -367,7 +379,11 @@ const RescheduleModal = ({
                 style={modalStyles.overlay}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                <TouchableOpacity style={modalStyles.backdrop} activeOpacity={1} onPress={onClose} />
+                <TouchableOpacity
+                    style={modalStyles.backdrop}
+                    activeOpacity={1}
+                    onPress={onClose}
+                />
 
                 <View style={modalStyles.sheet}>
                     {/* Handle */}
@@ -390,32 +406,35 @@ const RescheduleModal = ({
                     <View style={modalStyles.fieldGroup}>
                         <Text style={modalStyles.fieldLabel}>New Date</Text>
                         <View>
-
                             <TouchableOpacity
                                 style={modalStyles.inputWrapper}
                                 onPress={() => setShowCalendar(true)}
                                 disabled={loading}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="calendar-clear-outline" color={Colors.gradientStart} size={16} />
+                                <Ionicons
+                                    name="calendar-clear-outline"
+                                    color={Colors.gradientStart}
+                                    size={16}
+                                />
 
                                 <Text style={modalStyles.input}>
-                                    {form.newDate
-                                        ? formatDisplayDate(form.newDate)
-                                        : 'Select date'}
+                                    {form.newDate ? formatDisplayDate(form.newDate) : 'Select date'}
                                 </Text>
                             </TouchableOpacity>
 
                             {/* <Text style={modalStyles.inputIcon}>📆</Text>
                             <Text style={modalStyles.input}>{formatDisplayDate(form.newDate) || ''}</Text> */}
-                            {showCalendar && (<Calendar
-                                selectedDate={form.newDate}
-                                minDateKey={todayKey}
-                                onSelectDate={date => {
-                                    onChange('newDate', date);
-                                    setShowCalendar(false);
-                                }}
-                            />)}
+                            {showCalendar && (
+                                <Calendar
+                                    selectedDate={form.newDate}
+                                    minDateKey={todayKey}
+                                    onSelectDate={date => {
+                                        onChange('newDate', date);
+                                        setShowCalendar(false);
+                                    }}
+                                />
+                            )}
                             {/* <TextInput
                                 style={modalStyles.input}
                                 placeholder="YYYY-MM-DD"
@@ -432,7 +451,7 @@ const RescheduleModal = ({
                     {/* Time Field */}
                     <View style={modalStyles.fieldGroup}>
                         <Text style={modalStyles.fieldLabel}>Preferred Time</Text>
-                        <View >
+                        <View>
                             {/* <Text style={modalStyles.inputIcon}>🕐</Text> */}
                             <TimeDropdown
                                 times={STATIC_TIMES}
@@ -488,7 +507,11 @@ const RescheduleModal = ({
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+                                colors={[
+                                    Colors.gradientStart,
+                                    Colors.gradientMid,
+                                    Colors.gradientEnd,
+                                ]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={modalStyles.confirmGradient}
@@ -496,7 +519,9 @@ const RescheduleModal = ({
                                 {loading ? (
                                     <ActivityIndicator color="#fff" size="small" />
                                 ) : (
-                                    <Text style={modalStyles.confirmBtnText}>Confirm Reschedule</Text>
+                                    <Text style={modalStyles.confirmBtnText}>
+                                        Confirm Reschedule
+                                    </Text>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
@@ -583,6 +608,7 @@ const modalStyles = StyleSheet.create({
 const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     const alert = useAlert();
     const bookingId = route.params?.bookingId;
+    const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
     const [booking, setBooking] = useState<PopulatedBooking | null>(null);
     const [loading, setLoading] = useState(true);
@@ -667,11 +693,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         const response = await bookingAPI.confirmBooking(bookingId);
         if (response.data?.success) {
             alert.success(response?.data?.message || 'Agreement confirmed successfully!');
-
         } else {
             alert.error('Something went wrong', 'Please try again letter');
         }
-    }
+    };
 
     // ── Reschedule ─────────────────────────────────────────────────────────────
 
@@ -708,9 +733,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                 setBooking(prev =>
                     prev
                         ? {
-                            ...prev,
-                            preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
-                        }
+                              ...prev,
+                              preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
+                          }
                         : prev,
                 );
                 alert.success('Success', 'Booking rescheduled successfully.');
@@ -820,17 +845,19 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         ...(booking.reports ?? []),
         ...(booking.reportUrl
             ? [
-                {
-                    reportUrl: booking.reportUrl,
-                    reportType: 'general' as const,
-                    reportName: 'Report',
-                    addedAt: booking.reportGeneratedAt,
-                },
-            ]
+                  {
+                      reportUrl: booking.reportUrl,
+                      reportType: 'general' as const,
+                      reportName: 'Report',
+                      addedAt: booking.reportGeneratedAt,
+                  },
+              ]
             : []),
     ];
 
-    const displayBookingId = booking.bookingId ? `#${booking.bookingId}` : `#${booking._id?.slice(-8).toUpperCase()}`;
+    const displayBookingId = booking.bookingId
+        ? `#${booking.bookingId}`
+        : `#${booking._id?.slice(-8).toUpperCase()}`;
 
     return (
         <View style={styles.root}>
@@ -886,8 +913,15 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             </Text>
                         </View>
                         {booking.bookingStatus === 'pending' ? (
-                            <TouchableOpacity onPress={() => navigation.navigate('Booking', { isEdit: true, booking: booking })}>
-                                <Ionicons name='create-outline' size={25} color={Colors.white} />
+                            <TouchableOpacity
+                                onPress={() =>
+                                    navigation.navigate('Booking', {
+                                        isEdit: true,
+                                        booking: booking,
+                                    })
+                                }
+                            >
+                                <Ionicons name="create-outline" size={25} color={Colors.white} />
                             </TouchableOpacity>
                         ) : null}
                     </View>
@@ -915,37 +949,38 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             ]}
                         >
                             {/* <Text style={styles.statusIcon}>{status.icon}</Text> */}
-                            {(booking.bookingStatus === 'in-progress' && booking?.userConsent?.agreed === false) ?
-                                (
-                                    <TouchableOpacity onPress={handleConfirm}>
-                                        <Text style={[styles.statusText, { color: status.text }]}>
-                                            Confirm booking
-                                        </Text>
-                                    </TouchableOpacity>
-                                ) :
-                                (
+                            {booking.bookingStatus === 'in-progress' &&
+                            booking?.userConsent?.agreed === false ? (
+                                <TouchableOpacity onPress={handleConfirm}>
                                     <Text style={[styles.statusText, { color: status.text }]}>
-                                        {status.label}
+                                        Confirm booking
                                     </Text>
-                                )
-                            }
+                                </TouchableOpacity>
+                            ) : (
+                                <Text style={[styles.statusText, { color: status.text }]}>
+                                    {status.label}
+                                </Text>
+                            )}
                         </Animated.View>
                     </View>
 
                     {/* Slot + Duration strip */}
                     <View style={styles.slotStrip}>
                         <View style={styles.slotChip}>
-                            <Ionicons name='calendar-number-outline' style={styles.slotIcon}></Ionicons>
+                            <Ionicons
+                                name="calendar-number-outline"
+                                style={styles.slotIcon}
+                            ></Ionicons>
                             <Text style={styles.slotText}>{booking.preferredTimeSlot}</Text>
                         </View>
                         <View style={styles.slotDivider} />
                         <View style={styles.slotChip}>
-                            <Ionicons name='timer-outline' style={styles.slotIcon}></Ionicons>
+                            <Ionicons name="timer-outline" style={styles.slotIcon}></Ionicons>
                             <Text style={styles.slotText}>~{booking.estimatedDuration} min</Text>
                         </View>
                         <View style={styles.slotDivider} />
                         <View style={styles.slotChip}>
-                            <Ionicons name='people-outline' style={styles.slotIcon}></Ionicons>
+                            <Ionicons name="people-outline" style={styles.slotIcon}></Ionicons>
                             <Text style={styles.slotText}>{booking.staffPreference}</Text>
                         </View>
                     </View>
@@ -1051,7 +1086,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Payment ── */}
                     <SectionHeader icon="credit-card-outline" title="Payment" />
                     <View style={styles.card}>
-                        <InfoRow label="Method" value={formatPaymentMethod(booking.paymentMethod)} />
+                        <InfoRow
+                            label="Method"
+                            value={formatPaymentMethod(booking.paymentMethod)}
+                        />
                         {paymentStatusCfg ? (
                             <PillRow
                                 label="Status"
@@ -1101,10 +1139,11 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 label="Booked For"
                                 value={
                                     booking.familyMemberId.name
-                                        ? `${booking.familyMemberId.name}${booking.familyMemberId.relation
-                                            ? ` (${booking.familyMemberId.relation})`
-                                            : ''
-                                        }`
+                                        ? `${booking.familyMemberId.name}${
+                                              booking.familyMemberId.relation
+                                                  ? ` (${booking.familyMemberId.relation})`
+                                                  : ''
+                                          }`
                                         : 'Family Member'
                                 }
                                 accent
@@ -1169,11 +1208,14 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 <View key={idx} style={[styles.card, idx > 0 && { marginTop: 10 }]}>
                                     <TouchableOpacity
                                         style={styles.rxHeader}
-                                        onPress={() =>
+                                        onPress={() => {
+                                            LayoutAnimation.configureNext(
+                                                LayoutAnimation.Presets.easeInEaseOut,
+                                            );
                                             setExpandedPrescription(
                                                 expandedPrescription === idx ? null : idx,
-                                            )
-                                        }
+                                            );
+                                        }}
                                         activeOpacity={0.8}
                                     >
                                         <View style={styles.rxIconWrap}>
@@ -1181,10 +1223,11 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.rxTitle}>
-                                                {rx.doctorName ?? 'Prescription'}
+                                                {rx.doctorName || 'Prescription'}
                                             </Text>
                                             <Text style={styles.rxSub}>
-                                                {rx.hospitalName} · {formatDate(rx.addedAt)}
+                                                {rx.hospitalName ? `${rx.hospitalName} · ` : ''}
+                                                {formatDate(rx.addedAt)}
                                             </Text>
                                         </View>
                                         <Text style={styles.rxChevron}>
@@ -1245,7 +1288,24 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                                     accent
                                                 />
                                             )}
-                                            {!!rx.imageUrl && (<Image source={{uri: rx.imageUrl}} style={styles.rxImage} />)}
+                                            {!!rx.imageUrl && (
+                                                <TouchableOpacity
+                                                    activeOpacity={0.85}
+                                                    onPress={() => setZoomImageUrl(rx.imageUrl!)}
+                                                >
+                                                    <Image
+                                                        source={{ uri: rx.imageUrl }}
+                                                        style={styles.rxImage}
+                                                    />
+                                                    <View style={styles.zoomHint}>
+                                                        <Ionicons
+                                                            name="expand-outline"
+                                                            size={14}
+                                                            color="#fff"
+                                                        />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     )}
                                 </View>
@@ -1277,7 +1337,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         ]}
                                     >
                                         <View style={styles.noteAvatar}>
-                                            <Ionicons name='person-outline' style={{ fontSize: 13 }}></Ionicons>
+                                            <Ionicons
+                                                name="person-outline"
+                                                style={{ fontSize: 13 }}
+                                            ></Ionicons>
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.noteText}>{note.text}</Text>
@@ -1294,17 +1357,26 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Runtime Notes (from vendor/admin during service) ── */}
                     {(booking.runtimeNotes?.length ?? 0) > 0 && (
                         <>
-                            <SectionHeader icon="chat-processing-outline" title="Provider Updates" />
+                            <SectionHeader
+                                icon="chat-processing-outline"
+                                title="Provider Updates"
+                            />
                             <View style={styles.card}>
                                 {booking.runtimeNotes!.map((note, i) => (
                                     <View
                                         key={i}
                                         style={[
                                             styles.noteRow,
-                                            i < booking.runtimeNotes!.length - 1 && styles.noteBorder,
+                                            i < booking.runtimeNotes!.length - 1 &&
+                                                styles.noteBorder,
                                         ]}
                                     >
-                                        <View style={[styles.noteAvatar, { backgroundColor: '#E8F9FF' }]}>
+                                        <View
+                                            style={[
+                                                styles.noteAvatar,
+                                                { backgroundColor: '#E8F9FF' },
+                                            ]}
+                                        >
                                             <Ionicons
                                                 name={
                                                     note.addedBy === 'Admin'
@@ -1317,7 +1389,8 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.noteText}>{note.text}</Text>
                                             <Text style={styles.noteMeta}>
-                                                {note.addedBy ?? 'Team'} · {formatDate(note.addedAt)}
+                                                {note.addedBy ?? 'Team'} ·{' '}
+                                                {formatDate(note.addedAt)}
                                             </Text>
                                         </View>
                                     </View>
@@ -1383,18 +1456,25 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         onPress={() => handleOpenReport(r.reportUrl)}
                                     >
                                         <View style={styles.reportIconWrap}>
-                                            <Ionicons name="document-text-outline" style={{ fontSize: 18, color: '#5B5BD6' }} />
+                                            <Ionicons
+                                                name="document-text-outline"
+                                                style={{ fontSize: 18, color: '#5B5BD6' }}
+                                            />
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.reportName}>
-                                                {r.reportName || REPORT_TYPE_LABEL[r.reportType ?? 'general']}
+                                                {r.reportName ||
+                                                    REPORT_TYPE_LABEL[r.reportType ?? 'general']}
                                             </Text>
                                             <Text style={styles.noteMeta}>
                                                 {REPORT_TYPE_LABEL[r.reportType ?? 'general']} ·{' '}
                                                 {formatDate(r.addedAt)}
                                             </Text>
                                         </View>
-                                        <Ionicons name="download-outline" style={{ fontSize: 18, color: Colors.gradientMid }} />
+                                        <Ionicons
+                                            name="download-outline"
+                                            style={{ fontSize: 18, color: Colors.gradientMid }}
+                                        />
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -1453,13 +1533,21 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             <Text style={styles.reviewPromptText}>
                                 Rate your experience with this service
                             </Text>
-                            <Ionicons name="chevron-forward" style={{ fontSize: 16, color: '#C07800' }} />
+                            <Ionicons
+                                name="chevron-forward"
+                                style={{ fontSize: 16, color: '#C07800' }}
+                            />
                         </TouchableOpacity>
                     )}
 
                     <View style={{ height: 40 }} />
                 </ScrollView>
             </Animated.View>
+            <ImageZoomModal
+                visible={!!zoomImageUrl}
+                imageUrl={zoomImageUrl}
+                onClose={() => setZoomImageUrl(null)}
+            />
         </View>
     );
 };
@@ -1649,7 +1737,14 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 8,
     },
-    rxImage:{ width: '70%', height: '70%', borderRadius: 12, marginTop: 7, resizeMode: 'center', alignSelf: 'center' },
+    rxImage: {
+        width: '100%',
+        height: 220, // fixed height instead of '70%'
+        borderRadius: 12,
+        marginTop: 10,
+        resizeMode: 'contain', // 'contain' looks better than 'center' at fixed size
+        backgroundColor: '#F8FCFF',
+    },
     medRow: { backgroundColor: '#F8FCFF', borderRadius: 10, padding: 10, marginBottom: 7 },
     medName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
     medDetail: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
@@ -1788,6 +1883,14 @@ const styles = StyleSheet.create({
     },
     reviewPromptIcon: { fontSize: 20 },
     reviewPromptText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#C07800' },
+    zoomHint: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 14,
+        padding: 6,
+    },
 });
 
 export default BookingDetailScreen;

@@ -60,7 +60,7 @@ const formatINR = (amount?: number): string =>
 
 const VendorDashboardScreen = ({ navigation }: VendorDashboardProps) => {
     const rootNav = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
-    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); // current location
+    const { state: locationState, retry: retryLocation } = useVendorLocationTracking(); 
     const { user } = useAuthStore();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [services, setServices] = useState<Service[]>([]);

@@ -3,7 +3,7 @@ import { RootStackParamList } from '@/types/RootStackParamList';
 import { bookingAPI } from '@/service/apis/bookingService';
 import { useAlert } from '@/context/AlertContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Image,
@@ -16,6 +16,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Booking, BookingStatus, PaymentStatus } from '../types/Booking';
+import { ImageZoomModal } from '../model/ImageZoomModel';
 
 type BookingDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'VendorBookingDetail'>;
 
@@ -133,6 +134,7 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
     // The notification passes the populated booking object directly
     const booking: Booking = route.params?.booking;
     const notificationId: string | undefined = route.params?.notificationId;
+    const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
     const alert = useAlert();
     const [accepting, setAccepting] = useState(false);
@@ -532,20 +534,41 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                                         </View>
                                     )}
                                     {note.addedAt && (
-                                        <Text style={styles.noteTime}>{formatDate(note.addedAt)}</Text>
+                                        <Text style={styles.noteTime}>
+                                            {formatDate(note.addedAt)}
+                                        </Text>
                                     )}
                                 </View>
                             </View>
                         ))}
                     </SectionCard>
-
                 )}
 
-                {/* Priscription */}
-                <SectionCard title='Priscription' icon='receipt-outline' >
+                {/* Prescription */}
+                <SectionCard title="Prescription" icon="receipt-outline">
                     {booking.prescriptions?.map((rx, idx) => (
-                        <View key={idx} style={{height:200}}>
-                            {!!rx.imageUrl && (<Image source={{ uri: rx.imageUrl }} style={styles.rxImage} />)}
+                        <View
+                            key={idx}
+                            style={{
+                                height: 200,
+                                marginBottom: idx < booking.prescriptions!.length - 1 ? 12 : 0,
+                            }}
+                        >
+                            {!!rx.imageUrl && (
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() => setZoomImageUrl(rx?.imageUrl)}
+                                >
+                                    <Image source={{ uri: rx.imageUrl }} style={styles.rxImage} />
+                                    <View style={styles.zoomHint}>
+                                        <Ionicons
+                                            name="expand-outline"
+                                            size={14}
+                                            color={Colors.white}
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     ))}
                 </SectionCard>
@@ -592,6 +615,12 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                     <Text style={styles.acceptedBannerText}>Booking Accepted</Text>
                 </View>
             )}
+
+            <ImageZoomModal
+                visible={!!zoomImageUrl}
+                imageUrl={zoomImageUrl}
+                onClose={() => setZoomImageUrl(null)}
+            />
         </View>
     );
 };
@@ -904,5 +933,18 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: Colors.gradientStart,
     },
-    rxImage: { width: '80%', height: '80%', borderRadius: 12, marginTop: 2, resizeMode: 'center', alignSelf: 'center' },
+    rxImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 12,
+        resizeMode: 'contain', // was 'center' — now scales to fit instead of cropping
+    },
+    zoomHint: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 14,
+        padding: 6,
+    },
 });

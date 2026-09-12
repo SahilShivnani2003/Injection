@@ -8,7 +8,7 @@ import {
       LocationServicesDisabledError,
 } from './deviceLocation';
 import { Coordinates, coordinatesToAddress } from './geocoding';
-import { vendorAPI } from '@/service/apis/vendorService'; // <- wire this to your existing API client
+import { vendorAPI } from '@/service/apis/vendorService'; 
 import { userApi } from '@/service/apis/userService';
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -19,17 +19,6 @@ export type VendorLocationFlowState =
       | 'tracking'
       | 'error';
 
-/**
- * Drop this into your app's root/home screen (wherever the vendor lands after
- * login, or on app open if already logged in). It:
- *  1. Checks/asks for location permission.
- *  2. Checks/asks to turn GPS on.
- *  3. Once both are OK, starts watchPosition and pushes each update to the
- *     backend via updateVendorCoords()/updateUserCoords(), which your server can use to match
- *     nearby bookings instead of pincode.
- *  4. If the vendor backgrounds the app to grant permission / enable GPS in
- *     Settings, the flow automatically re-runs when they come back.
- */
 export function useVendorLocationTracking() {
       const [state, setState] = useState<VendorLocationFlowState>('checking');
       const stateRef = useRef(state);

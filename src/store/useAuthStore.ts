@@ -48,21 +48,6 @@ export const useAuthStore = create<AuthState>((set) => ({
                 loggedInRole: role
             })
 
-            // const hasPermission = await requestNotificationPermission();
-
-            // if (hasPermission) {
-            //     const fcmToken = await messaging().getToken();
-
-            //     const registerDeviceData: IRegisterDevice = {
-            //         token: fcmToken,
-            //         deviceType: 'android',
-            //         platform: 'app',
-            //         appVersion: DeviceConfig.version,
-            //     }
-
-            //     await registerDevice(registerDeviceData);
-            // }
-
             try {
                 console.log('1. Requesting notification permission...');
 
@@ -73,10 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
                 if (hasPermission) {
                     console.log('3. Getting FCM token...');
 
-                    const app = getApp();
-                    const messagingInstance = getMessaging(app);
-
-                    const fcmToken = await getToken(messagingInstance);
+                    const fcmToken = await messaging().getToken();
 
                     console.log('4. FCM token:', fcmToken);
 
