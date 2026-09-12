@@ -15,6 +15,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Notification } from '../types/Notification';
 import { bookingAPI } from '@/service/apis/bookingService';
 import { useAlert } from '@/context/AlertContext';
+import { useAuthStore } from '@/store/useAuthStore';
 
 type NotificationScreenProps = NativeStackScreenProps<RootStackParamList, 'Notification'>;
 
@@ -145,6 +146,7 @@ export const NotificationScreen = ({ navigation }: NotificationScreenProps) => {
     const [notifications, setNotifications] = useState<Notification[] | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const { user } = useAuthStore();
 
     useEffect(() => {
         fetchNotifications();

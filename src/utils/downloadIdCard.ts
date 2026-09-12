@@ -20,17 +20,6 @@ export async function downloadVendorIdCardPdf(
       try {
             const html = buildVendorIdCardHtml(vendor, setting);
 
-            // Renders the HTML to a real PDF file on disk.
-            // const file = await RNHTMLtoPDF.convert({
-            //       html,
-            //       fileName: `vendor_id_card_${vendor.vendorId || vendor._id}`,
-            //       base64: false,
-            //       // Android only: which app-scoped external directory to write into.
-            //       // Use 'Download' instead of 'Documents' if you'd rather it land in
-            //       // the device's public Downloads folder.
-            //       directory: Platform.OS === 'android' ? 'Documents' : undefined,
-            // });
-
             const file = await generatePDF({
                   html,
                   fileName: `vendor_id_card_${vendor.vendorId || vendor._id}`,
@@ -38,7 +27,7 @@ export async function downloadVendorIdCardPdf(
                   // Android only: which app-scoped external directory to write into.
                   // Use 'Download' instead of 'Documents' if you'd rather it land in
                   // the device's public Downloads folder.
-                  directory: Platform.OS === 'android' ? 'Documents' : undefined,
+                  // directory: Platform.OS === 'android' ? 'Documents' : undefined,
             });
 
             if (!file.filePath) {

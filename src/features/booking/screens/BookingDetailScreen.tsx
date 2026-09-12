@@ -622,7 +622,6 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     // ── Cancel ─────────────────────────────────────────────────────────────────
 
     const handleCancelBooking = async () => {
-        debugger
         try {
             // const response = await bookingAPI.CancelBooking(bookingId);
             const response = await cancelBooking(bookingId);
@@ -662,6 +661,16 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
             ],
         });
     };
+
+    const handleConfirm = async () => {
+        const response = await bookingAPI.confirmBooking(bookingId);
+        if (response.data?.success) {
+            alert.success(response?.data?.message || 'Agreement confirmed successfully!');
+
+        } else {
+            alert.error('Something went wrong', 'Please try again letter');
+        }
+    }
 
     // ── Reschedule ─────────────────────────────────────────────────────────────
 
@@ -905,9 +914,20 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                             ]}
                         >
                             {/* <Text style={styles.statusIcon}>{status.icon}</Text> */}
-                            <Text style={[styles.statusText, { color: status.text }]}>
-                                {status.label}
-                            </Text>
+                            {(booking.bookingStatus === 'in-progress' && booking?.userConsent?.agreed === false) ?
+                                (
+                                    <TouchableOpacity onPress={handleConfirm}>
+                                        <Text style={[styles.statusText, { color: status.text }]}>
+                                            Confirm booking
+                                        </Text>
+                                    </TouchableOpacity>
+                                ) :
+                                (
+                                    <Text style={[styles.statusText, { color: status.text }]}>
+                                        {status.label}
+                                    </Text>
+                                )
+                            }
                         </Animated.View>
                     </View>
 

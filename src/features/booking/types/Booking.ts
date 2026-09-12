@@ -240,4 +240,9 @@ export interface Booking {
     latitude?: number;
     longitude?: number;
     useCurrentLocation?: boolean;
+    userConsent: {
+        agreed: boolean;
+        agreedAt: string;
+        notes?: string;
+    },
 }

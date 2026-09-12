@@ -27,6 +27,9 @@ export const bookingAPI = {
   getNotifications: () => privateClient.get('/user-bookings/notifications'),
   acceptUserBooking: (bookingId: string) => privateClient.put(`/user-bookings/accept/${bookingId}`),
   readNotification: (notificatonId: string) => privateClient.put(`/user-bookings/notifications/${notificatonId}/read`),
+
+  //user confirms booking started by vendor
+  confirmBooking: (bookingId: string) => privateClient.put(`/bookings/${bookingId}/user-consent`)
 };
 
 export const cancelBooking = async (bookingId: string) => {

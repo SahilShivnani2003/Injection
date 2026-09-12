@@ -143,6 +143,7 @@ const DashboardScreen = ({ navigation }: DashboardProps) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
 

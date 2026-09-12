@@ -44,7 +44,7 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
     const [form, setForm] = useState<VendorForm>(vendorData ? vendorData : INITIAL_FORM);
     const [profileImage, setProfileImage] = useState<string | null>(vendorData ? vendorData.profileImage : null);
     const [documents, setDocuments] =
-        useState<Record<DocumentField, string | null>>(vendorData ? vendorData.documents : INITIAL_DOCUMENTS);
+        useState<Record<DocumentField, string | null>>(vendorData.documents ? vendorData.documents : INITIAL_DOCUMENTS);
 
     const scrollRef = useRef<ScrollView>(null);
 

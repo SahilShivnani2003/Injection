@@ -117,7 +117,8 @@ const VendorIdCardScreen = ({ navigation }: VendorIdCardScreenProps) => {
             if (isDownloading) return;
             setIsDownloading(true);
             try {
-                  await downloadVendorIdCardPdf(vendor, setting);
+                  const res = await downloadVendorIdCardPdf(vendor, setting);
+                  console.log('response:', res);
             } finally {
                   setIsDownloading(false);
             }
