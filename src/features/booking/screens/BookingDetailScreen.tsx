@@ -18,6 +18,7 @@ import {
     Platform,
     KeyboardAvoidingView,
     Linking,
+    Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Booking, BookingStatus, PaymentStatus } from '../types/Booking';
@@ -1163,7 +1164,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Prescriptions ── */}
                     {(booking.prescriptions?.length ?? 0) > 0 && (
                         <>
-                            <SectionHeader icon="📋" title="Prescriptions" />
+                            <SectionHeader icon="prescription" title="Prescriptions" />
                             {booking.prescriptions!.map((rx, idx) => (
                                 <View key={idx} style={[styles.card, idx > 0 && { marginTop: 10 }]}>
                                     <TouchableOpacity
@@ -1244,6 +1245,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                                     accent
                                                 />
                                             )}
+                                            {!!rx.imageUrl && (<Image source={{uri: rx.imageUrl}} style={styles.rxImage} />)}
                                         </View>
                                     )}
                                 </View>
@@ -1647,6 +1649,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 8,
     },
+    rxImage:{ width: '70%', height: '70%', borderRadius: 12, marginTop: 7, resizeMode: 'center', alignSelf: 'center' },
     medRow: { backgroundColor: '#F8FCFF', borderRadius: 10, padding: 10, marginBottom: 7 },
     medName: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
     medDetail: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },

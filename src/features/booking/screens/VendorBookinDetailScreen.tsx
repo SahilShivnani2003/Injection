@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
     ActivityIndicator,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -537,7 +538,17 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                             </View>
                         ))}
                     </SectionCard>
+
                 )}
+
+                {/* Priscription */}
+                <SectionCard title='Priscription' icon='receipt-outline' >
+                    {booking.prescriptions?.map((rx, idx) => (
+                        <View key={idx} style={{height:200}}>
+                            {!!rx.imageUrl && (<Image source={{ uri: rx.imageUrl }} style={styles.rxImage} />)}
+                        </View>
+                    ))}
+                </SectionCard>
 
                 {/* bottom padding so CTA doesn't overlap */}
                 <View style={{ height: accepted ? Spacing.xxxl : 96 }} />
@@ -893,4 +904,5 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: Colors.gradientStart,
     },
+    rxImage: { width: '80%', height: '80%', borderRadius: 12, marginTop: 2, resizeMode: 'center', alignSelf: 'center' },
 });
