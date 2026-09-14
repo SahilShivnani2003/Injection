@@ -13,12 +13,13 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { bookingAPI } from '@/service/apis/bookingService';
+import { bookingAPI, cancelBooking } from '@/service/apis/bookingService';
 import { Booking } from '@/features/booking/types/Booking';
 import { VendorTabParamList } from '@/types/VendorTabParamList';
 import { Colors } from '@/theme/colors';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/types/RootStackParamList';
+import { useAlert } from '@/context/AlertContext';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ const formatINR = (amount?: number): string =>
 const VendorBookingsScreen = ({
     navigation,
 }: NativeBottomTabScreenProps<VendorTabParamList, 'Bookings'>) => {
+    const alert = useAlert();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -74,9 +76,9 @@ const VendorBookingsScreen = ({
             const response = await bookingAPI.vendorBookings();
             console.log('Booking response : ', response.data);
             setBookings(response.data?.data ?? response.data?.bookings ?? response.data ?? []);
-        } catch (error) {
-            console.warn('Unable to load bookings', error);
-            Alert.alert('Error', 'Unable to load bookings. Pull down to retry.');
+        } catch (error: any) {
+            console.error('Unable to load bookings', error);
+            alert.error('Error', error?.message || 'Unable to load bookings. Pull down to retry.');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -144,13 +146,16 @@ const VendorBookingsScreen = ({
                     break;
                 case 'cancel':
                     // Use your actual cancel endpoint — adjust if the method name differs
-                    await bookingAPI.CancelBooking?.({ bookingId });
+                    await cancelBooking(bookingId);
                     break;
             }
             await fetchBookings(true);
-        } catch (error) {
-            console.log('Error while updating status : ', error);
-            Alert.alert('Action failed', 'Unable to update booking status. Please try again.');
+        } catch (error: any) {
+            console.error('Error while updating status : ', error);
+            alert.error(
+                'Action failed',
+                error?.message || 'Unable to update booking status. Please try again.',
+            );
         } finally {
             setProcessingId(null);
         }
@@ -326,10 +331,11 @@ const VendorBookingsScreen = ({
                         const amount = booking.grandTotal ?? booking.subtotal;
 
                         return (
-                            <View
+                            <TouchableOpacity
                                 key={key}
                                 style={styles.bookingCard}
-                                onTouchStart={() =>
+                                activeOpacity={0.9}
+                                onPress={() =>
                                     navigation
                                         .getParent<NativeStackNavigationProp<RootStackParamList>>()
                                         .navigate('VendorBookingDetail', {
@@ -409,7 +415,7 @@ const VendorBookingsScreen = ({
 
                                 {/* Action buttons */}
                                 {renderActions(booking)}
-                            </View>
+                            </TouchableOpacity>
                         );
                     })
                 )}
