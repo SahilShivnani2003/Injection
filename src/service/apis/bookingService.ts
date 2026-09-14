@@ -30,6 +30,7 @@ export const bookingAPI = {
 
   //user confirms booking started by vendor
   confirmBooking: (bookingId: string) => privateClient.put(`/bookings/${bookingId}/user-consent`), 
+  vendorRuntimeNotes : (bookingId: string, text: any) => privateClient.post(`/bookings/${bookingId}/runtime-notes`, { text }),
 };
 
 export const cancelBooking = async (bookingId: string) => {

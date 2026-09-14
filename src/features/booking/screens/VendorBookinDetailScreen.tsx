@@ -10,6 +10,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -140,6 +141,11 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
     const [accepting, setAccepting] = useState(false);
     const [accepted, setAccepted] = useState(booking?.bookingStatus === 'accepted');
 
+    // Runtime notes — kept in local state so newly-added notes show immediately
+    const [runtimeNotes, setRuntimeNotes] = useState(booking?.runtimeNotes ?? []);
+    const [noteText, setNoteText] = useState('');
+    const [addingNote, setAddingNote] = useState(false);
+
     if (!booking) {
         return (
             <View style={[styles.root, styles.centered]}>
@@ -170,6 +176,30 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
         }
     };
 
+    const handleAddRuntimeNote = async () => {
+        const trimmed = noteText.trim();
+        if (!trimmed || !booking._id) return;
+
+        try {
+            setAddingNote(true);
+            const response = await bookingAPI.vendorRuntimeNotes(booking._id, trimmed);
+
+            const updatedNotes = response.data?.data?.runtimeNotes;
+            if (Array.isArray(updatedNotes)) {
+                setRuntimeNotes(updatedNotes);
+            } else {
+                setRuntimeNotes(prev => [
+                    ...prev,
+                    { text: trimmed, addedBy: 'Vendor', addedAt: new Date().toISOString() },
+                ]);
+            }
+            setNoteText('');
+        } catch (error: any) {
+            alert.error('Note Failed', error?.message || 'Could not add runtime note.');
+        } finally {
+            setAddingNote(false);
+        }
+    };
     const totalServices = booking.selectedServices?.length ?? 0;
     const couponDiscount = booking.appliedCoupon?.discountAmount ?? 0;
     const displayId = booking.bookingId || booking._id?.slice(-8).toUpperCase();
@@ -521,10 +551,12 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                 )}
 
                 {/* ── Runtime Notes ── */}
-                {booking.runtimeNotes && booking.runtimeNotes.length > 0 && (
-                    <SectionCard title="Runtime Notes" icon="chatbox-ellipses-outline">
-                        {booking.runtimeNotes.map((note, idx) => (
-                            <View key={idx}>
+                <SectionCard title="Runtime Notes" icon="chatbox-ellipses-outline">
+                    {runtimeNotes.length === 0 ? (
+                        <Text style={styles.noRuntimeNotesText}>No runtime notes yet.</Text>
+                    ) : (
+                        runtimeNotes.map((note, idx) => (
+                            <View key={note?._id ?? idx}>
                                 {idx > 0 && <Divider />}
                                 <Text style={styles.noteText}>{note.text}</Text>
                                 <View style={styles.runtimeNoteMeta}>
@@ -540,9 +572,39 @@ export const VendorBookingDetailScreen = ({ route, navigation }: BookingDetailSc
                                     )}
                                 </View>
                             </View>
-                        ))}
-                    </SectionCard>
-                )}
+                        ))
+                    )}
+
+                    <Divider />
+
+                    {/* Add note input */}
+                    <View style={styles.addNoteRow}>
+                        <TextInput
+                            style={styles.addNoteInput}
+                            placeholder="Add a runtime note…"
+                            placeholderTextColor={Colors.textMuted}
+                            value={noteText}
+                            onChangeText={setNoteText}
+                            multiline
+                            editable={!addingNote}
+                        />
+                        <TouchableOpacity
+                            style={[
+                                styles.addNoteBtn,
+                                (!noteText.trim() || addingNote) && styles.addNoteBtnDisabled,
+                            ]}
+                            onPress={handleAddRuntimeNote}
+                            disabled={!noteText.trim() || addingNote}
+                            activeOpacity={0.8}
+                        >
+                            {addingNote ? (
+                                <ActivityIndicator size="small" color={Colors.white} />
+                            ) : (
+                                <Ionicons name="send" size={16} color={Colors.white} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </SectionCard>
 
                 {/* Prescription */}
                 <SectionCard title="Prescription" icon="receipt-outline">
@@ -946,5 +1008,41 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.55)',
         borderRadius: 14,
         padding: 6,
+    },
+    noRuntimeNotesText: {
+        fontSize: Fonts.sizes.sm,
+        color: Colors.textMuted,
+        fontStyle: 'italic',
+        paddingVertical: 10,
+    },
+    addNoteRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: Spacing.sm,
+        paddingVertical: 10,
+    },
+    addNoteInput: {
+        flex: 1,
+        minHeight: 40,
+        maxHeight: 100,
+        borderWidth: 1,
+        borderColor: Colors.background,
+        backgroundColor: Colors.background,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: Fonts.sizes.sm,
+        color: Colors.textDark,
+    },
+    addNoteBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: Colors.gradientStart,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addNoteBtnDisabled: {
+        opacity: 0.5,
     },
 });
