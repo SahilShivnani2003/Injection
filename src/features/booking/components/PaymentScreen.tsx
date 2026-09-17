@@ -12,6 +12,7 @@ import { privateClient } from '@/service/apiClient';
 import { useAlert } from '@/context/AlertContext';
 import { envConfig } from '@/config/env';
 import { useAuthStore } from '@/store/useAuthStore';
+import { verifyPayment } from '@/service/apis/bookingService';
 
 type PaymentMethod = 'cash' | 'razorpay';
 
@@ -69,9 +70,12 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
         };
 
         RazorpayCheckout.open(options)
-            .then((data: SuccessResponse) => {
-                onRazorpaySuccess(data);
-                onClose();
+            .then(async (data: SuccessResponse) => {
+                const response = await verifyPayment(bookingId, data);
+                if (response?.success || response?.data?.success) {
+                    onRazorpaySuccess(data);
+                    onClose();
+                }
             })
             .catch((error: ErrorResponse) => {
                 if (onRazorpayFailure) {
@@ -200,7 +204,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                                     style={[
                                         styles.methodIconBadge,
                                         selectedMethod === 'razorpay' &&
-                                            styles.methodIconBadgeSelected,
+                                        styles.methodIconBadgeSelected,
                                     ]}
                                 >
                                     <Icon

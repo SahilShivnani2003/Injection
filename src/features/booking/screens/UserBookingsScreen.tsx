@@ -104,7 +104,7 @@ const BookingsScreen = ({ navigation }: BookingsProps) => {
     // Show "Pay" only when there's genuinely something to collect: booking has
     // moved past pending, and payment hasn't succeeded yet.
     const needsPayment = (booking: Booking) =>
-        (booking.bookingStatus === 'accepted' || booking.bookingStatus === 'in-progress') &&
+        (booking.bookingStatus === 'accepted' || booking.bookingStatus === 'in-progress' || booking.bookingStatus === 'completed') &&
         booking.paymentStatus !== 'paid';
 
     // ── filtering ──────────────────────────────────────────────────────────

@@ -29,8 +29,8 @@ export const bookingAPI = {
   readNotification: (notificatonId: string) => privateClient.put(`/user-bookings/notifications/${notificatonId}/read`),
 
   //user confirms booking started by vendor
-  confirmBooking: (bookingId: string) => privateClient.put(`/bookings/${bookingId}/user-consent`), 
-  vendorRuntimeNotes : (bookingId: string, text: any) => privateClient.post(`/bookings/${bookingId}/runtime-notes`, { text }),
+  confirmBooking: (bookingId: string) => privateClient.put(`/bookings/${bookingId}/user-consent`),
+  vendorRuntimeNotes: (bookingId: string, text: any) => privateClient.post(`/bookings/${bookingId}/runtime-notes`, { text }),
 };
 
 export const cancelBooking = async (bookingId: string) => {
@@ -53,6 +53,17 @@ export const updateBooking = async (booking: Booking) => {
     return response.data;
   } catch (error) {
     console.log('Error in updating booking:', error);
+    throw error;
+  }
+}
+
+export const verifyPayment = async (bookingId: string, paymentDetails: any) => {
+  try {
+    const response = await privateClient.post(`/bookings/${bookingId}/pay/razorpay-verify`, paymentDetails);
+    console.log('Payment Verified', response.data);
+    return response.data;
+  } catch (error) {
+    console.log('Error in verifing payment', error);
     throw error;
   }
 }
