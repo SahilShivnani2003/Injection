@@ -211,7 +211,7 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                 if (formData?.pincode?.length !== 6)
                     return warn('Please enter a valid 6-digit pincode.');
                 if (!formData.currentLocation?.trim() && !formData.address?.trim()) return warn('Please enter address or use current location.');
-                if (!formData?.phoneNumber?.trim() || !formData.alternateMobile?.trim()) return warn('Please enter phone number.');
+                if (!formData?.phoneNumber?.trim() && !formData.alternateMobile?.trim()) return warn('Please enter phone number.');
                 if (formData?.phoneNumber?.length < 10)
                     return warn('Please enter a valid 10-digit phone number.');
                 if (!formData.email.trim()) return warn('Please enter email address.');

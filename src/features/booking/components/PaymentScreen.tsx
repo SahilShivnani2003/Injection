@@ -93,7 +93,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 <View style={styles.card}>
                     {/* Header */}
                     <LinearGradient
-                        colors={[Colors.gradientStart, Colors.accent]}
+                        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.header}
@@ -265,7 +265,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
                             <TouchableOpacity onPress={handlePay} activeOpacity={0.85}>
                                 <LinearGradient
-                                    colors={[Colors.gradientMid, Colors.accent]}
+                                    colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                     style={styles.payButton}

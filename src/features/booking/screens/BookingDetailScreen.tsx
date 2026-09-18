@@ -30,6 +30,7 @@ import { cancelBooking } from '@/service/apis/bookingService';
 import { LayoutAnimation, UIManager } from 'react-native';
 import { ImageZoomModal } from '../model/ImageZoomModel';
 import { PaymentMethodModal } from '../components/PaymentScreen';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1160,7 +1161,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 activeOpacity={0.85}
                                 onPress={() => handlePay(booking)}
                             >
-                                <Ionicons name="payments" size={15} color={Colors.white} />
+                                <Icon name="payments" size={15} color={Colors.white} />
                                 <Text style={styles.payBtnText}>Pay</Text>
                             </TouchableOpacity>
                         ) : null}
