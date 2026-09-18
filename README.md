@@ -1,590 +1,408 @@
 # Injection
 
-A comprehensive React Native mobile application for healthcare services, offering seamless booking, insurance management, vendor services, and personalized user dashboards.
+Injection is a React Native healthcare services application for patients and healthcare vendors. Patients can discover services, submit appointment requests, manage bookings, make payments, track service progress, and access reports. Vendors can manage their profile, request services, activate their offerings, and process patient bookings from request through completion.
 
----
+## Contents
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
+- [Product Overview](#product-overview)
+- [Roles and Capabilities](#roles-and-capabilities)
+- [Application Flow](#application-flow)
+- [Booking Lifecycle](#booking-lifecycle)
+- [Vendor Workflow](#vendor-workflow)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
 - [Project Structure](#project-structure)
-- [Development](#development)
-- [Building](#building)
-- [Testing](#testing)
+- [Testing and Code Quality](#testing-and-code-quality)
 - [Troubleshooting](#troubleshooting)
-- [License](#license)
 
----
+## Product Overview
 
-## 🎯 Overview
+Injection provides two authenticated experiences in one mobile application:
 
-**Injection** is a feature-rich React Native application designed to simplify healthcare service management. It provides users with an intuitive interface for booking medical services, managing insurance information, tracking orders, and accessing vendor services. The application supports dual-platform deployment (iOS and Android) with a modern, responsive UI and robust backend integration.
+- **Patient experience**: Dashboard, booking creation, booking history, payment, appointment details, route viewing, notifications, profile management, insurance information, and reports.
+- **Vendor experience**: Dashboard, booking queue, booking detail, service catalog, service requests, activation controls, profile management, runtime notes, and route viewing.
 
-### Key Capabilities
+The application uses role-aware navigation. A saved session is restored during the splash screen, and the user is sent directly to the appropriate dashboard.
 
-- **User Authentication & Profile Management**: Secure login and comprehensive user profiles
-- **Service Booking System**: Easy scheduling and management of medical services
-- **Insurance Integration**: Streamlined insurance information and claims management
-- **Vendor Marketplace**: Browse and interact with healthcare vendors
-- **Real-time Order Tracking**: Track service deliveries and appointments
-- **Coupon & Promotion Management**: Apply discounts and manage promotional offers
-- **Laboratory Partner Network**: Access to partner laboratory services
-- **Responsive Dashboard**: Personalized user dashboard with key metrics
+## Roles and Capabilities
 
----
+### Patient
 
-## ✨ Features
+Patients can:
 
-### Core Features
+1. Register or sign in with email and password.
+2. Browse available healthcare services.
+3. Create a booking for themselves or a family member.
+4. Provide patient details, location, contact information, requirements, insurance, documents, preferred schedule, staff preference, and a complimentary service.
+5. Review the calculated charges before submitting the request.
+6. Track booking status from the Bookings tab.
+7. Open booking details to view the vendor, schedule, location, selected services, payment, requested items, notes, and reports.
+8. Reschedule or cancel a booking when supported by the current booking state.
+9. Pay an eligible booking using cash or Razorpay.
+10. Receive foreground and push notification updates.
 
-✅ **Authentication**
-- Secure user registration and login
-- Session management with persistent storage
-- Token-based authentication
+### Vendor
 
-✅ **Booking Management**
-- Browse available medical services
-- Schedule appointments and services
-- Manage existing bookings
-- Cancellation and rescheduling
+Vendors can:
 
-✅ **Insurance**
-- View and manage insurance policies
-- Claims submission
-- Policy details and coverage information
+1. Register with contact, business, location, service, professional, banking, profile, and document information.
+2. Sign in using the Vendor login option.
+3. View booking requests assigned to the vendor.
+4. Inspect complete patient, service, schedule, location, payment, and requirement details.
+5. Accept or cancel pending bookings.
+6. Start an accepted booking and mark an in-progress booking as complete.
+7. Add runtime notes during service delivery.
+8. View the patient route on a map when location data is available.
+9. Request additional services from the service catalog.
+10. Monitor service request status and activate or deactivate available vendor services.
 
-✅ **Dashboard**
-- Personalized user dashboard
-- Quick access to frequent services
-- Activity history and statistics
+## Application Flow
 
-✅ **Vendor Services**
-- Discover healthcare service providers
-- View vendor profiles and ratings
-- Direct service requests
+```mermaid
+flowchart TD
+    A[Launch app] --> B[Splash screen]
+    B --> C{Saved session?}
+    C -->|No| D[Patient or Vendor login]
+    C -->|Patient| E[Patient dashboard]
+    C -->|Vendor| F[Vendor dashboard]
+    D -->|Patient login| E
+    D -->|Vendor login| F
+    E --> G[Create booking]
+    G --> H[Booking status: Pending]
+    H --> F
+    F --> I[Vendor reviews request]
+    I -->|Accept| J[Accepted]
+    I -->|Cancel| K[Cancelled]
+    J --> L[Vendor starts service]
+    L --> M[In Progress]
+    M --> N[Vendor marks complete]
+    N --> O[Completed]
+    O --> P[Patient pays or views report]
+```
 
-✅ **Order Tracking**
-- Real-time order status updates
-- Order history
-- Service delivery confirmation
+### Launch and session restoration
 
-✅ **Coupon & Promotions**
-- Available promotions and coupon codes
-- Discount application at checkout
-- Promotion history
+1. The app opens on the animated Splash screen.
+2. The authentication store loads the saved session from device storage.
+3. Authenticated patients are routed to `UserTab > Dashboard`.
+4. Authenticated vendors are routed to `VendorTab > Dashboard`.
+5. Without a saved session, the app opens the email login screen.
+6. After a successful login, the app stores the user, role, and token locally. Notification permission and device registration are also attempted.
 
-✅ **Lab Partners**
-- Partner laboratory listings
-- Service offerings
-- Direct booking integration
+### Patient navigation
 
----
+The patient tab bar contains:
 
-## 🛠 Tech Stack
+- **Dashboard**: Entry point for available healthcare features.
+- **Bookings**: Booking history, filters, statuses, payment state, reports, and booking details.
+- **Profile**: Patient profile and account management.
 
-### Frontend
-- **React Native** 0.84.1 - Cross-platform mobile framework
-- **React** 19.2.3 - UI library
-- **TypeScript** 5.8.3 - Type-safe JavaScript
-- **React Navigation** 7.x - Navigation & routing
-  - Bottom tabs, native stack, drawer navigation
+Additional stack screens support booking creation, booking detail, booking maps, notifications, profile editing, order tracking, and vendor ID cards.
 
-### State Management & Storage
-- **Zustand** 5.0.12 - Lightweight state management
-- **AsyncStorage** 2.2.0 - Persistent local storage
+### Vendor navigation
 
-### UI & Styling
-- **React Native Linear Gradient** 2.8.3 - Gradient components
-- **React Native Vector Icons** 10.3.0 - Icon library
-- **React Native Safe Area Context** 5.5.2 - Safe area handling
+The vendor tab bar contains:
 
-### API & Network
-- **Axios** 1.14.0 - HTTP client
+- **Dashboard**: Vendor overview and operational entry point.
+- **Bookings**: Booking queue, status filters, refresh, and workflow actions.
+- **Services**: Active services, service requests, activation controls, and service catalog requests.
+- **Profile**: Vendor account and business profile management.
 
-### Development Tools
-- **Babel** 7.25.2 - JavaScript transpiler
-- **ESLint** 8.19.0 - Code linting
-- **Jest** 29.6.3 - Testing framework
-- **Prettier** 2.8.8 - Code formatting
-- **Metro** - React Native bundler
+## Booking Lifecycle
 
-### Platform-Specific
-- **Android**: Gradle build system, proguard obfuscation
-- **iOS**: CocoaPods dependency management, Xcode build
+### Creating a booking
 
----
+From the patient dashboard, open the booking flow. The form contains six steps:
 
-## 📦 Prerequisites
+1. **Basic Details**
+   - Patient name, age, sex, address or current location, pincode, phone numbers, and email.
+   - The form can start with values from the saved patient profile.
+   - Location permissions may be required when using the current location option.
 
-Before you begin, ensure you have the following installed:
+2. **Select Services**
+   - Select one or more services.
+   - Set quantities where applicable.
 
-- **Node.js** >= 22.11.0
-- **npm** or **Yarn** (package manager)
-- **Git** (version control)
+3. **Requirements**
+   - Add additional instructions.
+   - Upload a prescription or supporting document/image.
+   - Provide insurance details when insurance is selected.
 
-### Platform-Specific Requirements
+4. **Select Slots**
+   - Select the preferred date and time.
+   - Choose staff preference: Any Available, Male Staff, or Female Staff.
 
-**For Android Development:**
-- Android Studio or Android SDK
-- Java Development Kit (JDK) 11+
-- Android SDK API level 21+
+5. **Review and Charges**
+   - Review selected services and charges.
+   - The app calculates the subtotal, 18% GST, and grand total before submission.
 
-**For iOS Development:**
-- macOS 12.0+
-- Xcode 14.0+
+6. **Complimentary Service**
+   - Select an available complimentary service, such as Blood Sugar, Blood Group, or Haemoglobin, or choose None.
+   - Review the appointment summary and confirm.
+
+The app validates each step before allowing the patient to continue. On confirmation, the booking is submitted to the backend with status `pending`. A successful submission returns the patient to the previous screen and displays the appointment confirmation.
+
+### Editing a booking
+
+When an existing booking is opened for editing, the same multi-step form is pre-filled with the saved data. Submitting the form updates the existing booking while preserving its current status unless the backend applies a different business rule.
+
+### Booking statuses
+
+| Status | Meaning | Primary owner |
+| --- | --- | --- |
+| `pending` | Booking has been submitted and is waiting for vendor action. | Vendor |
+| `accepted` | Vendor accepted the booking. | Vendor / Patient |
+| `in-progress` | Vendor started the appointment or service. | Vendor |
+| `completed` | Vendor marked the service as finished. | Vendor |
+| `cancelled` | Booking was cancelled by an authorized action. | Vendor / Patient |
+
+The patient and vendor booking lists provide filters for each status. Pull-to-refresh reloads the latest server state.
+
+### Vendor confirmation and service execution
+
+1. The vendor opens **Bookings** and reviews pending requests.
+2. The vendor opens a request to inspect patient details, selected services, preferred slot, service address, requirements, insurance information, and payment information.
+3. The vendor selects **Accept** to call the booking acceptance endpoint. The booking moves to `accepted` and the patient can see the updated state.
+4. If the request cannot be fulfilled, the vendor selects **Cancel** instead.
+5. For an accepted booking, the vendor selects **Start Service**. The booking moves to `in-progress`.
+6. During delivery, the vendor can add runtime notes and use the map route when coordinates are available.
+7. When the work is finished, the vendor selects **Mark Complete**. The booking moves to `completed`.
+8. The patient can then review payment state and available reports from booking details.
+
+### Payments
+
+The patient booking list displays a payment action when the booking is `accepted`, `in-progress`, or `completed` and the payment is not yet marked as paid. The supported methods are:
+
+- **Cash**: Select cash in the payment flow and close the payment prompt.
+- **Razorpay**: Complete the Razorpay payment and verify it through the backend before the booking is considered paid.
+
+Payment states are `pending`, `paid`, and `failed`. The final amount can include the booking total and any additional amount returned by the backend.
+
+### Rescheduling, cancellation, and reports
+
+- **Reschedule**: Provide a future date in `YYYY-MM-DD` format, a time in `HH:MM` 24-hour format, and a reason of at least five characters.
+- **Cancellation**: Confirm the cancellation prompt. The backend records the cancellation and the booking appears under the `cancelled` filter.
+- **Reports**: Completed bookings can expose an uploaded report or report list in booking details. Reports may be categorized as lab, imaging, general, or other.
+- **Notifications**: The app registers a device token after login when notification permission is granted. Tapping a foreground notification opens the Notifications screen.
+
+## Vendor Workflow
+
+### Vendor registration
+
+Vendor registration is a four-step process:
+
+1. **Contact and Business**: Name, email, phone, password, and business name.
+2. **Location and Services**: Address, city, state, pincode, offered services, service areas, and coordinates.
+3. **Professional Information**: Business and professional details.
+4. **Bank and Documents**: Bank information, profile image, and supporting documents.
+
+Required checks include a valid email, ten-digit phone number, password confirmation, business name, complete address, six-digit pincode, at least one service, and a profile image. New vendor accounts are submitted for administrative activation and return to the login screen after successful registration.
+
+### Managing vendor services
+
+Open **Services** to view the vendor's services and their active/inactive state.
+
+- Use **Request** to choose services from the catalog and submit a service request.
+- Open **Service Requests** to see `pending`, `approved`, or `rejected` requests.
+- Approved services appear in the vendor service list.
+- Use **Activate** or **Deactivate** to control whether a service is available for operations.
+- Pull down to refresh either the service list or request list.
+
+## Prerequisites
+
+### General
+
+- Node.js `>= 22.11.0`
+- npm or Yarn
+- Git
+
+### Android
+
+- Android Studio and Android SDK
+- JDK 11 or newer
+- Android SDK API level 21 or newer
+- An emulator or a connected Android device
+
+### iOS
+
+- macOS 12 or newer
+- Xcode 14 or newer
 - CocoaPods
-- Ruby 2.7+
+- Ruby 2.7 or newer
+- An iOS Simulator or connected iOS device
 
-### Optional Tools
-- Visual Studio Code with React Native extensions
-- Android Emulator or physical Android device
-- iOS Simulator or physical iOS device
-
----
-
-## 🚀 Installation
-
-### 1. Clone the Repository
+## Installation
 
 ```bash
-git clone https://github.com/yourusername/injection.git
-cd injection
-```
-
-### 2. Install Dependencies
-
-```bash
+git clone <repository-url>
+cd Injection
 npm install
-# or
-yarn install
 ```
 
-### 3. Platform-Specific Setup
-
-#### Android Setup
+For iOS, install Ruby and CocoaPods dependencies:
 
 ```bash
-# Android dependencies are typically installed automatically
-# If needed, configure Android SDK paths in local.properties
-```
-
-#### iOS Setup
-
-```bash
-# Install Ruby dependencies
 bundle install
-
-# Install CocoaPods
-bundle exec pod install --repo-update
+bundle exec pod install
 ```
 
-### 4. Environment Configuration
+For Android, confirm that the Android SDK path is configured in `android/local.properties` when Android Studio has not configured it automatically.
 
-Create a `.env` file in the root directory with required API endpoints:
+## Configuration
 
-```env
-API_BASE_URL=https://your-api-endpoint.com
-API_TIMEOUT=30000
-```
+The application uses the API client configuration in `src/config/env.ts` and `src/service/apiClient.ts`. Configure the backend URL and any environment-specific values required by the local or deployed API before running the application.
 
----
+The app also expects platform configuration for Firebase notifications. Android Firebase configuration is stored in `android/app/google-services.json`. iOS notification configuration must be completed in Xcode and the Apple Developer account before push notifications can work on iOS.
 
-## 📁 Project Structure
+Do not commit production credentials, signing keys, API secrets, or private certificates.
 
-```
-injection/
-├── src/
-│   ├── components/          # Reusable UI components
-│   │   ├── CustomAlert.tsx
-│   │   ├── CustomTabBar.tsx
-│   │   ├── FieldInput.tsx
-│   │   ├── Loader.tsx
-│   │   └── LoaderShowcase.tsx
-│   ├── context/             # React Context providers
-│   │   └── AlertContext.tsx
-│   ├── features/            # Feature modules
-│   │   ├── auth/            # Authentication
-│   │   ├── booking/         # Booking services
-│   │   ├── coupon/          # Coupon management
-│   │   ├── dashboard/       # User dashboard
-│   │   ├── Insurance/       # Insurance services
-│   │   ├── labPartner/      # Lab partnerships
-│   │   ├── profile/         # User profile
-│   │   └── vendorService/   # Vendor services
-│   ├── navigation/          # Navigation configuration
-│   │   ├── AppNavigator.tsx
-│   │   ├── TabNavigator.tsx
-│   │   └── VendorTabNavigation.tsx
-│   ├── screens/             # Standalone screens
-│   │   ├── OrderTrackingScreen.tsx
-│   │   └── SplashScreen.tsx
-│   ├── service/             # API & business logic
-│   │   ├── apiClient.ts
-│   │   └── apis/
-│   │       ├── bookingService.ts
-│   │       ├── dashboardService.ts
-│   │       ├── medicalServices.ts
-│   │       ├── prescriptionService.ts
-│   │       ├── userService.ts
-│   │       └── vendorService.ts
-│   ├── store/               # State management (Zustand)
-│   │   └── useAuthStore.ts
-│   ├── theme/               # Design system
-│   │   └── colors.ts
-│   ├── types/               # TypeScript type definitions
-│   │   ├── Alert.ts
-│   │   ├── ApiError.ts
-│   │   ├── booking.ts
-│   │   ├── Loader.ts
-│   │   └── RootStackParamList.ts
-│   └── assets/              # Static assets
-├── android/                 # Android native code
-├── ios/                     # iOS native code
-├── __tests__/               # Test files
-├── app.json                 # App configuration
-├── App.tsx                  # Root component
-├── babel.config.js          # Babel configuration
-├── tsconfig.json            # TypeScript configuration
-├── jest.config.js           # Jest testing configuration
-├── metro.config.js          # Metro bundler configuration
-├── package.json             # Dependencies & scripts
-└── README.md                # This file
-```
+## Running the Application
 
----
+### 1. Start Metro
 
-## 💻 Development
-
-### Starting the Development Server
-
-#### 1. Start Metro Bundler
+From the repository root:
 
 ```bash
 npm start
-# or
-yarn start
 ```
 
-Metro is the JavaScript bundler for React Native. It will compile your code and serve it to the devices/emulators.
-
-#### 2. Run on Android
-
-In a new terminal window:
+To clear Metro's cache:
 
 ```bash
-npm run android
-# or
-yarn android
+npm start -- --reset-cache
 ```
 
-Requires Android Emulator running or connected Android device.
+### 2. Run Android
 
-#### 3. Run on iOS
-
-In a new terminal window:
-
-```bash
-npm run ios
-# or
-yarn ios
-```
-
-### Hot Reload & Fast Refresh
-
-Changes are automatically reflected during development. For a full reload:
-
-- **Android**: Press `R` twice or `Ctrl + M` → Reload
-- **iOS**: Press `R` in Simulator
-
-### Code Quality
-
-#### Linting
-
-```bash
-npm run lint
-# or
-yarn lint
-```
-
-Fix linting issues automatically:
-
-```bash
-npm run lint -- --fix
-```
-
-#### Code Formatting
-
-```bash
-npx prettier --write src/
-```
-
----
-
-## 🏗 Building
-
-### Android Build
-
-#### Development Build
+Start an emulator or connect a device, then run:
 
 ```bash
 npm run android
 ```
 
-#### Release Build
+### 3. Run iOS
 
-```bash
-cd android
-./gradlew assembleRelease
-# APK will be generated at: app/build/outputs/apk/release/app-release.apk
-```
-
-### iOS Build
-
-#### Development Build
+On macOS, after installing pods:
 
 ```bash
 npm run ios
 ```
 
-#### Release Build
+### 4. First-use walkthrough
 
-```bash
-cd ios
-xcodebuild -scheme Injection -configuration Release -derivedDataPath build
-# IPA will be generated in build directory
+After the app opens:
+
+1. Select **Patient** or **Vendor** on the login screen.
+2. Sign in with an existing account, or use the registration flow for a new account.
+3. For a patient, open the dashboard and create a booking using the six-step flow above.
+4. For a vendor, open **Bookings**, review the pending request, and process it through accept, start, and complete.
+5. Return to the patient account to verify status changes, payment state, notifications, and reports.
+
+## Project Structure
+
+```text
+Injection/
+├── App.tsx                         # Root component and safe-area setup
+├── src/
+│   ├── components/                 # Shared UI components
+│   ├── context/                    # Alert and application context
+│   ├── features/
+│   │   ├── auth/                   # Patient and vendor authentication
+│   │   ├── booking/                # Booking forms, lists, details, and maps
+│   │   ├── dashboard/              # Patient and vendor dashboards
+│   │   ├── notification/           # Notification screens and services
+│   │   ├── profile/                # Patient and vendor profiles
+│   │   └── vendorService/          # Vendor service catalog and requests
+│   ├── navigation/                 # Stack and role-specific tab navigators
+│   ├── service/                    # API client and API modules
+│   ├── store/                      # Zustand authentication store
+│   ├── theme/                      # Colors, map styling, and design tokens
+│   ├── types/                      # Shared TypeScript models
+│   └── utils/                      # Location, directions, documents, and notifications
+├── android/                        # Android native project
+├── ios/                            # iOS native project
+├── __tests__/                      # Jest tests
+├── package.json                    # Scripts and dependencies
+└── README.md
 ```
 
----
+## Testing and Code Quality
 
-## 🧪 Testing
-
-### Running Tests
+Run the Jest test suite:
 
 ```bash
 npm test
-# or
-yarn test
 ```
 
-### Test Coverage
-
-```bash
-npm test -- --coverage
-```
-
-### Test Files
-
-Test files are located in `__tests__/` directory with `.test.tsx` extension.
-
-### Running Specific Tests
+Run a single test file:
 
 ```bash
 npm test -- App.test.tsx
 ```
 
-### Watch Mode
+Run linting:
 
 ```bash
-npm test -- --watch
+npm run lint
 ```
 
----
-
-## 🐛 Troubleshooting
-
-### Common Issues & Solutions
-
-#### Metro Bundler Issues
+Run the TypeScript compiler without emitting files:
 
 ```bash
-# Clear cache and restart
-npm start -- --reset-cache
-```
-
-#### Dependency Problems
-
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-#### Android Build Issues
-
-```bash
-cd android
-./gradlew clean
-./gradlew build
-```
-
-#### iOS Build Issues
-
-```bash
-cd ios
-rm -rf Pods Podfile.lock
-bundle exec pod install --repo-update
-cd ..
-npm run ios
-```
-
-#### Port Already in Use
-
-```bash
-# Metro defaults to port 8081
-npm start -- --port 8082
-```
-
-#### TypeScript Errors
-
-```bash
-# Verify TypeScript configuration
 npx tsc --noEmit
 ```
 
-#### Device/Emulator Not Detected
+Format source files with Prettier when needed:
 
 ```bash
-# Android: List connected devices
-adb devices
-
-# iOS: List simulators
-xcrun simctl list devices
+npx prettier --write src/
 ```
 
-### Debug Mode
+## Troubleshooting
 
-Enable debug menu:
-- **Android**: `Ctrl + M` (Windows/Linux) or `Cmd + M` (macOS)
-- **iOS**: `Cmd + D` in Simulator
+### Metro or bundling errors
 
----
+```bash
+npm start -- --reset-cache
+```
 
-## 📄 License
+If the dependency tree is inconsistent, remove `node_modules` and reinstall using the package manager used by the project.
+
+### Android build errors
+
+```bash
+cd android
+gradlew clean
+gradlew assembleDebug
+```
+
+Check that `android/local.properties` points to a valid Android SDK and that the selected device meets the minimum API level.
+
+### iOS dependency errors
+
+```bash
+cd ios
+bundle exec pod install --repo-update
+```
+
+Then rebuild from Xcode or run `npm run ios` again.
+
+### API or login errors
+
+- Confirm the API base URL in the application configuration.
+- Confirm that the backend is reachable from the emulator or device, not only from the development machine.
+- For Android emulators, use the host address required by the backend setup instead of assuming `localhost` refers to the development machine.
+- Verify that the selected login role matches the account type.
+
+### Location, maps, or notifications do not work
+
+- Grant location permission and enable device location services.
+- Confirm that coordinates are available for the booking or vendor address.
+- Confirm Firebase and platform notification configuration.
+- Reinstall the app after changing native permissions or notification configuration.
+
+## License
 
 This project is proprietary software. All rights reserved.
-
----
-
-## 📝 Version History
-
-**v0.0.1** - Initial Release
-- Core authentication system
-- Booking management
-- Dashboard implementation
-- Insurance integration
-- Vendor services
-- Order tracking
-- Coupon management
-- Lab partner integration
-
----
-
-## 🔗 References
-
-- [React Native Documentation](https://reactnative.dev/docs/getting-started)
-- [React Navigation](https://reactnavigation.org)
-- [Zustand Documentation](https://github.com/pmndrs/zustand)
-- [Axios Documentation](https://axios-http.com)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs)
-
----
-
-**Last Updated**: June 2024
-
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
-
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
