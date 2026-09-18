@@ -224,10 +224,10 @@ const BasicDetailsScreen: React.FC<BasicDetailsScreenProps> = ({ basicDetails, o
             debugger;
             const geocoded = await coordinatesToAddress(coords);
             if (geocoded) {
-                // onChange('address', geocoded.addressLine || geocoded.formattedAddress);
-                // onChange('pincode', geocoded.pincode);
-                // onChange('state', geocoded.state);
-                // onChange('city', geocoded.city);
+                onChange('address', geocoded.addressLine || geocoded.formattedAddress);
+                onChange('pincode', geocoded.pincode);
+                onChange('state', geocoded.state);
+                onChange('city', geocoded.city);
                 onChange(
                     'currentLocation',
                     `${geocoded.coordinates.latitude},${geocoded.coordinates.longitude}`,

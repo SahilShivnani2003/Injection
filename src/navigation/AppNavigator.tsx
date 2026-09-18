@@ -32,7 +32,7 @@ export default function AppNavigator() {
 
     useForegroundNotificationBanner(data => {
         // navigate wherever the tap should go
-        navigationRef.navigate('Notification');
+        // navigationRef.navigate('Notification');
     });
 
     return (

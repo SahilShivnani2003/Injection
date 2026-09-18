@@ -276,8 +276,6 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                 return;
             }
 
-
-
             if (isEdit) {
                 const upDatedBooking: Booking = {
                     _id: booking?._id,
@@ -310,14 +308,15 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     reportUrl: null,
                     useCurrentLocation: formData.currentLocation ? true : false,
                     latitude: formData.currentLocation ? formData.latitude ?? 0 : 0,
-                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0
+                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0,
+                    userConsent: booking?.userConsent ?? false,
                 };
                 console.log('updated booking:', upDatedBooking);
                 const response = await updateBooking(upDatedBooking);
 
                 if (response?.success || response?.data?._id || response?.status === 200) {
 
-                    alert.success('Booking Confirmed!  ',
+                    alert.success('Booking Updated!  ',
                         `Your appointment on ${preferredTimeSlot} has been updated successfully.`)
                     navigation.goBack();
                 } else {
@@ -355,14 +354,18 @@ const BookingScreen = ({ navigation, route }: BookingScreenProps) => {
                     reportUrl: null,
                     useCurrentLocation: formData.currentLocation ? true : false,
                     latitude: formData.currentLocation ? formData.latitude ?? 0 : 0,
-                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0
+                    longitude: formData.currentLocation ? formData.longitude ?? 0 : 0,
+                    userConsent: {
+                        agreed: false,
+                        agreedAt: '',
+                    }
                 };
 
                 const response = await bookingAPI.userCreateBooking(payload);
 
                 if (response?.data?.success || response?.data?._id || response?.status === 201) {
 
-                    alert.success('Booking Confirmed!  ',
+                    alert.success('Booking Created!  ',
                         `Your appointment on ${preferredTimeSlot} has been booked successfully.`)
                     navigation.goBack();
                 } else {

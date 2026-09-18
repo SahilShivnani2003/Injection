@@ -29,6 +29,7 @@ import { TimeDropdown, Calendar } from '../components/SlotBookingScreen';
 import { cancelBooking } from '@/service/apis/bookingService';
 import { LayoutAnimation, UIManager } from 'react-native';
 import { ImageZoomModal } from '../model/ImageZoomModel';
+import { PaymentMethodModal } from '../components/PaymentScreen';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -98,6 +99,13 @@ const validateRescheduleForm = (form: RescheduleForm): string | null => {
     if (form.reason.trim().length < 5) return 'Reason must be at least 5 characters.';
     return null;
 };
+
+const needsPayment = (booking: Booking | PopulatedBooking) =>
+    (booking.bookingStatus === 'accepted' || booking.bookingStatus === 'in-progress' || booking.bookingStatus === 'completed') &&
+    booking.paymentStatus !== 'paid';
+
+const getDueAmount = (booking: Booking | PopulatedBooking) =>
+    (booking.finalAmount ?? booking.grandTotal ?? 0) + (booking.additionalAmount ?? 0);
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
@@ -272,7 +280,7 @@ const RequestedItemRow = ({
     const qty = item.quantity ?? 1;
     const statusCfg =
         REQUESTED_ITEM_STATUS_CONFIG[
-            (item.status as 'pending' | 'brought' | 'unavailable') ?? 'pending'
+        (item.status as 'pending' | 'brought' | 'unavailable') ?? 'pending'
         ];
     return (
         <View style={[srStyles.row, !isLast && srStyles.border]}>
@@ -313,6 +321,9 @@ const formatPaymentMethod = (method?: string | null) => {
 // ─── Reschedule Modal ─────────────────────────────────────────────────────────
 
 const STATIC_TIMES: string[] = [
+    '6:00',
+    '7:00',
+    '8:00',
     '9:00',
     '10:00',
     '11:00',
@@ -322,6 +333,12 @@ const STATIC_TIMES: string[] = [
     '15:00',
     '16:00',
     '17:00',
+    '18:00',
+    '19:00',
+    '20:00',
+    '21:00',
+    '22:00',
+    '23:00',
 ];
 
 const MONTH_NAMES = [
@@ -618,6 +635,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
     const [rescheduleVisible, setRescheduleVisible] = useState(false);
     const [rescheduleLoading, setRescheduleLoading] = useState(false);
     const [rescheduleForm, setRescheduleForm] = useState<RescheduleForm>(RESCHEDULE_FORM_DEFAULT);
+    //Payment modal state
+    const [showModal, setShowModal] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState<Booking | PopulatedBooking | null>(null);
 
     const headerAnim = useRef(new Animated.Value(0)).current;
     const contentAnim = useRef(new Animated.Value(0)).current;
@@ -693,8 +713,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         const response = await bookingAPI.confirmBooking(bookingId);
         if (response.data?.success) {
             alert.success(response?.data?.message || 'Agreement confirmed successfully!');
+            fetchBookingData(); // Refresh booking data after confirmation
         } else {
-            alert.error('Something went wrong', 'Please try again letter');
+            alert.error('Something went wrong', 'Please try again later');
         }
     };
 
@@ -733,9 +754,9 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                 setBooking(prev =>
                     prev
                         ? {
-                              ...prev,
-                              preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
-                          }
+                            ...prev,
+                            preferredTimeSlot: `${payload.newDate} ${payload.newTime}`,
+                        }
                         : prev,
                 );
                 alert.success('Success', 'Booking rescheduled successfully.');
@@ -845,19 +866,40 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
         ...(booking.reports ?? []),
         ...(booking.reportUrl
             ? [
-                  {
-                      reportUrl: booking.reportUrl,
-                      reportType: 'general' as const,
-                      reportName: 'Report',
-                      addedAt: booking.reportGeneratedAt,
-                  },
-              ]
+                {
+                    reportUrl: booking.reportUrl,
+                    reportType: 'general' as const,
+                    reportName: 'Report',
+                    addedAt: booking.reportGeneratedAt,
+                },
+            ]
             : []),
     ];
 
     const displayBookingId = booking.bookingId
         ? `#${booking.bookingId}`
         : `#${booking._id?.slice(-8).toUpperCase()}`;
+
+    const handlePay = (booking: Booking | PopulatedBooking) => {
+        setSelectedBooking(booking);
+        setShowModal(true);
+    };
+
+    const markBookingPaid = (payMethod: string, payId?: string) => {
+        if (payMethod === 'cash' || payMethod === 'Cash') {
+            setShowModal(false);
+        }
+    };
+    const onSuccessPay = () => {
+        alert.success(
+            'Payment Confirmed!  ',
+            `Your amount ${selectedBooking?.grandTotal} for this booking has been paid successfully.`,
+        );
+        navigation.goBack();
+    };
+    const onFail = () => {
+        alert.error('Failed', 'Payment method failed.Please try again latter');
+    };
 
     return (
         <View style={styles.root}>
@@ -869,6 +911,17 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                 onChange={handleRescheduleFormChange}
                 onConfirm={handleRescheduleConfirm}
                 onClose={() => !rescheduleLoading && setRescheduleVisible(false)}
+            />
+
+            {/* Payment Modal */}
+            <PaymentMethodModal
+                visible={showModal}
+                onClose={() => setShowModal(false)}
+                bookingId={booking?._id || ''}
+                amount={booking ? getDueAmount(booking) : 0.0}
+                onCashPayment={() => markBookingPaid('cash')}
+                onRazorpaySuccess={onSuccessPay}
+                onRazorpayFailure={onFail}
             />
 
             {/* ── Header ── */}
@@ -950,10 +1003,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         >
                             {/* <Text style={styles.statusIcon}>{status.icon}</Text> */}
                             {booking.bookingStatus === 'in-progress' &&
-                            booking?.userConsent?.agreed === false ? (
+                                booking?.userConsent?.agreed === false ? (
                                 <TouchableOpacity onPress={handleConfirm}>
                                     <Text style={[styles.statusText, { color: status.text }]}>
-                                        Confirm booking
+                                        Accept Service
                                     </Text>
                                 </TouchableOpacity>
                             ) : (
@@ -1101,6 +1154,16 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                         ) : (
                             <InfoRow label="Status" value="—" />
                         )}
+                        {needsPayment(booking) ? (
+                            <TouchableOpacity
+                                style={styles.payBtn}
+                                activeOpacity={0.85}
+                                onPress={() => handlePay(booking)}
+                            >
+                                <Ionicons name="payments" size={15} color={Colors.white} />
+                                <Text style={styles.payBtnText}>Pay</Text>
+                            </TouchableOpacity>
+                        ) : null}
                         {booking.paymentMethod === 'razorpay' && booking.razorpayPaymentId && (
                             <InfoRow label="Transaction ID" value={booking.razorpayPaymentId} />
                         )}
@@ -1139,11 +1202,10 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                 label="Booked For"
                                 value={
                                     booking.familyMemberId.name
-                                        ? `${booking.familyMemberId.name}${
-                                              booking.familyMemberId.relation
-                                                  ? ` (${booking.familyMemberId.relation})`
-                                                  : ''
-                                          }`
+                                        ? `${booking.familyMemberId.name}${booking.familyMemberId.relation
+                                            ? ` (${booking.familyMemberId.relation})`
+                                            : ''
+                                        }`
                                         : 'Family Member'
                                 }
                                 accent
@@ -1161,7 +1223,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Vendor / Service Provider ── */}
                     {booking.vendorId && (
                         <>
-                            <SectionHeader icon="🏥" title="Service Provider" />
+                            <SectionHeader icon='doctor' title="Service Provider" />
                             <View style={styles.card}>
                                 <View style={styles.vendorRow}>
                                     <View style={styles.vendorAvatar}>
@@ -1316,7 +1378,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                     {/* ── Additional Requirements ── */}
                     {!!booking.additionalRequirements && (
                         <>
-                            <SectionHeader icon="📝" title="Special Requirements" />
+                            <SectionHeader icon='medical-bag' title="Special Requirements" />
                             <View style={[styles.card, styles.reqCard]}>
                                 <Text style={styles.reqText}>{booking.additionalRequirements}</Text>
                             </View>
@@ -1368,7 +1430,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         style={[
                                             styles.noteRow,
                                             i < booking.runtimeNotes!.length - 1 &&
-                                                styles.noteBorder,
+                                            styles.noteBorder,
                                         ]}
                                     >
                                         <View
@@ -1501,7 +1563,7 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
                                         onPress={openRescheduleModal}
                                         activeOpacity={0.8}
                                     >
-                                        <Text style={styles.rescheduleBtnIcon}>📅</Text>
+                                        <MaterialCommunityIcons name="calendar-clock-outline" color="#1D4ED8" size={24} />
                                         <Text style={styles.rescheduleBtnText}>Reschedule</Text>
                                     </TouchableOpacity>
                                 )}
@@ -1520,7 +1582,8 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
                     {booking.bookingStatus === 'completed' && allReports.length === 0 && (
                         <View style={styles.reportPending}>
-                            <Text style={styles.reportPendingIcon}>📊</Text>
+                            {/* <Text style={styles.reportPendingIcon}>📊</Text> */}
+                            <MaterialCommunityIcons name="file-document-outline" color="#5B5BD6" size={24} />
                             <Text style={styles.reportPendingText}>
                                 Report is being prepared and will be available soon.
                             </Text>
@@ -1529,7 +1592,8 @@ const BookingDetailScreen = ({ navigation, route }: BookingDetailProps) => {
 
                     {booking.bookingStatus === 'completed' && !booking.isReviewedByCustomer && (
                         <TouchableOpacity style={styles.reviewPrompt} activeOpacity={0.85}>
-                            <Text style={styles.reviewPromptIcon}>⭐</Text>
+                            {/* <Text style={styles.reviewPromptIcon}>⭐</Text> */}
+                            <MaterialCommunityIcons name="star-half-full" color={Colors.serviceCardBorder} size={24} />
                             <Text style={styles.reviewPromptText}>
                                 Rate your experience with this service
                             </Text>
@@ -1890,6 +1954,22 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.55)',
         borderRadius: 14,
         padding: 6,
+    },
+    payBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: '#00D4A0',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        minHeight: 44,
+    },
+    payBtnText: {
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: '700',
     },
 });
 
