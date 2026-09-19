@@ -60,10 +60,10 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
     }, []);
 
     const handleLogin = async () => {
-        const trimmedEmail = email.trim();
+        const trimmedValue = email.trim();
 
-        if (!trimmedEmail) {
-            alert.error('Validation Error', 'Please enter your email address');
+        if (!trimmedValue) {
+            alert.error('Validation Error', 'Please enter your email address or phone number');
             return;
         }
         if (!password.trim()) {
@@ -71,18 +71,30 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
             return;
         }
 
+        // If it contains only digits → validate as phone
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(trimmedEmail)) {
-            alert.warning('Invalid Email', 'Please enter a valid email address');
-            return;
+        const phoneRegex = /^[6-9]\d{9}$/;
+        if (/^\d+$/.test(trimmedValue)) {
+            if (!phoneRegex.test(trimmedValue)) {
+                alert.warning(
+                    'Invalid Phone Number',
+                    'Please enter a valid 10-digit phone number',
+                );
+                return;
+            }
+        } else {
+            if (!emailRegex.test(trimmedValue)) {
+                alert.warning('Invalid Email', 'Please enter a valid email address');
+                return;
+            }
         }
 
         try {
             setIsLoading(true);
             const response =
                 userType === 'patient'
-                    ? await userApi.login({ email: trimmedEmail, password })
-                    : await vendorAPI.loginVendor({ email: trimmedEmail, password });
+                    ? await userApi.login({ email: trimmedValue, password })
+                    : await vendorAPI.loginVendor({ email: trimmedValue, password });
 
             if (response.data?.success) {
 
@@ -213,10 +225,10 @@ const EmailLoginScreen = ({ navigation }: EmailLoginProps) => {
 
                         {/* ── Email Input ─────────────────────────────────── */}
                         <FieldInput
-                            label="Email Address"
+                            label="Email Address/Phone Number"
                             value={email}
                             onChangeText={setEmail}
-                            placeholder="you@example.com"
+                            placeholder="you@example.com/9876543210"
                             keyboardType="email-address"
                             editable={!isLoading}
                             required
