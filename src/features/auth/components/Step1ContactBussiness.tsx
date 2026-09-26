@@ -110,7 +110,7 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                 isForgotPassword: false,
             };
             const response = await OtpService.sendOtp(data);
-            return !!response.data;
+            return response.data;
         } catch (error) {
             // return false;
             return error;

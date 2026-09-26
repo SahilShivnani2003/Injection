@@ -103,11 +103,11 @@ const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
                 setHasSentOnce(true);
                 setTimeout(() => focusBox(0), 250);
             } else {
-                alert.error(ok.message ||'');
+                alert.error(ok.message ||'Could not send the code. Please try again.');
                 onClose();
             }
-        } catch {
-            setError('Could not send the code. Please try again.');
+        } catch(error:any) {
+            setError(error?.message || 'Could not send the code. Please try again.');
         } finally {
             setSending(false);
         }
