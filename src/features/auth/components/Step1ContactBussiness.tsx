@@ -102,7 +102,7 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
     };
 
     // ── OTP modal callbacks ──────────────────────────────────────────────────
-    const sendOtpRequest = async (phone: string): Promise<boolean> => {
+    const sendOtpRequest = async (phone: string): Promise<any> => {
         try {
             const data: ISendOtp = {
                 phone: phone,
@@ -110,9 +110,10 @@ const StepContactBusiness = ({ form, updateField }: Props) => {
                 isForgotPassword: false,
             };
             const response = await OtpService.sendOtp(data);
-            return !!response.data?.success;
+            return !!response.data;
         } catch (error) {
-            return false;
+            // return false;
+            return error;
         }
     };
 

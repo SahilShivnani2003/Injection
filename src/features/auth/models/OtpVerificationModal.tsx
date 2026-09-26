@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors } from '@/theme/colors';
 import Loader from '@/components/Loader';
+import { useAlert } from '@/context/AlertContext';
 
 type OtpVerificationModalProps = {
     /** Controls modal visibility. */
@@ -24,7 +25,7 @@ type OtpVerificationModalProps = {
     /** Called once the code has been confirmed as valid. */
     onVerified: () => void;
     /** Should trigger sending/resending the code. Return true on success. */
-    onSendOtp: (destination: string) => Promise<boolean>;
+    onSendOtp: (destination: string) => Promise<{ success: boolean; message?: string }>;
     /** Should check the code with the backend. Return true if valid. */
     onVerifyOtp: (destination: string, otp: string) => Promise<boolean>;
     /** Number of digits in the code. Defaults to 6. */
@@ -64,6 +65,7 @@ const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
     const [error, setError] = useState('');
     const [resendTimer, setResendTimer] = useState(0);
     const inputRefs = useRef<Array<TextInput | null>>([]);
+    const alert = useAlert();
 
     // Reset and auto-send whenever the modal opens for a (possibly new) destination.
     useEffect(() => {
@@ -94,13 +96,15 @@ const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
         setError('');
         try {
             const ok = await onSendOtp(destination);
-            if (ok) {
+            if (ok.success === true) {
+                console.log('ok res:', ok);
                 setDigits(Array(otpLength).fill(''));
                 setResendTimer(resendCooldown);
                 setHasSentOnce(true);
                 setTimeout(() => focusBox(0), 250);
             } else {
-                setError('Could not send the code. Please try again.');
+                alert.error(ok.message ||'');
+                onClose();
             }
         } catch {
             setError('Could not send the code. Please try again.');

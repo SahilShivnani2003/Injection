@@ -42,9 +42,9 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
     const [step, setStep] = useState(0); // 0-indexed
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState<VendorForm>(vendorData ? vendorData : INITIAL_FORM);
-    const [profileImage, setProfileImage] = useState<string | null>(vendorData ? vendorData.profileImage : null);
+    const [profileImage, setProfileImage] = useState<string | null>(vendorData ? vendorData?.profileImage : null);
     const [documents, setDocuments] =
-        useState<Record<DocumentField, string | null>>(vendorData.documents ? vendorData.documents : INITIAL_DOCUMENTS);
+        useState<Record<DocumentField, string | null>>(vendorData?.documents ? vendorData?.documents : INITIAL_DOCUMENTS);
 
     const scrollRef = useRef<ScrollView>(null);
 
@@ -283,7 +283,7 @@ const VendorRegistrationScreen = ({ navigation, route }: VendorRegisterProps) =>
                         updateField={updateField}
                         profileImage={profileImage}
                         setProfileImage={setProfileImage}
-                        documents={documents}
+                        documents={documents || ''}
                         setDocuments={setDocuments}
                         onImageError={msg => alert.error('Image Error', msg)}
                     />
